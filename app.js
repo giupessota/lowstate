@@ -122,7 +122,7 @@ const els = {
   paperSlot: document.querySelector(".paper-slot span"),
 };
 
-const savedCover = localStorage.getItem(COVER_KEY) || "rose";
+const savedCover = localStorage.getItem(COVER_KEY) || "forest";
 const savedTitle = localStorage.getItem(NOTEBOOK_TITLE_KEY) || "MY DAILY NOTEBOOK";
 document.documentElement.dataset.cover = savedCover;
 els.notebookTitle.textContent = savedTitle;

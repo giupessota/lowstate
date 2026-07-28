@@ -1,4 +1,4 @@
-const CACHE = "type-todo-v54";
+const CACHE = "type-todo-v55";
 const ASSETS = [
   "./",
   "./index.html",

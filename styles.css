@@ -39,6 +39,11 @@
   --cover-dark: #826fa1;
   --cover-ink: #55466e;
 }
+:root[data-cover="forest"] {
+  --cover: #284236;
+  --cover-dark: #1b2e25;
+  --cover-ink: #dfe8e1;
+}
 
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
@@ -236,6 +241,7 @@ button { cursor: pointer; }
 .theme-palette [data-cover="green"] { background: #a6c4aa; }
 .theme-palette [data-cover="yellow"] { background: #e6c77f; }
 .theme-palette [data-cover="purple"] { background: #b4a3ca; }
+.theme-palette [data-cover="forest"] { background: #284236; }
 .cover-custom {
   width: 23px;
   height: 23px;
