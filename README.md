@@ -31,8 +31,6 @@ npm install
 npm start
 ```
 
-Use `Ctrl/Cmd + Shift + Space` to show or hide the gadget.
-
 To create installers:
 
 ```bash
@@ -42,6 +40,14 @@ npm run dist:win
 
 ## Keyboard shortcuts
 
-- `Enter`: add a task
-- `N`: focus the new-task field
-- `Esc`: cancel editing
+**Global (desktop app — work from anywhere, even when the app is hidden):**
+
+- `Ctrl/Cmd + Shift + Space`: show / hide the gadget
+- `Ctrl/Cmd + Shift + N`: quick-capture a task
+- `Ctrl/Cmd + Shift + B`: brain dump — capture straight into the Brain Inbox
+
+**In-app (while the window is focused):**
+
+- `Enter`: add the task / note
+- `N`: jump to the input field
+- `Esc`: collapse compact mode / cancel editing
