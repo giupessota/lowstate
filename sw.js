@@ -1,4 +1,4 @@
-const CACHE = "type-todo-v55";
+const CACHE = "lowstate-v1";
 const ASSETS = [
   "./",
   "./index.html",
@@ -20,13 +20,18 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Network-first: always try to fetch the latest version. Only fall back to
+// the cache when offline, so a bad/partial cache entry can never strand the
+// app without its CSS/JS (which used to happen with cache-first + ?v= bumps).
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-      const copy = response.clone();
-      caches.open(CACHE).then((cache) => cache.put(event.request, copy));
-      return response;
-    }))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
