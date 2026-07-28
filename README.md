@@ -1,8 +1,10 @@
-# Type Todo
+# Lowstate
 
-A tiny to-do gadget for Windows and macOS with a retro typewriter design. The
-desktop edition opens in an approximately 430 × 560 px always-on-top window and
-can be shown or hidden instantly.
+**Lower your mental entropy.**
+
+A tiny to-do gadget for Windows and macOS with a retro notebook design. The
+desktop edition opens in an always-on-top window and can be shown or hidden
+instantly, with global shortcuts for quick capture.
 
 ## Run in a browser
 
@@ -17,7 +19,7 @@ Open `http://localhost:4173`.
 ## Install as a browser app
 
 Open the app in Chrome or Edge and click the **Install** icon in the address bar.
-Type Todo will open in its own window and continue working offline. Tasks are
+Lowstate will open in its own window and continue working offline. Tasks are
 stored only on the device using `localStorage`.
 
 ## Always-on-top desktop edition

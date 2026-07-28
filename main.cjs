@@ -25,7 +25,7 @@ function createWindow() {
     resizable: true,
     maximizable: false,
     fullscreenable: false,
-    title: "Type Todo",
+    title: "Lowstate",
     icon: iconPath,
     backgroundColor: "#d8d4cf",
     webPreferences: {

@@ -1,7 +1,7 @@
 {
-  "name": "Type Todo — Desktop Widget",
-  "short_name": "Type Todo",
-  "description": "A tiny retro checklist for your desktop.",
+  "name": "Lowstate",
+  "short_name": "Lowstate",
+  "description": "Lower your mental entropy.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

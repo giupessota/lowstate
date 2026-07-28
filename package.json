@@ -1,8 +1,8 @@
 {
-  "name": "type-todo-desktop",
+  "name": "lowstate-desktop",
   "version": "1.0.0",
   "private": true,
-  "description": "A tiny retro to-do widget for Windows and macOS",
+  "description": "Lowstate — lower your mental entropy. A retro notebook to-do gadget for Windows and macOS.",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
@@ -14,8 +14,8 @@
     "electron-builder": "^26.0.12"
   },
   "build": {
-    "appId": "com.typetodo.widget",
-    "productName": "Type Todo",
+    "appId": "com.lowstate.app",
+    "productName": "Lowstate",
     "files": [
       "main.cjs",
       "preload.cjs",
