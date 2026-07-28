@@ -72,6 +72,15 @@ if (state.todos.some((todo) => !("dueDate" in todo))) {
   saveTodos();
 }
 
+// One-time migration: tasks created before manual drag order existed get an
+// order derived from createdAt, preserving the old "newest first" look.
+if (state.todos.some((todo) => !("order" in todo))) {
+  state.todos.forEach((todo) => {
+    if (!("order" in todo)) todo.order = -todo.createdAt;
+  });
+  saveTodos();
+}
+
 const els = {
   form: document.querySelector("#todoForm"),
   input: document.querySelector("#todoInput"),
@@ -265,6 +274,7 @@ function addTodo(title) {
     priority: state.priority,
     category: state.newCategory,
     dueDate: toISODate(new Date()),
+    order: -Date.now(),
     done: false,
     createdAt: Date.now(),
   });
@@ -313,8 +323,31 @@ function visibleTodos() {
   return todos.slice().sort((a, b) => {
     const ad = a.dueDate ? parseISODate(a.dueDate).getTime() : Infinity;
     const bd = b.dueDate ? parseISODate(b.dueDate).getTime() : Infinity;
-    return ad !== bd ? ad - bd : b.createdAt - a.createdAt;
+    if (ad !== bd) return ad - bd;
+    const ao = a.order ?? -a.createdAt;
+    const bo = b.order ?? -b.createdAt;
+    return ao !== bo ? ao - bo : b.createdAt - a.createdAt;
   });
+}
+
+// Reorder `dragId` relative to `targetId` within their shared due-date bucket
+// (dragging across different days is rejected before this is ever called).
+function reorderTodo(dragId, targetId, insertAfter) {
+  const dragged = state.todos.find((t) => t.id === dragId);
+  const target = state.todos.find((t) => t.id === targetId);
+  if (!dragged || !target || dragged.dueDate !== target.dueDate) return;
+
+  const bucket = state.todos
+    .filter((t) => t.dueDate === dragged.dueDate)
+    .sort((a, b) => (a.order ?? -a.createdAt) - (b.order ?? -b.createdAt));
+
+  bucket.splice(bucket.indexOf(dragged), 1);
+  const to = bucket.indexOf(target) + (insertAfter ? 1 : 0);
+  bucket.splice(to, 0, dragged);
+
+  bucket.forEach((t, i) => { t.order = i; });
+  saveTodos();
+  render();
 }
 
 function render() {
@@ -840,6 +873,65 @@ els.list.addEventListener("focusout", (event) => {
   state.editingId = null;
   if (title) updateTodo(id, { title });
   else render();
+});
+
+// ----- Drag to reorder tasks (only among tasks that share the same due date) -----
+let dragId = null;
+
+function clearDragIndicators() {
+  els.list.querySelectorAll(".dragging, .drag-over-before, .drag-over-after").forEach((el) => {
+    el.classList.remove("dragging", "drag-over-before", "drag-over-after");
+  });
+}
+
+els.list.addEventListener("dragstart", (event) => {
+  const handle = event.target.closest(".drag-handle");
+  const item = handle?.closest(".quest-item");
+  if (!handle || !item || state.mode === "brain") { event.preventDefault(); return; }
+  clearDragIndicators(); // self-heal in case a previous drag left stray classes behind
+  dragId = item.dataset.id;
+  event.dataTransfer.effectAllowed = "move";
+  event.dataTransfer.setData("text/plain", dragId);
+  // Deferred one frame so the browser's native drag-ghost snapshot is taken
+  // at full opacity; the left-behind row then fades once dragging is underway.
+  requestAnimationFrame(() => item.classList.add("dragging"));
+});
+
+els.list.addEventListener("dragend", () => {
+  clearDragIndicators();
+  dragId = null;
+});
+
+els.list.addEventListener("dragover", (event) => {
+  if (!dragId) return;
+  const overItem = event.target.closest(".quest-item");
+  if (!overItem || overItem.dataset.id === dragId) return;
+  const dragged = state.todos.find((t) => t.id === dragId);
+  const target = state.todos.find((t) => t.id === overItem.dataset.id);
+  if (!dragged || !target || dragged.dueDate !== target.dueDate) {
+    event.dataTransfer.dropEffect = "none";
+    return;
+  }
+  event.preventDefault();
+  event.dataTransfer.dropEffect = "move";
+  const after = event.clientY - overItem.getBoundingClientRect().top > overItem.offsetHeight / 2;
+  els.list.querySelectorAll(".drag-over-before, .drag-over-after").forEach((el) => {
+    el.classList.remove("drag-over-before", "drag-over-after");
+  });
+  overItem.classList.add(after ? "drag-over-after" : "drag-over-before");
+});
+
+els.list.addEventListener("drop", (event) => {
+  if (!dragId) return;
+  event.preventDefault();
+  const overItem = event.target.closest(".quest-item");
+  const targetId = overItem?.dataset.id;
+  if (targetId && targetId !== dragId) {
+    const after = event.clientY - overItem.getBoundingClientRect().top > overItem.offsetHeight / 2;
+    reorderTodo(dragId, targetId, after);
+  }
+  clearDragIndicators();
+  dragId = null;
 });
 
 els.clearDone.addEventListener("click", () => {
