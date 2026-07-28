@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#c55f52" />
+    <meta name="description" content="A tiny retro checklist for your desktop." />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="styles.css?v=49" />
+    <title>Type Todo</title>
+  </head>
+  <body>
+    <main class="machine">
+      <div class="spiral" aria-hidden="true">
+        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <button id="compactExpand" class="compact-expand" type="button" aria-label="Expand" title="Expand (Esc)" hidden>⊕</button>
+      <header class="machine-top">
+        <button id="titleButton" class="brand-mark" type="button" title="Rename notebook">
+          <span id="notebookTitle">MY DAILY NOTEBOOK</span>
+          <span class="title-edit" aria-hidden="true">✎</span>
+        </button>
+        <form id="titleForm" class="title-form" hidden>
+          <input id="titleInput" maxlength="24" aria-label="Notebook name" />
+          <button type="submit" aria-label="Save notebook name">✓</button>
+        </form>
+        <span id="clock" class="clock">--:--</span>
+        <button id="compactToggle" class="night-toggle" type="button" aria-label="Compact mode (quick capture)" title="Compact mode">⊟</button>
+        <button id="nightToggle" class="night-toggle" type="button" aria-label="Toggle night mode" aria-pressed="false" title="Night mode">☾</button>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Choose notebook color" aria-expanded="false" title="Notebook color">
+          <span class="cover-swatch" aria-hidden="true"></span>
+          <span>COVER</span>
+          <svg aria-hidden="true" viewBox="0 0 10 6">
+            <path d="m1 1 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </button>
+      </header>
+
+      <div id="themePalette" class="theme-palette" aria-label="Notebook colors" hidden>
+        <span>COVER</span>
+        <button type="button" data-cover="rose" aria-label="Rose cover"></button>
+        <button type="button" data-cover="blue" aria-label="Blue cover"></button>
+        <button type="button" data-cover="green" aria-label="Green cover"></button>
+        <button type="button" data-cover="yellow" aria-label="Yellow cover"></button>
+        <button type="button" data-cover="purple" aria-label="Purple cover"></button>
+        <button type="button" id="coverPickerToggle" class="cover-custom" title="Mix your own color" aria-label="Mix a custom cover color" aria-expanded="false"></button>
+      </div>
+
+      <div id="coverPicker" class="cover-picker" aria-label="Mix a custom cover" hidden>
+        <span class="cover-picker-title">MIX A COVER</span>
+        <div class="cover-picker-row">
+          <span id="coverPreview" class="cover-preview" aria-hidden="true"></span>
+          <div class="cover-sliders">
+            <input type="range" id="coverHue" class="cp-slider cp-hue" min="0" max="360" value="210" aria-label="Cover hue" />
+            <input type="range" id="coverDepth" class="cp-slider cp-depth" min="0" max="100" value="40" aria-label="Cover depth" />
+          </div>
+        </div>
+      </div>
+
+      <section class="paper">
+        <div class="paper-slot" aria-hidden="true">
+          <span>TO-DO LIST</span>
+        </div>
+        <div class="paper-toolbar">
+          <span aria-hidden="true"></span>
+          <div class="toolbar-center">
+            <div class="mode-switch" aria-label="Notebook mode">
+              <button type="button" class="active" data-mode="tasks">TASKS</button>
+              <button type="button" data-mode="brain">BRAIN INBOX</button>
+            </div>
+          </div>
+          <button id="clearDone" class="mini-button" type="button" title="Clear completed tasks">×</button>
+        </div>
+
+        <form id="todoForm" class="type-line">
+          <label class="sr-only" for="todoInput">New task</label>
+          <span aria-hidden="true">&gt;</span>
+          <input
+            id="todoInput"
+            type="text"
+            maxlength="160"
+            autocomplete="off"
+            placeholder="type a task..."
+            autofocus
+          />
+          <div class="cat-picker">
+            <button id="catPickerBtn" class="cat-picker-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Tag this task with a category">
+              <span class="cat-dot" id="catPickerDot" aria-hidden="true"></span>
+              <span id="catPickerLabel">TAG</span>
+              <svg aria-hidden="true" viewBox="0 0 10 6"><path d="m1 1 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+            </button>
+            <div id="categoryMenu" class="category-menu" role="menu" aria-label="Choose category" hidden></div>
+          </div>
+          <div class="priority-picker" aria-label="Priority">
+            <button type="button" class="priority active" data-priority="normal">NORMAL</button>
+            <button type="button" class="priority" data-priority="boss">URGENT</button>
+          </div>
+          <button type="submit" aria-label="Add task">↵</button>
+        </form>
+
+        <div class="progress-row">
+          <div class="progress-track" aria-hidden="true"><div id="progressBar"></div></div>
+          <strong id="progressText" aria-live="polite">0 / 0 DONE</strong>
+        </div>
+
+        <nav class="filters" aria-label="Task filters">
+          <div id="taskFilters" class="filter-row">
+            <div class="status-row">
+              <button class="filter active" data-filter="active">TO DO <span id="activeCount">0</span></button>
+              <button class="filter" data-filter="all">ALL</button>
+              <button class="filter" data-filter="done">DONE</button>
+              <button class="filter" data-filter="today">TODAY</button>
+              <button class="filter" data-filter="overdue">LATE</button>
+              <button id="activeCategoryChip" class="active-category-chip" type="button" hidden aria-label="Clear category filter">
+                <span class="cat-dot" aria-hidden="true"></span><span class="chip-name"></span><span class="chip-x" aria-hidden="true">×</span>
+              </button>
+              <button id="urgentToggle" class="urgent-toggle" type="button" aria-pressed="false" title="Show urgent tasks only">! URGENT</button>
+            </div>
+            <form id="categoryForm" class="category-form" hidden>
+              <input id="categoryInput" maxlength="10" placeholder="NAME" aria-label="Category name" />
+              <div class="category-colors" aria-label="Category color">
+                <label style="--choice:#c9dfd5" title="Mint"><input type="radio" name="categoryColor" value="#c9dfd5" checked /><span></span></label>
+                <label style="--choice:#efc3c1" title="Rose"><input type="radio" name="categoryColor" value="#efc3c1" /><span></span></label>
+                <label style="--choice:#c9dced" title="Blue"><input type="radio" name="categoryColor" value="#c9dced" /><span></span></label>
+                <label style="--choice:#eadca5" title="Yellow"><input type="radio" name="categoryColor" value="#eadca5" /><span></span></label>
+                <label style="--choice:#d5c5df" title="Purple"><input type="radio" name="categoryColor" value="#d5c5df" /><span></span></label>
+              </div>
+              <button type="submit" aria-label="Save category">↵</button>
+            </form>
+          </div>
+          <div id="brainFilters" class="brain-filters" hidden>
+            <button class="brain-filter active" type="button" data-brain-filter="unprocessed">UNPROCESSED</button>
+            <button class="brain-filter" type="button" data-brain-filter="processed">PROCESSED</button>
+            <button id="copyBrain" class="brain-action" type="button">COPY ALL</button>
+            <button id="exportBrain" class="brain-action" type="button">EXPORT .MD</button>
+          </div>
+        </nav>
+
+        <ul id="todoList" class="todo-list" aria-live="polite"></ul>
+
+        <div id="emptyState" class="empty-state">
+          <span class="pixel-face" aria-hidden="true">•ᴗ•</span>
+          <p>all quiet around here.</p>
+        </div>
+      </section>
+
+      <footer>
+        <button id="exportData" class="foot-btn" type="button" title="Download a backup (.json)">⤓ BACKUP</button>
+        <button id="importData" class="foot-btn" type="button" title="Restore from a backup (.json)">⤒ RESTORE</button>
+        <span id="installHint">SAVED LOCALLY</span>
+        <span class="status-dot"></span>
+      </footer>
+      <input id="importFile" type="file" accept="application/json,.json" hidden />
+
+      <div id="duePicker" class="due-picker" aria-label="Due date" hidden>
+        <div class="due-quick">
+          <button type="button" data-due="today">TODAY</button>
+          <button type="button" data-due="tomorrow">TOMORROW</button>
+          <button type="button" data-due="weekend">WEEKEND</button>
+          <button type="button" data-due="nextweek">NEXT WEEK</button>
+        </div>
+        <div class="due-cal-head">
+          <button type="button" data-cal-nav="-1" aria-label="Previous month">‹</button>
+          <span id="dueMonthLabel"></span>
+          <button type="button" data-cal-nav="1" aria-label="Next month">›</button>
+        </div>
+        <div class="due-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
+        <div id="dueCalGrid" class="due-cal-grid"></div>
+        <button type="button" class="due-clear" data-due="clear">✕ NO DATE</button>
+      </div>
+    </main>
+
+    <template id="todoTemplate">
+      <li class="quest-item">
+        <button class="check" type="button" aria-label="Complete task"><span>✓</span></button>
+        <div class="quest-copy">
+          <div class="quest-meta">
+            <button class="cat-tag" type="button" hidden></button>
+            <button class="due-chip" type="button" hidden></button>
+            <span class="boss-tag">!</span>
+          </div>
+          <p class="quest-title"></p>
+          <input class="edit-input" maxlength="160" aria-label="Edit task" />
+        </div>
+        <div class="quest-actions">
+          <button class="icon-button tag-btn" type="button" aria-label="Set category" title="Category">#</button>
+          <button class="icon-button edit" type="button" aria-label="Edit task" title="Edit">✎</button>
+          <button class="icon-button delete" type="button" aria-label="Delete task" title="Delete">×</button>
+        </div>
+      </li>
+    </template>
+
+    <template id="brainTemplate">
+      <li class="quest-item brain-item">
+        <button class="check brain-check" type="button" aria-label="Mark as processed"><span>✓</span></button>
+        <div class="quest-copy">
+          <div class="quest-meta">
+            <span class="brain-tags"></span>
+          </div>
+          <p class="quest-title"></p>
+        </div>
+        <div class="quest-actions">
+          <button class="icon-button copy-note" type="button" aria-label="Copy note" title="Copy">⧉</button>
+          <button class="icon-button delete-note" type="button" aria-label="Delete note" title="Delete">×</button>
+        </div>
+      </li>
+    </template>
+
+    <script src="app.js?v=50" defer></script>
+  </body>
+</html>
