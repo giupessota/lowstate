@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "description": "Lowstate — lower your mental entropy. A retro notebook to-do gadget for Windows and macOS.",
+  "author": "Giuliana Pessota",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "dist:mac": "electron-builder --mac",
-    "dist:win": "electron-builder --win"
+    "dist:mac": "electron-builder --mac --publish=never",
+    "dist:win": "electron-builder --win --publish=never"
   },
   "devDependencies": {
     "electron": "^37.10.3",
