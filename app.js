@@ -4,6 +4,7 @@ const COVER_CUSTOM_KEY = "type-todo.cover-custom.v1";
 const COVER_MIX_KEY = "type-todo.cover-mix.v1";
 const THEME_KEY = "type-todo.theme.v1";
 const STYLE_KEY = "type-todo.style.v1";
+const PRE_MINIMAL_COVER_KEY = "type-todo.pre-minimal-cover.v1";
 const CATEGORIES_KEY = "type-todo.categories.v1";
 const CATEGORY_COLORS_KEY = "type-todo.category-colors.v1";
 const NOTEBOOK_TITLE_KEY = "type-todo.notebook-title.v1";
@@ -1046,7 +1047,17 @@ els.nightToggle.addEventListener("click", () => {
 });
 
 els.styleToggle.addEventListener("click", () => {
-  applyStyle(document.documentElement.dataset.style === "minimal" ? "notebook" : "minimal");
+  const goingMinimal = document.documentElement.dataset.style !== "minimal";
+  // Minimal style defaults to a plain black cover; remember whatever cover was
+  // on the notebook side so switching back restores it instead of staying black.
+  if (goingMinimal) {
+    localStorage.setItem(PRE_MINIMAL_COVER_KEY, document.documentElement.dataset.cover || "forest");
+    selectCover("mono");
+  } else {
+    const restoreCover = localStorage.getItem(PRE_MINIMAL_COVER_KEY) || "forest";
+    selectCover(restoreCover, restoreCover === "custom" ? localStorage.getItem(COVER_CUSTOM_KEY) : undefined);
+  }
+  applyStyle(goingMinimal ? "minimal" : "notebook");
 });
 
 els.titleButton.addEventListener("click", () => {

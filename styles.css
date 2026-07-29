@@ -44,6 +44,11 @@
   --cover-dark: #1b2e25;
   --cover-ink: #dfe8e1;
 }
+:root[data-cover="mono"] {
+  --cover: #232323;
+  --cover-dark: #131313;
+  --cover-ink: #d8d5cf;
+}
 
 * { box-sizing: border-box; }
 html, body { min-height: 100%; }
@@ -242,6 +247,7 @@ button { cursor: pointer; }
 .theme-palette [data-cover="yellow"] { background: #e6c77f; }
 .theme-palette [data-cover="purple"] { background: #b4a3ca; }
 .theme-palette [data-cover="forest"] { background: #284236; }
+.theme-palette [data-cover="mono"] { background: #232323; }
 .cover-custom {
   width: 23px;
   height: 23px;
@@ -1067,6 +1073,13 @@ kbd { border: 1px solid currentColor; border-radius: 3px; padding: 2px 4px; back
   border-color: color-mix(in srgb, var(--ink) 15%, transparent);
   box-shadow: 0 4px 18px rgba(0,0,0,.16);
   transform: none;
+}
+/* Less pastel wash overall: neutral filter tabs, no highlighter tint on urgent rows */
+[data-style="minimal"] .filter { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+[data-style="minimal"] .filter.active { background: color-mix(in srgb, var(--ink) 14%, transparent); }
+[data-style="minimal"] .quest-item.boss,
+[data-style="minimal"] .quest-item.boss:hover {
+  background: none;
 }
 
 @media (max-width: 520px) {
