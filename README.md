@@ -6,6 +6,17 @@ A tiny to-do gadget for Windows and macOS with a retro notebook design. The
 desktop edition opens in an always-on-top window and can be shown or hidden
 instantly, with global shortcuts for quick capture.
 
+## Download
+
+- **Web app:** [giupessota.github.io/lowstate](https://giupessota.github.io/lowstate/) — open it and click **Install** in the browser's address bar.
+- **Windows / macOS installer:** [latest release](https://github.com/giupessota/lowstate/releases/latest)
+  - [Lowstate Setup 1.0.0.exe](https://github.com/giupessota/lowstate/releases/download/v1.0.0/Lowstate.Setup.1.0.0.exe) (Windows)
+  - [Lowstate-1.0.0-arm64.dmg](https://github.com/giupessota/lowstate/releases/download/v1.0.0/Lowstate-1.0.0-arm64.dmg) (macOS, Apple Silicon)
+
+The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
+will warn on first launch — choose "More info → Run anyway" (Windows) or
+right-click → "Open" (macOS).
+
 ## Run in a browser
 
 From the `todo-gadget` directory:
