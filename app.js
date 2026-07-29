@@ -3,6 +3,7 @@ const COVER_KEY = "type-todo.cover.v1";
 const COVER_CUSTOM_KEY = "type-todo.cover-custom.v1";
 const COVER_MIX_KEY = "type-todo.cover-mix.v1";
 const THEME_KEY = "type-todo.theme.v1";
+const STYLE_KEY = "type-todo.style.v1";
 const CATEGORIES_KEY = "type-todo.categories.v1";
 const CATEGORY_COLORS_KEY = "type-todo.category-colors.v1";
 const NOTEBOOK_TITLE_KEY = "type-todo.notebook-title.v1";
@@ -104,6 +105,7 @@ const els = {
   categoryInput: document.querySelector("#categoryInput"),
   urgentToggle: document.querySelector("#urgentToggle"),
   nightToggle: document.querySelector("#nightToggle"),
+  styleToggle: document.querySelector("#styleToggle"),
   compactToggle: document.querySelector("#compactToggle"),
   compactExpand: document.querySelector("#compactExpand"),
   exportData: document.querySelector("#exportData"),
@@ -147,6 +149,18 @@ function applyTheme(theme) {
   localStorage.setItem(THEME_KEY, theme);
   els.nightToggle.textContent = theme === "dark" ? "☀" : "☾";
   els.nightToggle.setAttribute("aria-pressed", String(theme === "dark"));
+}
+
+const savedStyle = localStorage.getItem(STYLE_KEY) || "notebook";
+
+function applyStyle(style) {
+  document.documentElement.dataset.style = style;
+  localStorage.setItem(STYLE_KEY, style);
+  const isMinimal = style === "minimal";
+  els.styleToggle.textContent = isMinimal ? "▤" : "▭";
+  els.styleToggle.setAttribute("aria-pressed", String(isMinimal));
+  els.styleToggle.setAttribute("aria-label", isMinimal ? "Switch to notebook style" : "Switch to minimal style");
+  els.styleToggle.title = isMinimal ? "Minimal style" : "Notebook style";
 }
 
 const CUSTOM_COVER_VARS = ["--cover", "--cover-dark", "--cover-ink"];
@@ -1031,6 +1045,10 @@ els.nightToggle.addEventListener("click", () => {
   applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 });
 
+els.styleToggle.addEventListener("click", () => {
+  applyStyle(document.documentElement.dataset.style === "minimal" ? "notebook" : "minimal");
+});
+
 els.titleButton.addEventListener("click", () => {
   els.titleInput.value = els.notebookTitle.textContent;
   els.titleButton.hidden = true;
@@ -1132,5 +1150,6 @@ window.addEventListener("beforeinstallprompt", () => {
 updateClock();
 setInterval(updateClock, 30_000);
 applyTheme(savedTheme);
+applyStyle(savedStyle);
 selectCover(savedCover);
 render();

@@ -1026,6 +1026,49 @@ kbd { border: 1px solid currentColor; border-radius: 3px; padding: 2px 4px; back
 [data-theme="dark"] .cover-picker-title { color: #b9b2a5; }
 [data-theme="dark"] .cp-slider { box-shadow: inset 0 0 0 1px rgba(0,0,0,.4); }
 
+/* ===== Minimal style ("Notepad"-like) — flat skin, no notebook flourishes ===== */
+:root[data-style="minimal"] {
+  --hand: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+[data-style="minimal"] .spiral,
+[data-style="minimal"] .paper-slot,
+[data-style="minimal"] .machine::after {
+  display: none;
+}
+[data-style="minimal"] .machine {
+  padding: 14px 18px 12px;
+  border: 1px solid color-mix(in srgb, var(--cover-ink) 32%, transparent);
+  border-radius: 8px;
+  background: var(--cover);
+  box-shadow: 0 2px 10px rgba(0,0,0,.12);
+}
+[data-style="minimal"] .paper {
+  background: var(--paper);
+  border-color: color-mix(in srgb, var(--ink) 15%, transparent);
+  border-radius: 4px;
+  box-shadow: none;
+}
+[data-style="minimal"] .paper::before { display: none; }
+[data-style="minimal"] .paper-toolbar,
+[data-style="minimal"] .progress-row {
+  margin-left: 16px;
+}
+[data-style="minimal"] .type-line { padding-left: 20px; }
+[data-style="minimal"] .filters { padding-left: 18px; }
+[data-style="minimal"] .todo-list { padding-left: 20px; }
+[data-style="minimal"] .check { transform: none; }
+[data-style="minimal"] .theme-toggle,
+[data-style="minimal"] .priority-picker {
+  transform: none;
+}
+[data-style="minimal"] .theme-palette,
+[data-style="minimal"] .cover-picker {
+  background: var(--paper);
+  border-color: color-mix(in srgb, var(--ink) 15%, transparent);
+  box-shadow: 0 4px 18px rgba(0,0,0,.16);
+  transform: none;
+}
+
 @media (max-width: 520px) {
   body { padding: 8px 8px 8px 24px; }
   .machine { padding-right: 12px; padding-left: 37px; }
