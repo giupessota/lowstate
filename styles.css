@@ -338,6 +338,8 @@ button { cursor: pointer; }
 }
 .paper {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-height: 520px;
   max-height: 520px;
   overflow: hidden;
@@ -772,15 +774,15 @@ button { cursor: pointer; }
 .todo-list {
   position: relative;
   z-index: 1;
-  max-height: 366px;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
   list-style: none;
   margin: 0;
-  padding: 0 10px 0 56px;
+  padding: 0 10px 6px 56px;
   scrollbar-color: var(--cover) transparent;
   scrollbar-width: thin;
 }
-.filters.brain-mode + .todo-list { max-height: 370px; }
 .quest-item {
   min-height: 48px;
   display: grid;
