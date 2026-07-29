@@ -1139,6 +1139,22 @@ function updateClock() {
   }).format(new Date());
 }
 
+// Due-date chips (TODAY/TOMORROW/overdue) are computed at render time, so a
+// gadget left open across midnight would keep showing yesterday's labels
+// until the next interaction. Poll for the calendar day changing and
+// re-render then — skipped while typing so it never yanks focus mid-keystroke.
+let lastKnownDay = toISODate(new Date());
+function checkDayRollover() {
+  const today = toISODate(new Date());
+  if (today === lastKnownDay) return;
+  if (state.mode === "tasks") {
+    const active = document.activeElement;
+    if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA")) return;
+    render();
+  }
+  lastKnownDay = today;
+}
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
 }
@@ -1149,6 +1165,7 @@ window.addEventListener("beforeinstallprompt", () => {
 
 updateClock();
 setInterval(updateClock, 30_000);
+setInterval(checkDayRollover, 60_000);
 applyTheme(savedTheme);
 applyStyle(savedStyle);
 selectCover(savedCover);
