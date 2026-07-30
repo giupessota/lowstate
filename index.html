@@ -25,7 +25,6 @@
           <input id="titleInput" maxlength="24" aria-label="Notebook name" />
           <button type="submit" aria-label="Save notebook name">✓</button>
         </form>
-        <span id="clock" class="clock">--:--</span>
         <button id="compactToggle" class="night-toggle" type="button" aria-label="Compact mode (quick capture)" title="Compact mode">⊟</button>
         <button id="settingsToggle" class="night-toggle" type="button" aria-label="Settings" title="Settings">⚙</button>
       </header>
@@ -157,6 +156,17 @@
             </div>
           </div>
 
+          <div class="settings-section" id="settingsWindowSection" hidden>
+            <h3 class="settings-section-title">Window</h3>
+            <div class="settings-row">
+              <span class="settings-label">Always on top</span>
+              <div class="mode-switch settings-switch" role="group" aria-label="Always on top">
+                <button type="button" class="active" data-aot-value="on">ON</button>
+                <button type="button" data-aot-value="off">OFF</button>
+              </div>
+            </div>
+          </div>
+
           <div class="settings-section">
             <h3 class="settings-section-title">Data</h3>
             <div class="settings-row settings-data-row">
@@ -168,10 +178,28 @@
           <div class="settings-section">
             <h3 class="settings-section-title">Shortcuts</h3>
             <p class="settings-hint">Global (desktop app)</p>
-            <ul class="settings-shortcuts">
-              <li><kbd>⌘⇧Space</kbd><span>Show / hide the gadget</span></li>
-              <li><kbd>⌘⇧N</kbd><span>Quick-capture a task</span></li>
-              <li><kbd>⌘⇧B</kbd><span>Brain dump</span></li>
+            <ul class="settings-shortcuts" id="globalShortcuts">
+              <li>
+                <span class="shortcut-key-group">
+                  <button type="button" class="shortcut-key" data-shortcut="toggle">⌘⇧Space</button>
+                  <button type="button" class="shortcut-reset" data-shortcut-reset="toggle" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
+                </span>
+                <span>Show / hide the gadget</span>
+              </li>
+              <li>
+                <span class="shortcut-key-group">
+                  <button type="button" class="shortcut-key" data-shortcut="capture">⌘⇧N</button>
+                  <button type="button" class="shortcut-reset" data-shortcut-reset="capture" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
+                </span>
+                <span>Quick-capture a task</span>
+              </li>
+              <li>
+                <span class="shortcut-key-group">
+                  <button type="button" class="shortcut-key" data-shortcut="brain">⌘⇧B</button>
+                  <button type="button" class="shortcut-reset" data-shortcut-reset="brain" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
+                </span>
+                <span>Brain dump</span>
+              </li>
             </ul>
             <p class="settings-hint">In-app</p>
             <ul class="settings-shortcuts">
@@ -183,8 +211,7 @@
       </section>
 
       <footer>
-        <span id="installHint">SAVED LOCALLY</span>
-        <span class="status-dot"></span>
+        <span id="installHint"></span>
       </footer>
       <input id="importFile" type="file" accept="application/json,.json" hidden />
 

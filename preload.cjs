@@ -7,6 +7,8 @@ contextBridge.exposeInMainWorld("desktopTheme", {
 contextBridge.exposeInMainWorld("desktopGadget", {
   setCompact: (on) => ipcRenderer.send("set-compact", on),
   hide: () => ipcRenderer.send("hide-window"),
+  setAlwaysOnTop: (on) => ipcRenderer.send("set-always-on-top", on),
+  setShortcuts: (map) => ipcRenderer.invoke("update-shortcuts", map),
   onQuickCapture: (cb) => ipcRenderer.on("quick-capture", (_e, mode) => cb(mode)),
   onSetCompactUI: (cb) => ipcRenderer.on("set-compact-ui", (_e, on) => cb(on))
 });

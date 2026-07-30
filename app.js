@@ -8,6 +8,13 @@ const PRE_MINIMAL_COVER_KEY = "type-todo.pre-minimal-cover.v1";
 const CATEGORIES_KEY = "type-todo.categories.v1";
 const CATEGORY_COLORS_KEY = "type-todo.category-colors.v1";
 const NOTEBOOK_TITLE_KEY = "type-todo.notebook-title.v1";
+const ALWAYS_ON_TOP_KEY = "type-todo.always-on-top.v1";
+const SHORTCUTS_KEY = "type-todo.shortcuts.v1";
+const DEFAULT_SHORTCUTS = {
+  toggle: "CommandOrControl+Shift+Space",
+  capture: "CommandOrControl+Shift+N",
+  brain: "CommandOrControl+Shift+B",
+};
 const BRAIN_KEY = "type-todo.brain-inbox.v1";
 
 const state = {
@@ -95,7 +102,6 @@ const els = {
   progressText: document.querySelector("#progressText"),
   progressBar: document.querySelector("#progressBar"),
   clearDone: document.querySelector("#clearDone"),
-  clock: document.querySelector("#clock"),
   installHint: document.querySelector("#installHint"),
   themePalette: document.querySelector("#themePalette"),
   settingsToggle: document.querySelector("#settingsToggle"),
@@ -134,6 +140,8 @@ const els = {
   copyBrain: document.querySelector("#copyBrain"),
   exportBrain: document.querySelector("#exportBrain"),
   paperSlot: document.querySelector(".paper-slot span"),
+  settingsWindowSection: document.querySelector("#settingsWindowSection"),
+  globalShortcuts: document.querySelector("#globalShortcuts"),
 };
 
 const savedCover = localStorage.getItem(COVER_KEY) || "forest";
@@ -163,6 +171,126 @@ function applyStyle(style) {
   document.querySelectorAll("[data-style-value]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.styleValue === style);
   });
+}
+
+const savedAlwaysOnTop = localStorage.getItem(ALWAYS_ON_TOP_KEY) !== "off";
+
+function applyAlwaysOnTop(on) {
+  localStorage.setItem(ALWAYS_ON_TOP_KEY, on ? "on" : "off");
+  window.desktopGadget?.setAlwaysOnTop(on);
+  document.querySelectorAll("[data-aot-value]").forEach((btn) => {
+    btn.classList.toggle("active", (btn.dataset.aotValue === "on") === on);
+  });
+}
+
+// ----- Configurable global shortcuts (desktop app only) -----
+function loadShortcuts() {
+  try {
+    return { ...DEFAULT_SHORTCUTS, ...JSON.parse(localStorage.getItem(SHORTCUTS_KEY) || "{}") };
+  } catch {
+    return { ...DEFAULT_SHORTCUTS };
+  }
+}
+const shortcuts = loadShortcuts();
+let recordingShortcut = null;
+
+const ACCELERATOR_SYMBOLS = { CommandOrControl: "⌘", Shift: "⇧", Alt: "⌥" };
+function formatAccelerator(accelerator) {
+  return accelerator.split("+").map((part) => ACCELERATOR_SYMBOLS[part] || part).join("");
+}
+
+const NAMED_KEYS = {
+  ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
+  Escape: "Esc", Tab: "Tab", Backspace: "Backspace", Delete: "Delete", Enter: "Enter",
+};
+function keyToAcceleratorPart(event) {
+  if (event.code === "Space") return "Space";
+  if (/^[a-zA-Z]$/.test(event.key)) return event.key.toUpperCase();
+  if (/^[0-9]$/.test(event.key)) return event.key;
+  if (/^F([1-9]|1[0-2])$/.test(event.key)) return event.key;
+  return NAMED_KEYS[event.key] || null;
+}
+
+function shortcutButton(key) {
+  return document.querySelector(`.shortcut-key[data-shortcut="${key}"]`);
+}
+
+function renderShortcut(key) {
+  const button = shortcutButton(key);
+  if (!button) return;
+  button.classList.remove("recording", "shortcut-error");
+  button.textContent = formatAccelerator(shortcuts[key]);
+  const resetButton = document.querySelector(`[data-shortcut-reset="${key}"]`);
+  if (resetButton) resetButton.hidden = shortcuts[key] === DEFAULT_SHORTCUTS[key];
+}
+
+function stopRecordingShortcut() {
+  document.removeEventListener("keydown", onShortcutRecordKeydown, true);
+  const key = recordingShortcut;
+  recordingShortcut = null;
+  if (key) renderShortcut(key);
+}
+
+function flashShortcutFeedback(key, message) {
+  const button = shortcutButton(key);
+  if (!button) return;
+  button.classList.remove("recording");
+  button.classList.add("shortcut-error");
+  button.textContent = message;
+  setTimeout(() => renderShortcut(key), 1200);
+}
+
+async function commitShortcut(key, accelerator) {
+  const button = shortcutButton(key);
+  if (button) button.textContent = "SAVING…";
+  let result;
+  try {
+    result = await window.desktopGadget?.setShortcuts({ [key]: accelerator });
+  } catch {
+    // Most likely cause: main.cjs/preload.cjs changed since the app was last
+    // launched, so the IPC handler the renderer is calling doesn't exist yet.
+    flashShortcutFeedback(key, "RESTART APP");
+    return;
+  }
+  if (!result || !result.ok) {
+    flashShortcutFeedback(key, "IN USE");
+    return;
+  }
+  shortcuts[key] = accelerator;
+  localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts));
+  renderShortcut(key);
+}
+
+function onShortcutRecordKeydown(event) {
+  event.preventDefault();
+  event.stopPropagation();
+  const key = recordingShortcut;
+  if (event.key === "Escape") { stopRecordingShortcut(); return; }
+  if (["Control", "Meta", "Shift", "Alt", "OS"].includes(event.key)) return; // still waiting for a real key
+  const parts = [];
+  if (event.metaKey || event.ctrlKey) parts.push("CommandOrControl");
+  if (event.altKey) parts.push("Alt");
+  if (event.shiftKey) parts.push("Shift");
+  const mainKey = keyToAcceleratorPart(event);
+  document.removeEventListener("keydown", onShortcutRecordKeydown, true);
+  recordingShortcut = null;
+  if (!parts.length) { flashShortcutFeedback(key, "USE CTRL/CMD/ALT"); return; }
+  if (!mainKey) { flashShortcutFeedback(key, "UNSUPPORTED KEY"); return; }
+  parts.push(mainKey);
+  const accelerator = parts.join("+");
+  const clash = Object.entries(shortcuts).find(([k, v]) => k !== key && v === accelerator);
+  if (clash) { flashShortcutFeedback(key, "ALREADY USED"); return; }
+  commitShortcut(key, accelerator);
+}
+
+function startRecordingShortcut(key) {
+  if (recordingShortcut) stopRecordingShortcut();
+  recordingShortcut = key;
+  const button = shortcutButton(key);
+  button.classList.remove("shortcut-error");
+  button.classList.add("recording");
+  button.textContent = "PRESS KEYS…";
+  document.addEventListener("keydown", onShortcutRecordKeydown, true);
 }
 
 // Switching to Minimal defaults to a plain black cover; remember whatever
@@ -1068,6 +1196,24 @@ document.querySelectorAll("[data-theme-value]").forEach((btn) => {
   btn.addEventListener("click", () => applyTheme(btn.dataset.themeValue));
 });
 
+document.querySelectorAll(".shortcut-key").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    if (!window.desktopGadget) return;
+    startRecordingShortcut(btn.dataset.shortcut);
+  });
+});
+
+document.querySelectorAll(".shortcut-reset").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const key = btn.dataset.shortcutReset;
+    commitShortcut(key, DEFAULT_SHORTCUTS[key]);
+  });
+});
+
+document.querySelectorAll("[data-aot-value]").forEach((btn) => {
+  btn.addEventListener("click", () => applyAlwaysOnTop(btn.dataset.aotValue === "on"));
+});
+
 els.settingsToggle.addEventListener("click", () => {
   state.settingsOpen = true;
   render();
@@ -1151,13 +1297,6 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-function updateClock() {
-  els.clock.textContent = new Intl.DateTimeFormat("en-US", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date());
-}
-
 // Due-date chips (TODAY/TOMORROW/overdue) are computed at render time, so a
 // gadget left open across midnight would keep showing yesterday's labels
 // until the next interaction. Poll for the calendar day changing and
@@ -1182,10 +1321,15 @@ window.addEventListener("beforeinstallprompt", () => {
   els.installHint.textContent = "READY TO INSTALL";
 });
 
-updateClock();
-setInterval(updateClock, 30_000);
 setInterval(checkDayRollover, 60_000);
 applyTheme(savedTheme);
 applyStyle(savedStyle);
+if (window.desktopGadget) {
+  els.settingsWindowSection.hidden = false;
+  applyAlwaysOnTop(savedAlwaysOnTop);
+  els.globalShortcuts.classList.add("shortcuts-editable");
+  Object.keys(shortcuts).forEach(renderShortcut);
+  window.desktopGadget.setShortcuts(shortcuts);
+}
 selectCover(savedCover);
 render();
