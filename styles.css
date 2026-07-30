@@ -186,7 +186,18 @@ button { cursor: pointer; }
   font-size: 12px;
   line-height: 1;
 }
-#settingsToggle { width: 28px; height: 28px; font-size: 19px; }
+#settingsToggle { position: relative; width: 28px; height: 28px; font-size: 19px; }
+.update-dot {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 1.5px var(--cover);
+}
+.update-dot[hidden] { display: none; }
 .night-toggle:hover { background: rgba(255,255,255,.55); }
 .theme-palette {
   display: flex;
@@ -885,6 +896,14 @@ kbd { border: 1px solid currentColor; border-radius: 3px; padding: 2px 4px; back
 #settingsBack[hidden] { display: none; }
 .settings-section { margin-bottom: 22px; }
 .settings-section:last-child { margin-bottom: 4px; }
+.update-banner {
+  padding: 4px 12px;
+  border: 1px solid color-mix(in srgb, var(--green) 38%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--green) 12%, transparent);
+}
+.update-banner .settings-row { padding: 9px 0; }
+.update-banner[hidden] { display: none; }
 .settings-section-title {
   margin: 0 0 2px;
   color: color-mix(in srgb, var(--ink) 55%, transparent);

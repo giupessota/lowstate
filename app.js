@@ -142,6 +142,10 @@ const els = {
   paperSlot: document.querySelector(".paper-slot span"),
   settingsWindowSection: document.querySelector("#settingsWindowSection"),
   globalShortcuts: document.querySelector("#globalShortcuts"),
+  updateDot: document.querySelector("#updateDot"),
+  updateBanner: document.querySelector("#updateBanner"),
+  updateBannerText: document.querySelector("#updateBannerText"),
+  updateBannerButton: document.querySelector("#updateBannerButton"),
 };
 
 const savedCover = localStorage.getItem(COVER_KEY) || "forest";
@@ -171,6 +175,15 @@ function applyStyle(style) {
   document.querySelectorAll("[data-style-value]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.styleValue === style);
   });
+}
+
+let pendingUpdateUrl = null;
+
+function showUpdateAvailable(info) {
+  pendingUpdateUrl = info.url;
+  els.updateDot.hidden = false;
+  els.updateBannerText.textContent = `Update available — v${info.version}`;
+  els.updateBanner.hidden = false;
 }
 
 const savedAlwaysOnTop = localStorage.getItem(ALWAYS_ON_TOP_KEY) !== "off";
@@ -464,6 +477,13 @@ function updateTodo(id, changes) {
   render();
 }
 
+function updateBrainNote(id, text) {
+  const tags = [...new Set(text.match(/#[\p{L}\p{N}_-]+/gu) || [])];
+  state.brainNotes = state.brainNotes.map((note) => note.id === id ? { ...note, text, tags } : note);
+  saveBrainNotes();
+  render();
+}
+
 function deleteTodo(id) {
   state.todos = state.todos.filter((todo) => todo.id !== id);
   saveTodos();
@@ -662,10 +682,14 @@ function renderBrainInbox() {
     const item = els.brainTemplate.content.firstElementChild.cloneNode(true);
     item.dataset.id = note.id;
     item.classList.toggle("processed", note.processed);
+    item.classList.toggle("editing", state.editingId === note.id);
     item.querySelector(".quest-title").textContent = note.text;
     item.querySelector(".brain-tags").textContent = note.tags.join(" ");
     item.querySelector(".brain-check").setAttribute("aria-label", note.processed ? "Mark as unprocessed" : "Mark as processed");
+    const editInput = item.querySelector(".edit-input");
+    editInput.value = note.text;
     els.list.append(item);
+    if (state.editingId === note.id) requestAnimationFrame(() => editInput.focus());
   });
   const unprocessed = state.brainNotes.filter((note) => !note.processed).length;
   const processed = state.brainNotes.length - unprocessed;
@@ -981,6 +1005,9 @@ els.list.addEventListener("click", (event) => {
       render();
     } else if (event.target.closest(".copy-note")) {
       navigator.clipboard.writeText(formatBrainNote(note));
+    } else if (event.target.closest(".edit-note")) {
+      state.editingId = id;
+      render();
     } else if (event.target.closest(".delete-note")) {
       state.brainNotes = state.brainNotes.filter((entry) => entry.id !== id);
       saveBrainNotes();
@@ -1023,8 +1050,11 @@ els.list.addEventListener("keydown", (event) => {
   if (!event.target.matches(".edit-input")) return;
   const id = event.target.closest(".quest-item").dataset.id;
   if (event.key === "Enter") {
-    const title = event.target.value.trim();
-    if (title) updateTodo(id, { title });
+    const text = event.target.value.trim();
+    if (text) {
+      if (state.mode === "brain") updateBrainNote(id, text);
+      else updateTodo(id, { title: text });
+    }
   }
   if (event.key === "Escape") {
     state.editingId = null;
@@ -1035,10 +1065,14 @@ els.list.addEventListener("keydown", (event) => {
 els.list.addEventListener("focusout", (event) => {
   if (!event.target.matches(".edit-input") || state.editingId === null) return;
   const id = event.target.closest(".quest-item").dataset.id;
-  const title = event.target.value.trim();
+  const text = event.target.value.trim();
   state.editingId = null;
-  if (title) updateTodo(id, { title });
-  else render();
+  if (text) {
+    if (state.mode === "brain") updateBrainNote(id, text);
+    else updateTodo(id, { title: text });
+  } else {
+    render();
+  }
 });
 
 // ----- Drag to reorder tasks (only among tasks that share the same due date) -----
@@ -1210,6 +1244,10 @@ document.querySelectorAll(".shortcut-reset").forEach((btn) => {
   });
 });
 
+els.updateBannerButton.addEventListener("click", () => {
+  if (pendingUpdateUrl) window.desktopGadget?.openExternal(pendingUpdateUrl);
+});
+
 document.querySelectorAll("[data-aot-value]").forEach((btn) => {
   btn.addEventListener("click", () => applyAlwaysOnTop(btn.dataset.aotValue === "on"));
 });
@@ -1330,6 +1368,7 @@ if (window.desktopGadget) {
   els.globalShortcuts.classList.add("shortcuts-editable");
   Object.keys(shortcuts).forEach(renderShortcut);
   window.desktopGadget.setShortcuts(shortcuts);
+  window.desktopGadget.onUpdateAvailable(showUpdateAvailable);
 }
 selectCover(savedCover);
 render();

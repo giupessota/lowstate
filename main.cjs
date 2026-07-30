@@ -1,4 +1,5 @@
-const { app, BrowserWindow, globalShortcut, ipcMain } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu } = require("electron");
+const https = require("https");
 const path = require("path");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
@@ -91,15 +92,63 @@ function registerShortcuts(map) {
   return failed;
 }
 
+// Neither platform lets an unsigned build silently install its own update
+// (macOS refuses outright; Windows would still trigger SmartScreen on the
+// downloaded installer), so this only checks GitHub for a newer tag and
+// lets the renderer show a "download the new version" nudge.
+function isNewerVersion(candidate, current) {
+  const a = candidate.split(".").map(Number);
+  const b = current.split(".").map(Number);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const na = a[i] || 0, nb = b[i] || 0;
+    if (na !== nb) return na > nb;
+  }
+  return false;
+}
+
+function checkForUpdate() {
+  const options = {
+    hostname: "api.github.com",
+    path: "/repos/giupessota/lowstate/releases/latest",
+    headers: { "User-Agent": "Lowstate-App" },
+  };
+  https.get(options, (res) => {
+    let body = "";
+    res.on("data", (chunk) => { body += chunk; });
+    res.on("end", () => {
+      try {
+        const release = JSON.parse(body);
+        const latest = String(release.tag_name || "").replace(/^v/, "");
+        if (latest && isNewerVersion(latest, app.getVersion()) && window) {
+          window.webContents.send("update-available", { version: latest, url: release.html_url });
+        }
+      } catch {
+        // Not critical — silently skip if the API shape changes or is unreachable.
+      }
+    });
+  }).on("error", () => {});
+}
+
 app.whenReady().then(() => {
-  if (process.platform === "darwin") app.dock.setIcon(iconPath);
+  if (process.platform === "darwin") {
+    app.dock.setIcon(iconPath);
+  } else {
+    // The default File/Edit/View/... menu bar doesn't fit a small always-on-top
+    // gadget. On macOS the Edit menu's roles are what make Cmd+C/V/X/A work in
+    // text fields, so it stays there; Windows/Linux don't have that dependency.
+    Menu.setApplicationMenu(null);
+  }
   createWindow();
   registerShortcuts(shortcuts);
+  setTimeout(checkForUpdate, 2000);
 });
 
 ipcMain.on("set-compact", (_event, on) => setCompactWindow(on));
 ipcMain.on("hide-window", () => { if (window) window.hide(); });
 ipcMain.on("set-always-on-top", (_event, on) => { if (window) window.setAlwaysOnTop(!!on, "floating"); });
+ipcMain.on("open-external", (_event, url) => {
+  if (typeof url === "string" && url.startsWith("https://github.com/")) shell.openExternal(url);
+});
 
 // The renderer owns the persisted shortcut preferences (localStorage); this
 // re-registers on the main-process side and reports back which ones failed

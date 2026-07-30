@@ -26,7 +26,7 @@
           <button type="submit" aria-label="Save notebook name">✓</button>
         </form>
         <button id="compactToggle" class="night-toggle" type="button" aria-label="Compact mode (quick capture)" title="Compact mode">⊟</button>
-        <button id="settingsToggle" class="night-toggle" type="button" aria-label="Settings" title="Settings">⚙</button>
+        <button id="settingsToggle" class="night-toggle" type="button" aria-label="Settings" title="Settings">⚙<span id="updateDot" class="update-dot" hidden></span></button>
       </header>
 
       <section class="paper">
@@ -116,6 +116,13 @@
         </div>
 
         <section id="settingsPage" class="settings-page" aria-label="Settings" hidden>
+          <div class="settings-section update-banner" id="updateBanner" hidden>
+            <div class="settings-row">
+              <span class="settings-label" id="updateBannerText">Update available</span>
+              <button type="button" class="foot-btn" id="updateBannerButton">DOWNLOAD</button>
+            </div>
+          </div>
+
           <div class="settings-section">
             <h3 class="settings-section-title">Appearance</h3>
             <div class="settings-row">
@@ -262,9 +269,11 @@
             <span class="brain-tags"></span>
           </div>
           <p class="quest-title"></p>
+          <input class="edit-input" maxlength="160" aria-label="Edit note" />
         </div>
         <div class="quest-actions">
           <button class="icon-button copy-note" type="button" aria-label="Copy note" title="Copy">⧉</button>
+          <button class="icon-button edit-note" type="button" aria-label="Edit note" title="Edit">✎</button>
           <button class="icon-button delete-note" type="button" aria-label="Delete note" title="Delete">×</button>
         </div>
       </li>
