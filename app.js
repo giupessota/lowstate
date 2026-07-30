@@ -27,6 +27,7 @@ const state = {
   brainFilter: "unprocessed",
   dueTarget: null,
   dueView: null,
+  settingsOpen: false,
 };
 
 // ----- Due dates -----
@@ -89,14 +90,17 @@ const els = {
   list: document.querySelector("#todoList"),
   template: document.querySelector("#todoTemplate"),
   empty: document.querySelector("#emptyState"),
+  paper: document.querySelector(".paper"),
   activeCount: document.querySelector("#activeCount"),
   progressText: document.querySelector("#progressText"),
   progressBar: document.querySelector("#progressBar"),
   clearDone: document.querySelector("#clearDone"),
   clock: document.querySelector("#clock"),
   installHint: document.querySelector("#installHint"),
-  themeToggle: document.querySelector("#themeToggle"),
   themePalette: document.querySelector("#themePalette"),
+  settingsToggle: document.querySelector("#settingsToggle"),
+  settingsBack: document.querySelector("#settingsBack"),
+  settingsPage: document.querySelector("#settingsPage"),
   catPickerBtn: document.querySelector("#catPickerBtn"),
   catPickerDot: document.querySelector("#catPickerDot"),
   catPickerLabel: document.querySelector("#catPickerLabel"),
@@ -105,8 +109,6 @@ const els = {
   categoryForm: document.querySelector("#categoryForm"),
   categoryInput: document.querySelector("#categoryInput"),
   urgentToggle: document.querySelector("#urgentToggle"),
-  nightToggle: document.querySelector("#nightToggle"),
-  styleToggle: document.querySelector("#styleToggle"),
   compactToggle: document.querySelector("#compactToggle"),
   compactExpand: document.querySelector("#compactExpand"),
   exportData: document.querySelector("#exportData"),
@@ -148,8 +150,9 @@ const savedTheme = localStorage.getItem(THEME_KEY)
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
   localStorage.setItem(THEME_KEY, theme);
-  els.nightToggle.textContent = theme === "dark" ? "☀" : "☾";
-  els.nightToggle.setAttribute("aria-pressed", String(theme === "dark"));
+  document.querySelectorAll("[data-theme-value]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.themeValue === theme);
+  });
 }
 
 const savedStyle = localStorage.getItem(STYLE_KEY) || "notebook";
@@ -157,11 +160,24 @@ const savedStyle = localStorage.getItem(STYLE_KEY) || "notebook";
 function applyStyle(style) {
   document.documentElement.dataset.style = style;
   localStorage.setItem(STYLE_KEY, style);
-  const isMinimal = style === "minimal";
-  els.styleToggle.textContent = isMinimal ? "▤" : "▭";
-  els.styleToggle.setAttribute("aria-pressed", String(isMinimal));
-  els.styleToggle.setAttribute("aria-label", isMinimal ? "Switch to notebook style" : "Switch to minimal style");
-  els.styleToggle.title = isMinimal ? "Minimal style" : "Notebook style";
+  document.querySelectorAll("[data-style-value]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.styleValue === style);
+  });
+}
+
+// Switching to Minimal defaults to a plain black cover; remember whatever
+// cover was on the notebook side so switching back restores it.
+function setStyle(newStyle) {
+  const current = document.documentElement.dataset.style;
+  if (newStyle === current) return;
+  if (newStyle === "minimal") {
+    localStorage.setItem(PRE_MINIMAL_COVER_KEY, document.documentElement.dataset.cover || "forest");
+    selectCover("mono");
+  } else if (current === "minimal") {
+    const restoreCover = localStorage.getItem(PRE_MINIMAL_COVER_KEY) || "forest";
+    selectCover(restoreCover, restoreCover === "custom" ? localStorage.getItem(COVER_CUSTOM_KEY) : undefined);
+  }
+  applyStyle(newStyle);
 }
 
 const CUSTOM_COVER_VARS = ["--cover", "--cover-dark", "--cover-ink"];
@@ -366,6 +382,14 @@ function reorderTodo(dragId, targetId, insertAfter) {
 }
 
 function render() {
+  els.paper.classList.toggle("settings-mode", state.settingsOpen);
+  els.settingsPage.hidden = !state.settingsOpen;
+  els.settingsBack.hidden = !state.settingsOpen;
+  els.paperSlot.textContent = state.settingsOpen
+    ? "SETTINGS"
+    : (state.mode === "brain" ? "BRAIN INBOX" : "TO-DO LIST");
+  if (state.settingsOpen) return;
+
   els.list.replaceChildren();
   const brainMode = state.mode === "brain";
   document.querySelector(".filters").classList.toggle("brain-mode", brainMode);
@@ -380,7 +404,6 @@ function render() {
   document.querySelector(".priority-picker").style.display = brainMode ? "none" : "";
   document.querySelector(".cat-picker").style.display = brainMode ? "none" : "";
   if (brainMode) closeCategoryMenu();
-  els.paperSlot.textContent = brainMode ? "BRAIN INBOX" : "TO-DO LIST";
   els.input.placeholder = brainMode ? "capture an idea, link, or note... #tag" : "type a task...";
   els.input.setAttribute("aria-label", brainMode ? "New brain capture" : "New task");
   els.form.querySelector(':scope > button[type="submit"]').setAttribute("aria-label", brainMode ? "Add capture" : "Add task");
@@ -1037,27 +1060,22 @@ els.exportBrain.addEventListener("click", () => {
   URL.revokeObjectURL(url);
 });
 
-els.themeToggle.addEventListener("click", () => {
-  els.themePalette.hidden = !els.themePalette.hidden;
-  els.themeToggle.setAttribute("aria-expanded", String(!els.themePalette.hidden));
+document.querySelectorAll("[data-style-value]").forEach((btn) => {
+  btn.addEventListener("click", () => setStyle(btn.dataset.styleValue));
 });
 
-els.nightToggle.addEventListener("click", () => {
-  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+document.querySelectorAll("[data-theme-value]").forEach((btn) => {
+  btn.addEventListener("click", () => applyTheme(btn.dataset.themeValue));
 });
 
-els.styleToggle.addEventListener("click", () => {
-  const goingMinimal = document.documentElement.dataset.style !== "minimal";
-  // Minimal style defaults to a plain black cover; remember whatever cover was
-  // on the notebook side so switching back restores it instead of staying black.
-  if (goingMinimal) {
-    localStorage.setItem(PRE_MINIMAL_COVER_KEY, document.documentElement.dataset.cover || "forest");
-    selectCover("mono");
-  } else {
-    const restoreCover = localStorage.getItem(PRE_MINIMAL_COVER_KEY) || "forest";
-    selectCover(restoreCover, restoreCover === "custom" ? localStorage.getItem(COVER_CUSTOM_KEY) : undefined);
-  }
-  applyStyle(goingMinimal ? "minimal" : "notebook");
+els.settingsToggle.addEventListener("click", () => {
+  state.settingsOpen = true;
+  render();
+});
+
+els.settingsBack.addEventListener("click", () => {
+  state.settingsOpen = false;
+  render();
 });
 
 els.titleButton.addEventListener("click", () => {
@@ -1090,11 +1108,9 @@ els.themePalette.addEventListener("click", (event) => {
   const button = event.target.closest("[data-cover]");
   if (!button) return;
   selectCover(button.dataset.cover);
-  els.themePalette.hidden = true;
-  els.themeToggle.setAttribute("aria-expanded", "false");
 });
 
-// Custom cover — in-app hue/depth picker
+// Custom cover — in-app hue/depth picker, expands inline within the settings page
 function openCoverPicker() {
   refreshCoverPicker();
   els.coverPicker.hidden = false;
@@ -1119,25 +1135,17 @@ els.coverPickerToggle.addEventListener("click", (event) => {
   });
 });
 
-document.addEventListener("click", (event) => {
-  if (els.coverPicker.hidden) return;
-  if (els.coverPicker.contains(event.target) || els.coverPickerToggle.contains(event.target)) return;
-  closeCoverPicker();
-});
-
-document.addEventListener("click", (event) => {
-  if (els.themePalette.hidden) return;
-  if (els.themePalette.contains(event.target) || els.themeToggle.contains(event.target)) return;
-  els.themePalette.hidden = true;
-  els.themeToggle.setAttribute("aria-expanded", "false");
-});
-
 document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && state.settingsOpen) {
+    state.settingsOpen = false;
+    render();
+    return;
+  }
   if (event.key === "Escape" && document.documentElement.hasAttribute("data-compact")) {
     setCompact(false, false);
     return;
   }
-  if (event.key.toLowerCase() === "n" && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+  if (event.key.toLowerCase() === "n" && !state.settingsOpen && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
     event.preventDefault();
     els.input.focus();
   }
