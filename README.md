@@ -10,8 +10,8 @@ instantly, with global shortcuts for quick capture.
 
 - **Web app:** [giupessota.github.io/lowstate](https://giupessota.github.io/lowstate/) — open it and click **Install** in the browser's address bar.
 - **Windows / macOS installer:** [latest release](https://github.com/giupessota/lowstate/releases/latest)
-  - [Lowstate Setup 1.0.5.exe](https://github.com/giupessota/lowstate/releases/download/v1.0.5/Lowstate.Setup.1.0.5.exe) (Windows)
-  - [Lowstate-1.0.5-arm64.dmg](https://github.com/giupessota/lowstate/releases/download/v1.0.5/Lowstate-1.0.5-arm64.dmg) (macOS, Apple Silicon)
+  - [Lowstate Setup 1.0.6.exe](https://github.com/giupessota/lowstate/releases/download/v1.0.6/Lowstate.Setup.1.0.6.exe) (Windows)
+  - [Lowstate-1.0.6-arm64.dmg](https://github.com/giupessota/lowstate/releases/download/v1.0.6/Lowstate-1.0.6-arm64.dmg) (macOS, Apple Silicon)
 
 The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
 will warn on first launch.
