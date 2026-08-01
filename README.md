@@ -14,8 +14,16 @@ instantly, with global shortcuts for quick capture.
   - [Lowstate-1.0.5-arm64.dmg](https://github.com/giupessota/lowstate/releases/download/v1.0.5/Lowstate-1.0.5-arm64.dmg) (macOS, Apple Silicon)
 
 The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
-will warn on first launch — choose "More info → Run anyway" (Windows) or
-right-click → "Open" (macOS).
+will warn on first launch.
+
+- **Windows:** choose "More info → Run anyway".
+- **macOS:** right-click (or Control-click) the app → "Open" → confirm. On
+  newer macOS versions this dialog may only offer "Move to Trash"/"Done"
+  with no way to open it — if so, open **Terminal** and run:
+  ```bash
+  xattr -cr /Applications/Lowstate.app
+  ```
+  then open Lowstate normally. This only needs to be done once per install.
 
 ## Run in a browser
 
