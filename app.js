@@ -4,6 +4,7 @@ const COVER_CUSTOM_KEY = "type-todo.cover-custom.v1";
 const COVER_MIX_KEY = "type-todo.cover-mix.v1";
 const THEME_KEY = "type-todo.theme.v1";
 const STYLE_KEY = "type-todo.style.v1";
+const FONT_SIZE_KEY = "type-todo.font-size.v1";
 const PRE_MINIMAL_COVER_KEY = "type-todo.pre-minimal-cover.v1";
 const CATEGORIES_KEY = "type-todo.categories.v1";
 const CATEGORY_COLORS_KEY = "type-todo.category-colors.v1";
@@ -174,6 +175,16 @@ function applyStyle(style) {
   localStorage.setItem(STYLE_KEY, style);
   document.querySelectorAll("[data-style-value]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.styleValue === style);
+  });
+}
+
+const savedFontSize = localStorage.getItem(FONT_SIZE_KEY) || "normal";
+
+function applyFontSize(size) {
+  document.documentElement.dataset.fontSize = size;
+  localStorage.setItem(FONT_SIZE_KEY, size);
+  document.querySelectorAll("[data-font-size-value]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.fontSizeValue === size);
   });
 }
 
@@ -1230,6 +1241,10 @@ document.querySelectorAll("[data-theme-value]").forEach((btn) => {
   btn.addEventListener("click", () => applyTheme(btn.dataset.themeValue));
 });
 
+document.querySelectorAll("[data-font-size-value]").forEach((btn) => {
+  btn.addEventListener("click", () => applyFontSize(btn.dataset.fontSizeValue));
+});
+
 document.querySelectorAll(".shortcut-key").forEach((btn) => {
   btn.addEventListener("click", () => {
     if (!window.desktopGadget) return;
@@ -1362,6 +1377,7 @@ window.addEventListener("beforeinstallprompt", () => {
 setInterval(checkDayRollover, 60_000);
 applyTheme(savedTheme);
 applyStyle(savedStyle);
+applyFontSize(savedFontSize);
 if (window.desktopGadget) {
   els.settingsWindowSection.hidden = false;
   applyAlwaysOnTop(savedAlwaysOnTop);
