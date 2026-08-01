@@ -19,11 +19,15 @@ will warn on first launch.
 - **Windows:** choose "More info → Run anyway".
 - **macOS:** right-click (or Control-click) the app → "Open" → confirm. On
   newer macOS versions this dialog may only offer "Move to Trash"/"Done"
-  with no way to open it — if so, open **Terminal** and run:
-  ```bash
-  xattr -cr /Applications/Lowstate.app
-  ```
-  then open Lowstate normally. This only needs to be done once per install.
+  with no way to open it — if so:
+  - Go to **System Settings → Privacy & Security**, scroll down, and look
+    for an **"Open Anyway"** button next to the Lowstate warning (appears
+    shortly after the blocked attempt); or
+  - Open **Terminal** and run:
+    ```bash
+    xattr -cr /Applications/Lowstate.app
+    ```
+  Either way, this only needs to be done once per install.
 
 ## Run in a browser
 
