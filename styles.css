@@ -783,11 +783,11 @@ button { cursor: pointer; }
   transition: border-color .15s, background .15s, transform .15s;
 }
 .check:hover { border-color: var(--green); background: rgba(93,157,136,.16); transform: rotate(0) scale(1.05); }
-.check span { opacity: 0; font: 700 19px var(--hand); transition: opacity .15s; }
-.check:hover span { opacity: .3; }
+.check-mark { width: 14px; height: 14px; opacity: 0; transition: opacity .15s; }
+.check:hover .check-mark { opacity: .3; }
 .done .check { border-color: var(--green); color: var(--green); }
-.done .check:hover span { opacity: 1; }
-.done .check span { opacity: 1; }
+.done .check:hover .check-mark { opacity: 1; }
+.done .check-mark { opacity: 1; }
 .quest-copy { min-width: 0; }
 .quest-meta { display: flex; gap: 5px; align-items: center; margin-bottom: 3px; }
 .boss-tag {
@@ -804,13 +804,13 @@ button { cursor: pointer; }
 .brain-tags { color: var(--purple); font-size: 7px; }
 .brain-item.processed .quest-title { color: #969da6; text-decoration: line-through 2px var(--green); }
 .brain-item.processed .check { border-color: var(--green); color: var(--green); }
-.brain-item.processed .check span { opacity: 1; }
+.brain-item.processed .check-mark { opacity: 1; }
 .quest-title { margin: 1px 0 0; overflow-wrap: anywhere; font: 600 20px/1.1 var(--hand); }
 .quest-item.done { opacity: .78; }
 .done .quest-title { color: #969da6; text-decoration: line-through 2px var(--red); }
 /* One-shot completion animation (plays on the item just before it re-renders) */
 .just-done .check { border-color: var(--green); color: var(--green); animation: check-pop .28s ease; }
-.just-done .check span { opacity: 1; }
+.just-done .check-mark { opacity: 1; }
 .just-done .quest-title { position: relative; display: inline-block; max-width: 100%; color: #969da6; }
 .just-done .quest-title::after {
   content: "";

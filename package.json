@@ -27,6 +27,7 @@
       "sw.js",
       "assets/**/*"
     ],
+    "afterSign": "scripts/after-sign.cjs",
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",

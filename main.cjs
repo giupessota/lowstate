@@ -49,12 +49,16 @@ let shortcuts = { ...DEFAULT_SHORTCUTS };
 
 function focusWindow(compact) {
   if (!window) return;
-  setCompactWindow(compact);
   // A minimized window still reports isVisible() === true on macOS, so
   // isMinimized() has to be checked separately before restoring/showing.
   if (window.isMinimized()) window.restore();
   window.show();
   window.focus();
+  // Resize AFTER show/restore, not before: on Windows, a setContentSize()
+  // applied while the window is still hidden/minimized can get silently
+  // discarded once the OS repaints it, leaving the window at its old
+  // (full) size with the compact UI rendered inside it.
+  setCompactWindow(compact);
 }
 
 const SHORTCUT_HANDLERS = {
