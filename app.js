@@ -151,8 +151,7 @@ const savedMix = (localStorage.getItem(COVER_MIX_KEY) || "210,40").split(",");
 els.coverHue.value = savedMix[0];
 els.coverDepth.value = savedMix[1];
 
-const savedTheme = localStorage.getItem(THEME_KEY)
-  || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+const savedTheme = localStorage.getItem(THEME_KEY) || "light";
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
