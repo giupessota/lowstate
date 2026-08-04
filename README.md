@@ -16,7 +16,7 @@ instantly, with global shortcuts for quick capture.
 - Undo feedback plus a 30-day Trash for deleted tasks and notes
 - Notebook and minimal styles, light/dark themes, and custom colors
 - English and Portuguese interface
-- Local backup and restore
+- Automatic durable desktop snapshots plus manual backup and restore
 - Installable offline PWA and always-on-top Electron desktop app
 
 ## Download
@@ -26,7 +26,7 @@ instantly, with global shortcuts for quick capture.
 
 Every push to `main` also creates downloadable GitHub Actions artifacts for
 Windows x64 and a universal macOS build that supports both Intel and Apple
-Silicon. Version tags such as `v1.1.1`
+Silicon. Version tags such as `v1.1.2`
 publish those installers to the corresponding GitHub Release.
 
 The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
@@ -58,8 +58,17 @@ Open `http://localhost:4173`.
 ## Install as a browser app
 
 Open the app in Chrome or Edge and click the **Install** icon in the address bar.
-Lowstate will open in its own window and continue working offline. Tasks are
-stored only on the device using `localStorage`.
+Lowstate will open in its own window and continue working offline. Browser/PWA
+data is stored only on the device using `localStorage`.
+
+The desktop app additionally mirrors tasks, Brain Inbox notes, categories, and
+settings into `lowstate-data.json` inside a separate per-user data directory. A
+previous valid copy is kept as `lowstate-data.backup.json`; if Chromium's local
+profile is reset or the current snapshot is damaged, Lowstate restores the
+missing data automatically on launch. This remains local-only and is not cloud
+sync. On the first launch, the desktop app also checks the legacy
+`type-todo-desktop` profile and migrates notes left there by versions from before
+the Lowstate rename.
 
 Deleted tasks and Brain Inbox notes stay in the in-app Trash for 30 days. Use
 **Settings → Data → Trash** to restore the latest item or empty it permanently.
@@ -91,7 +100,7 @@ npm run dist:win
 ```
 
 Installer filenames include the target architecture, for example
-`Lowstate-1.1.1-universal.dmg` and `Lowstate-Setup-1.1.1-x64.exe`.
+`Lowstate-1.1.2-universal.dmg` and `Lowstate-Setup-1.1.2-x64.exe`.
 
 To run syntax checks and the automated tests:
 

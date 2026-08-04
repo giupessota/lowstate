@@ -155,7 +155,7 @@ const savedTheme = localStorage.getItem(THEME_KEY) || "light";
 
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  localStorage.setItem(THEME_KEY, theme);
+  store.setRaw(THEME_KEY, theme);
   document.querySelectorAll("[data-theme-value]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.themeValue === theme);
   });
@@ -165,7 +165,7 @@ const savedStyle = localStorage.getItem(STYLE_KEY) || "notebook";
 
 function applyStyle(style) {
   document.documentElement.dataset.style = style;
-  localStorage.setItem(STYLE_KEY, style);
+  store.setRaw(STYLE_KEY, style);
   document.querySelectorAll("[data-style-value]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.styleValue === style);
   });
@@ -175,7 +175,7 @@ const savedFontSize = localStorage.getItem(FONT_SIZE_KEY) || "normal";
 
 function applyFontSize(size) {
   document.documentElement.dataset.fontSize = size;
-  localStorage.setItem(FONT_SIZE_KEY, size);
+  store.setRaw(FONT_SIZE_KEY, size);
   document.querySelectorAll("[data-font-size-value]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.fontSizeValue === size);
   });
@@ -193,7 +193,7 @@ function showUpdateAvailable(info) {
 const savedAlwaysOnTop = localStorage.getItem(ALWAYS_ON_TOP_KEY) !== "off";
 
 function applyAlwaysOnTop(on) {
-  localStorage.setItem(ALWAYS_ON_TOP_KEY, on ? "on" : "off");
+  store.setRaw(ALWAYS_ON_TOP_KEY, on ? "on" : "off");
   window.desktopGadget?.setAlwaysOnTop(on);
   document.querySelectorAll("[data-aot-value]").forEach((btn) => {
     btn.classList.toggle("active", (btn.dataset.aotValue === "on") === on);
@@ -274,7 +274,7 @@ async function commitShortcut(key, accelerator) {
     return;
   }
   shortcuts[key] = accelerator;
-  localStorage.setItem(SHORTCUTS_KEY, JSON.stringify(shortcuts));
+  store.setRaw(SHORTCUTS_KEY, JSON.stringify(shortcuts));
   renderShortcut(key);
 }
 
@@ -316,7 +316,7 @@ function setStyle(newStyle) {
   const current = document.documentElement.dataset.style;
   if (newStyle === current) return;
   if (newStyle === "minimal") {
-    localStorage.setItem(PRE_MINIMAL_COVER_KEY, document.documentElement.dataset.cover || "forest");
+    store.setRaw(PRE_MINIMAL_COVER_KEY, document.documentElement.dataset.cover || "forest");
     selectCover("mono");
   } else if (current === "minimal") {
     const restoreCover = localStorage.getItem(PRE_MINIMAL_COVER_KEY) || "forest";
@@ -348,10 +348,10 @@ function applyCustomCover(hex) {
 
 function selectCover(cover, customHex) {
   document.documentElement.dataset.cover = cover;
-  localStorage.setItem(COVER_KEY, cover);
+  store.setRaw(COVER_KEY, cover);
   if (cover === "custom") {
     const hex = customHex || localStorage.getItem(COVER_CUSTOM_KEY) || "#d9a5a0";
-    localStorage.setItem(COVER_CUSTOM_KEY, hex);
+    store.setRaw(COVER_CUSTOM_KEY, hex);
     applyCustomCover(hex);
   } else {
     CUSTOM_COVER_VARS.forEach((v) => document.documentElement.style.removeProperty(v));
@@ -1429,9 +1429,9 @@ els.clearDone.addEventListener("click", () => {
   });
 });
 
-// ----- Backup / restore (all data lives in localStorage) -----
+// ----- Manual backup / restore (desktop data is also mirrored to disk) -----
 function isAppKey(key) {
-  return key.startsWith("type-todo.") || key.startsWith("quest-log.");
+  return store.isAppKey(key);
 }
 
 els.exportData.addEventListener("click", () => {
@@ -1467,11 +1467,7 @@ els.importFile.addEventListener("change", async () => {
       "Restore this backup? It will replace your current tasks, notes, categories and settings."
     );
     if (!ok) return;
-    for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i);
-      if (isAppKey(key)) localStorage.removeItem(key);
-    }
-    keys.forEach((key) => localStorage.setItem(key, data[key]));
+    store.replaceAll(Object.fromEntries(keys.map((key) => [key, data[key]])));
     location.reload();
   } catch (error) {
     window.alert("Couldn't read that file — make sure it's a Type Todo backup (.json).");
@@ -1534,7 +1530,7 @@ document.querySelectorAll("[data-language-value]").forEach((btn) => {
 });
 
 els.dismissOnboarding.addEventListener("click", () => {
-  localStorage.setItem(ONBOARDING_KEY, "1");
+  store.setRaw(ONBOARDING_KEY, "1");
   els.onboardingTip.hidden = true;
 });
 
@@ -1610,7 +1606,7 @@ els.titleForm.addEventListener("submit", (event) => {
   const title = els.titleInput.value.trim().toUpperCase();
   if (title) {
     els.notebookTitle.textContent = title;
-    localStorage.setItem(NOTEBOOK_TITLE_KEY, title);
+    store.setRaw(NOTEBOOK_TITLE_KEY, title);
   }
   els.titleForm.hidden = true;
   els.titleButton.hidden = false;
@@ -1650,7 +1646,7 @@ els.coverPickerToggle.addEventListener("click", (event) => {
   slider.addEventListener("input", () => {
     refreshCoverPicker();
     selectCover("custom", coverMixHex());
-    localStorage.setItem(COVER_MIX_KEY, `${els.coverHue.value},${els.coverDepth.value}`);
+    store.setRaw(COVER_MIX_KEY, `${els.coverHue.value},${els.coverDepth.value}`);
   });
 });
 

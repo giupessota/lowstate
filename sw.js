@@ -1,4 +1,4 @@
-const CACHE = "lowstate-v3";
+const CACHE = "lowstate-v4";
 const ASSETS = [
   "./",
   "./index.html",

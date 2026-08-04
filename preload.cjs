@@ -1,5 +1,10 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+contextBridge.exposeInMainWorld("desktopStorage", {
+  loadSnapshot: () => ipcRenderer.sendSync("storage-load"),
+  saveSnapshot: (data) => ipcRenderer.sendSync("storage-save", data),
+});
+
 contextBridge.exposeInMainWorld("desktopTheme", {
   setCover: (cover) => ipcRenderer.send("cover-changed", cover)
 });

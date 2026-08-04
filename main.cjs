@@ -1,6 +1,8 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, session } = require("electron");
+const fs = require("fs");
 const https = require("https");
 const path = require("path");
+const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
@@ -46,6 +48,86 @@ const DEFAULT_SHORTCUTS = {
   brain: "CommandOrControl+Shift+B",
 };
 let shortcuts = { ...DEFAULT_SHORTCUTS };
+
+function desktopStoragePaths() {
+  // Keep the durable copy outside Chromium's userData/profile directory. If
+  // that profile is reset, this sibling directory is left intact.
+  const directory = path.join(app.getPath("appData"), "Lowstate Data");
+  return {
+    current: path.join(directory, "lowstate-data.json"),
+    backup: path.join(directory, "lowstate-data.backup.json"),
+  };
+}
+
+// localStorage remains the web/PWA-compatible working store. The desktop app
+// mirrors it into an atomic JSON file outside Electron's Chromium profile so a
+// damaged or reset profile can be rebuilt on the next launch.
+ipcMain.on("storage-load", (event) => {
+  const paths = desktopStoragePaths();
+  event.returnValue = loadSnapshot(paths.current, paths.backup);
+});
+
+ipcMain.on("storage-save", (event, data) => {
+  try {
+    const paths = desktopStoragePaths();
+    const snapshot = saveSnapshot(paths.current, paths.backup, data);
+    event.returnValue = { ok: true, savedAt: snapshot.savedAt };
+  } catch (error) {
+    console.error("Could not persist Lowstate data snapshot:", error);
+    event.returnValue = { ok: false };
+  }
+});
+
+async function migrateLegacyProfile() {
+  const paths = desktopStoragePaths();
+  if (Object.keys(loadSnapshot(paths.current, paths.backup).data).length) return;
+
+  // The app was originally published as "type-todo-desktop". Electron derives
+  // its profile folder from that package name, so notes from installations made
+  // before the Lowstate rename can still be present in this sibling profile.
+  const legacyProfile = path.join(app.getPath("appData"), "type-todo-desktop");
+  if (!fs.existsSync(legacyProfile) || legacyProfile === app.getPath("userData")) return;
+
+  let legacyWindow;
+  try {
+    const legacySession = session.fromPath(legacyProfile);
+    legacySession.webRequest.onBeforeRequest(
+      { urls: ["http://*/*", "https://*/*"] },
+      (_details, callback) => callback({ cancel: true })
+    );
+    legacyWindow = new BrowserWindow({
+      show: false,
+      webPreferences: {
+        contextIsolation: true,
+        sandbox: true,
+        session: legacySession,
+      },
+    });
+    await legacyWindow.loadFile(path.join(__dirname, "index.html"));
+    const data = await legacyWindow.webContents.executeJavaScript(`(() => {
+      const recovered = {};
+      for (let index = 0; index < localStorage.length; index++) {
+        const key = localStorage.key(index);
+        if (key && (key.startsWith("type-todo.") || key.startsWith("quest-log."))) {
+          recovered[key] = localStorage.getItem(key);
+        }
+      }
+      return recovered;
+    })()`);
+    const contentKeys = ["quest-log.todos.v1", "type-todo.brain-inbox.v1", "type-todo.trash.v1"];
+    const hasRecoverableContent = contentKeys.some((key) => {
+      try {
+        const items = JSON.parse(data?.[key]);
+        return Array.isArray(items) && items.length > 0;
+      } catch { return false; }
+    });
+    if (hasRecoverableContent) saveSnapshot(paths.current, paths.backup, data);
+  } catch (error) {
+    console.error("Could not migrate the legacy Lowstate profile:", error);
+  } finally {
+    legacyWindow?.destroy();
+  }
+}
 
 function focusWindow(compact) {
   if (!window) return;
@@ -133,7 +215,7 @@ function checkForUpdate() {
   }).on("error", () => {});
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (process.platform === "darwin") {
     app.dock.setIcon(iconPath);
   } else {
@@ -142,6 +224,7 @@ app.whenReady().then(() => {
     // text fields, so it stays there; Windows/Linux don't have that dependency.
     Menu.setApplicationMenu(null);
   }
+  await migrateLegacyProfile();
   createWindow();
   registerShortcuts(shortcuts);
   setTimeout(checkForUpdate, 2000);
