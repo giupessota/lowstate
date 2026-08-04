@@ -1,13 +1,17 @@
 name: Build desktop apps
 
-# Roda ao criar uma tag "v..." (ex.: v1.0.1) ou manualmente pelo botão "Run workflow".
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: desktop-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -17,29 +21,41 @@ jobs:
         include:
           - os: windows-latest
             script: "dist:win"
+            arch: "--x64"
             pattern: "dist/*.exe"
+            artifact: "lowstate-windows-x64"
           - os: macos-latest
             script: "dist:mac"
-            pattern: "dist/*.dmg"
+            arch: "--x64"
+            pattern: "dist/*-x64.dmg"
+            artifact: "lowstate-macos-x64"
+          - os: macos-latest
+            script: "dist:mac"
+            arch: "--arm64"
+            pattern: "dist/*-arm64.dmg"
+            artifact: "lowstate-macos-arm64"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
       - run: npm ci
+      - name: Check and test
+        run: npm run check
       - name: Build installer
-        run: npm run ${{ matrix.script }}
+        run: npm run ${{ matrix.script }} -- ${{ matrix.arch }}
         env:
-          # Não assinar (build gratuito). Gera app não assinado.
           CSC_IDENTITY_AUTO_DISCOVERY: false
-      # Fica disponível pra baixar na aba Actions, em qualquer execução
       - uses: actions/upload-artifact@v4
         with:
-          name: type-todo-${{ runner.os }}
+          name: ${{ matrix.artifact }}
           path: ${{ matrix.pattern }}
-      # Ao criar uma tag "v...", anexa os instaladores numa Release
+          if-no-files-found: error
+          retention-days: 30
       - uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ${{ matrix.pattern }}
+          generate_release_notes: true

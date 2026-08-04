@@ -1,12 +1,14 @@
 {
   "name": "lowstate-desktop",
-  "version": "1.0.7",
+  "version": "1.1.0",
   "private": true,
   "description": "Lowstate — lower your mental entropy. A retro notebook to-do gadget for Windows and macOS.",
   "author": "Giuliana Pessota",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
+    "test": "node --test",
+    "check": "node --check app.js && node --check core.js && node --check storage.js && node --check i18n.js && node --check main.cjs && node --check preload.cjs && node --test",
     "dist:mac": "electron-builder --mac --publish=never",
     "dist:win": "electron-builder --win --publish=never"
   },
@@ -22,6 +24,9 @@
       "preload.cjs",
       "index.html",
       "styles.css",
+      "storage.js",
+      "i18n.js",
+      "core.js",
       "app.js",
       "manifest.webmanifest",
       "sw.js",
@@ -31,12 +36,14 @@
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         "dmg"
       ]
     },
     "win": {
       "icon": "assets/icon.ico",
+      "artifactName": "${productName}-Setup-${version}-${arch}.${ext}",
       "target": [
         "nsis"
       ]

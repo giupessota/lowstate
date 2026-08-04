@@ -1,8 +1,11 @@
-const CACHE = "lowstate-v1";
+const CACHE = "lowstate-v3";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
+  "./storage.js",
+  "./i18n.js",
+  "./core.js",
   "./app.js",
   "./manifest.webmanifest",
   "./assets/icon.svg",

@@ -2,16 +2,31 @@
 
 **Lower your mental entropy.**
 
+[![Build desktop apps](https://github.com/giupessota/lowstate/actions/workflows/build-desktop.yml/badge.svg)](https://github.com/giupessota/lowstate/actions/workflows/build-desktop.yml)
+
 A tiny to-do gadget for Windows and macOS with a retro notebook design. The
 desktop edition opens in an always-on-top window and can be shown or hidden
 instantly, with global shortcuts for quick capture.
+
+## Features
+
+- Tasks with due dates, categories, urgency, filters, and drag ordering
+- Quick syntax such as `#work`, `!urgent`, and `@tomorrow`
+- Brain Inbox with hashtags, batch processing, and conversion into tasks
+- Undo feedback plus a 30-day Trash for deleted tasks and notes
+- Notebook and minimal styles, light/dark themes, and custom colors
+- English and Portuguese interface
+- Local backup and restore
+- Installable offline PWA and always-on-top Electron desktop app
 
 ## Download
 
 - **Web app:** [giupessota.github.io/lowstate](https://giupessota.github.io/lowstate/) — open it and click **Install** in the browser's address bar.
 - **Windows / macOS installer:** [latest release](https://github.com/giupessota/lowstate/releases/latest)
-  - [Lowstate Setup 1.0.7.exe](https://github.com/giupessota/lowstate/releases/download/v1.0.7/Lowstate.Setup.1.0.7.exe) (Windows)
-  - [Lowstate-1.0.7-arm64.dmg](https://github.com/giupessota/lowstate/releases/download/v1.0.7/Lowstate-1.0.7-arm64.dmg) (macOS, Apple Silicon)
+
+Every push to `main` also creates downloadable GitHub Actions artifacts for
+Windows x64, macOS Intel, and macOS Apple Silicon. Version tags such as `v1.1.0`
+publish those installers to the corresponding GitHub Release.
 
 The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
 will warn on first launch.
@@ -45,6 +60,19 @@ Open the app in Chrome or Edge and click the **Install** icon in the address bar
 Lowstate will open in its own window and continue working offline. Tasks are
 stored only on the device using `localStorage`.
 
+Deleted tasks and Brain Inbox notes stay in the in-app Trash for 30 days. Use
+**Settings → Data → Trash** to restore the latest item or empty it permanently.
+
+## Quick capture syntax
+
+Task details can be added without leaving the input field:
+
+- `#work`: category (new categories are created automatically)
+- `!urgent` or `!!`: urgent priority
+- `@today`, `@tomorrow`, `@weekend`, `@nextweek`: due date
+
+Portuguese aliases such as `!urgente`, `@hoje`, and `@amanhã` also work.
+
 ## Always-on-top desktop edition
 
 From the `todo-gadget` directory:
@@ -59,6 +87,15 @@ To create installers:
 ```bash
 npm run dist:mac
 npm run dist:win
+```
+
+Installer filenames include the target architecture, for example
+`Lowstate-1.1.0-arm64.dmg` and `Lowstate-Setup-1.1.0-x64.exe`.
+
+To run syntax checks and the automated tests:
+
+```bash
+npm run check
 ```
 
 ## Keyboard shortcuts

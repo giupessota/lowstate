@@ -17,6 +17,11 @@ const DEFAULT_SHORTCUTS = {
   brain: "CommandOrControl+Shift+B",
 };
 const BRAIN_KEY = "type-todo.brain-inbox.v1";
+const ONBOARDING_KEY = "type-todo.onboarding-dismissed.v1";
+const NEW_TASK_DUE_TARGET = "__new_task__";
+const { startOfDay, toISODate, parseISODate, dueMeta, quickDueISO, filterAndSortTodos, parseTaskCapture } = window.LowstateCore;
+const store = window.LowstateStorage;
+const { t } = window.LowstateI18n;
 
 const state = {
   todos: loadTodos(),
@@ -28,57 +33,26 @@ const state = {
   categories: loadCategories(),
   categoryColors: loadCategoryColors(),
   urgentOnly: false,
+  filterMenuOpen: false,
   priority: "normal",
+  newDueDate: null,
+  captureOptionsOpen: false,
   editingId: null,
   mode: "tasks",
   brainNotes: loadBrainNotes(),
   brainFilter: "unprocessed",
+  brainTag: null,
   dueTarget: null,
   dueView: null,
   settingsOpen: false,
+  trash: store.pruneTrash(),
 };
 
-// ----- Due dates -----
-const MONTHS_SHORT = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
-const MONTHS_LONG = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
-function startOfDay(date) {
-  const clone = new Date(date);
-  clone.setHours(0, 0, 0, 0);
-  return clone;
-}
-function toISODate(date) {
-  const d = startOfDay(date);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-function parseISODate(str) {
-  const [y, m, d] = str.split("-").map(Number);
-  return new Date(y, m - 1, d);
-}
-function dueMeta(dueDate) {
-  if (!dueDate) return { status: "none", label: "" };
-  const due = startOfDay(parseISODate(dueDate));
-  const diff = Math.round((due - startOfDay(new Date())) / 86400000);
-  if (diff < 0) return { status: "overdue", label: `${due.getDate()} ${MONTHS_SHORT[due.getMonth()]}` };
-  if (diff === 0) return { status: "today", label: "TODAY" };
-  if (diff === 1) return { status: "future", label: "TOMORROW" };
-  return { status: "future", label: `${due.getDate()} ${MONTHS_SHORT[due.getMonth()]}` };
-}
-function quickDueISO(kind) {
-  const d = startOfDay(new Date());
-  const wd = d.getDay();
-  if (kind === "tomorrow") d.setDate(d.getDate() + 1);
-  else if (kind === "weekend") d.setDate(d.getDate() + ((6 - wd + 7) % 7));
-  else if (kind === "nextweek") d.setDate(d.getDate() + (((1 - wd + 7) % 7) || 7));
-  return toISODate(d);
-}
-
 // One-time migration: tasks created before due dates existed (no dueDate field)
-// get today's date. Tasks explicitly cleared ("NO DATE", dueDate: null) are left as-is.
+// remain unscheduled. Tasks explicitly cleared ("NO DATE", dueDate: null) are left as-is.
 if (state.todos.some((todo) => !("dueDate" in todo))) {
-  const today = toISODate(new Date());
   state.todos.forEach((todo) => {
-    if (!("dueDate" in todo)) todo.dueDate = today;
+    if (!("dueDate" in todo)) todo.dueDate = null;
   });
   saveTodos();
 }
@@ -116,6 +90,10 @@ const els = {
   categoryForm: document.querySelector("#categoryForm"),
   categoryInput: document.querySelector("#categoryInput"),
   urgentToggle: document.querySelector("#urgentToggle"),
+  filterMenuToggle: document.querySelector("#filterMenuToggle"),
+  filterMenu: document.querySelector("#filterMenu"),
+  filterActiveDot: document.querySelector("#filterActiveDot"),
+  filterCategoryList: document.querySelector("#filterCategoryList"),
   compactToggle: document.querySelector("#compactToggle"),
   compactExpand: document.querySelector("#compactExpand"),
   exportData: document.querySelector("#exportData"),
@@ -131,6 +109,9 @@ const els = {
   coverHue: document.querySelector("#coverHue"),
   coverDepth: document.querySelector("#coverDepth"),
   coverPreview: document.querySelector("#coverPreview"),
+  captureOptionsToggle: document.querySelector("#captureOptionsToggle"),
+  captureOptions: document.querySelector("#captureOptions"),
+  newDueButton: document.querySelector("#newDueButton"),
   titleButton: document.querySelector("#titleButton"),
   notebookTitle: document.querySelector("#notebookTitle"),
   titleForm: document.querySelector("#titleForm"),
@@ -140,6 +121,9 @@ const els = {
   brainFilters: document.querySelector("#brainFilters"),
   copyBrain: document.querySelector("#copyBrain"),
   exportBrain: document.querySelector("#exportBrain"),
+  processBrain: document.querySelector("#processBrain"),
+  brainTagToggle: document.querySelector("#brainTagToggle"),
+  brainTagMenu: document.querySelector("#brainTagMenu"),
   paperSlot: document.querySelector(".paper-slot span"),
   settingsWindowSection: document.querySelector("#settingsWindowSection"),
   globalShortcuts: document.querySelector("#globalShortcuts"),
@@ -147,6 +131,16 @@ const els = {
   updateBanner: document.querySelector("#updateBanner"),
   updateBannerText: document.querySelector("#updateBannerText"),
   updateBannerButton: document.querySelector("#updateBannerButton"),
+  toast: document.querySelector("#toast"),
+  toastMessage: document.querySelector("#toastMessage"),
+  toastAction: document.querySelector("#toastAction"),
+  emptyTitle: document.querySelector("#emptyTitle"),
+  emptyHint: document.querySelector("#emptyHint"),
+  onboardingTip: document.querySelector("#onboardingTip"),
+  dismissOnboarding: document.querySelector("#dismissOnboarding"),
+  trashCount: document.querySelector("#trashCount"),
+  restoreTrash: document.querySelector("#restoreTrash"),
+  emptyTrash: document.querySelector("#emptyTrash"),
 };
 
 const savedCover = localStorage.getItem(COVER_KEY) || "forest";
@@ -397,72 +391,94 @@ function refreshCoverPicker() {
 }
 
 function loadTodos() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    return Array.isArray(saved) ? saved : [];
-  } catch {
-    return [];
-  }
+  return store.loadArray(STORAGE_KEY);
 }
 
 function loadBrainNotes() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(BRAIN_KEY));
-    return Array.isArray(saved) ? saved : [];
-  } catch {
-    return [];
-  }
+  return store.loadArray(BRAIN_KEY);
 }
 
 function saveBrainNotes() {
-  localStorage.setItem(BRAIN_KEY, JSON.stringify(state.brainNotes));
+  store.save(BRAIN_KEY, state.brainNotes);
 }
 
 function loadCategories() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(CATEGORIES_KEY));
-    return Array.isArray(saved) ? saved : [];
-  } catch {
-    return [];
-  }
+  return store.loadArray(CATEGORIES_KEY);
 }
 
 function saveCategories() {
-  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(state.categories));
+  store.save(CATEGORIES_KEY, state.categories);
 }
 
 function loadCategoryColors() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(CATEGORY_COLORS_KEY));
-    return saved && typeof saved === "object" ? saved : {};
-  } catch {
-    return {};
-  }
+  return store.loadObject(CATEGORY_COLORS_KEY);
 }
 
 function saveCategoryColors() {
-  localStorage.setItem(CATEGORY_COLORS_KEY, JSON.stringify(state.categoryColors));
+  store.save(CATEGORY_COLORS_KEY, state.categoryColors);
 }
 
 function saveTodos() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.todos));
+  store.save(STORAGE_KEY, state.todos);
+}
+
+let toastTimer = null;
+let toastAction = null;
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  toastTimer = null;
+  toastAction = null;
+  els.toast.hidden = true;
+}
+
+function showToast(message, options = {}) {
+  clearTimeout(toastTimer);
+  els.toastMessage.textContent = message;
+  toastAction = options.action || null;
+  els.toastAction.hidden = !toastAction;
+  els.toastAction.textContent = options.actionLabel || t("undo");
+  els.toast.hidden = false;
+  toastTimer = setTimeout(hideToast, options.duration || 5000);
+}
+
+function resetNewTaskOptions(options = {}) {
+  state.priority = "normal";
+  if (!options.keepCategory) state.newCategory = null;
+  state.newDueDate = null;
+  state.captureOptionsOpen = false;
+  document.querySelectorAll(".priority").forEach((button) => {
+    button.classList.toggle("active", button.dataset.priority === "normal");
+  });
+  updateCategoryPicker();
+  updateNewDueButton();
+  updateCaptureOptions();
 }
 
 function addTodo(title) {
-  const cleanTitle = title.trim();
+  const parsed = parseTaskCapture(title);
+  const cleanTitle = parsed.title;
   if (!cleanTitle) return;
+  if (parsed.category && !state.categories.includes(parsed.category)) {
+    state.categories.push(parsed.category);
+    state.categoryColors[parsed.category] = "#c9dfd5";
+    saveCategories();
+    saveCategoryColors();
+  }
   state.todos.unshift({
     id: crypto.randomUUID(),
     title: cleanTitle,
-    priority: state.priority,
-    category: state.newCategory,
-    dueDate: toISODate(new Date()),
+    priority: parsed.priority || state.priority,
+    category: parsed.category || state.newCategory,
+    dueDate: parsed.dueDate !== undefined ? parsed.dueDate : state.newDueDate,
     order: -Date.now(),
     done: false,
     createdAt: Date.now(),
   });
   saveTodos();
   els.form.reset();
+  if (parsed.category) state.newCategory = parsed.category;
+  resetNewTaskOptions({ keepCategory: true });
   render();
 }
 
@@ -496,27 +512,48 @@ function updateBrainNote(id, text) {
 }
 
 function deleteTodo(id) {
-  state.todos = state.todos.filter((todo) => todo.id !== id);
+  const index = state.todos.findIndex((todo) => todo.id === id);
+  if (index < 0) return;
+  const [deleted] = state.todos.splice(index, 1);
+  state.trash = store.trash("todo", deleted, index);
+  const trashId = state.trash[0].id;
   saveTodos();
   render();
+  showToast(t("taskDeleted"), {
+    actionLabel: t("undo"),
+    action: () => {
+      store.removeTrashEntry(trashId);
+      state.trash = store.pruneTrash();
+      state.todos.splice(index, 0, deleted);
+      saveTodos();
+      render();
+    },
+  });
+}
+
+function setTodoCompleted(id, done) {
+  const todo = state.todos.find((entry) => entry.id === id);
+  if (!todo) return;
+  const previous = todo.done;
+  updateTodo(id, { done });
+  showToast(done ? t("taskCompleted") : t("taskReopened"), {
+    actionLabel: t("undo"),
+    action: () => updateTodo(id, { done: previous }),
+  });
+}
+
+function updateTrashSettings() {
+  state.trash = store.pruneTrash();
+  els.trashCount.textContent = state.trash.length;
+  els.restoreTrash.disabled = state.trash.length === 0;
+  els.emptyTrash.disabled = state.trash.length === 0;
 }
 
 function visibleTodos() {
-  let todos;
-  if (state.category) todos = state.todos.filter((todo) => todo.category === state.category);
-  else if (state.filter === "active") todos = state.todos.filter((todo) => !todo.done);
-  else if (state.filter === "done") todos = state.todos.filter((todo) => todo.done);
-  else if (state.filter === "today") todos = state.todos.filter((todo) => !todo.done && dueMeta(todo.dueDate).status === "today");
-  else if (state.filter === "overdue") todos = state.todos.filter((todo) => !todo.done && dueMeta(todo.dueDate).status === "overdue");
-  else todos = state.todos;
-  if (state.urgentOnly) todos = todos.filter((todo) => todo.priority === "boss");
-  return todos.slice().sort((a, b) => {
-    const ad = a.dueDate ? parseISODate(a.dueDate).getTime() : Infinity;
-    const bd = b.dueDate ? parseISODate(b.dueDate).getTime() : Infinity;
-    if (ad !== bd) return ad - bd;
-    const ao = a.order ?? -a.createdAt;
-    const bo = b.order ?? -b.createdAt;
-    return ao !== bo ? ao - bo : b.createdAt - a.createdAt;
+  return filterAndSortTodos(state.todos, {
+    category: state.category,
+    filter: state.filter,
+    urgentOnly: state.urgentOnly,
   });
 }
 
@@ -540,13 +577,44 @@ function reorderTodo(dragId, targetId, insertAfter) {
   render();
 }
 
+function updateNewDueButton() {
+  const meta = dueMeta(state.newDueDate);
+  const label = meta.label === "TODAY" ? t("today") : (meta.label === "TOMORROW" ? t("tomorrow") : meta.label);
+  els.newDueButton.textContent = meta.status === "none" ? `◷ ${t("date")}` : `◷ ${label}`;
+  els.newDueButton.dataset.status = meta.status;
+}
+
+function updateCaptureOptions() {
+  const open = state.captureOptionsOpen && state.mode === "tasks";
+  els.captureOptions.hidden = !open;
+  els.form.classList.toggle("options-open", open);
+  els.captureOptionsToggle.setAttribute("aria-expanded", String(open));
+  els.captureOptionsToggle.classList.toggle("active", open || Boolean(state.newCategory || state.newDueDate || state.priority === "boss"));
+}
+
+function updateEmptyState(empty, titleKey, hintKey) {
+  els.empty.classList.toggle("visible", empty);
+  els.emptyTitle.textContent = empty ? t(titleKey) : "";
+  els.emptyHint.textContent = empty ? t(hintKey) : "";
+}
+
 function render() {
+  window.LowstateI18n.apply();
+  document.querySelectorAll("[data-language-value]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.languageValue === window.LowstateI18n.language);
+  });
+  updateTrashSettings();
   els.paper.classList.toggle("settings-mode", state.settingsOpen);
   els.settingsPage.hidden = !state.settingsOpen;
   els.settingsBack.hidden = !state.settingsOpen;
   els.paperSlot.textContent = state.settingsOpen
     ? "SETTINGS"
     : (state.mode === "brain" ? "BRAIN INBOX" : "TO-DO LIST");
+  const showOnboarding = !localStorage.getItem(ONBOARDING_KEY)
+    && state.todos.length === 0
+    && state.brainNotes.length === 0
+    && !state.settingsOpen;
+  els.onboardingTip.hidden = !showOnboarding;
   if (state.settingsOpen) return;
 
   els.list.replaceChildren();
@@ -559,13 +627,19 @@ function render() {
   document.querySelectorAll("[data-mode]").forEach((button) => {
     button.classList.toggle("active", button.dataset.mode === state.mode);
   });
-  document.querySelector(".priority-picker").hidden = brainMode;
-  document.querySelector(".priority-picker").style.display = brainMode ? "none" : "";
-  document.querySelector(".cat-picker").style.display = brainMode ? "none" : "";
-  if (brainMode) closeCategoryMenu();
-  els.input.placeholder = brainMode ? "capture an idea, link, or note... #tag" : "type a task...";
-  els.input.setAttribute("aria-label", brainMode ? "New brain capture" : "New task");
-  els.form.querySelector(':scope > button[type="submit"]').setAttribute("aria-label", brainMode ? "Add capture" : "Add task");
+  els.captureOptionsToggle.hidden = brainMode;
+  if (brainMode) {
+    closeCategoryMenu();
+    state.captureOptionsOpen = false;
+    state.filterMenuOpen = false;
+  } else {
+    els.brainTagToggle.setAttribute("aria-expanded", "false");
+    els.brainTagMenu.hidden = true;
+  }
+  updateCaptureOptions();
+  els.input.placeholder = brainMode ? t("brainPlaceholder") : t("taskPlaceholder");
+  els.input.setAttribute("aria-label", brainMode ? t("newBrain") : t("newTask"));
+  els.form.querySelector(':scope > button[type="submit"]').setAttribute("aria-label", brainMode ? t("addCapture") : t("addTask"));
   if (brainMode) {
     renderBrainInbox();
     return;
@@ -591,11 +665,12 @@ function render() {
     const meta = dueMeta(todo.dueDate);
     dueChip.hidden = false;
     dueChip.dataset.status = todo.done ? "done" : meta.status;
-    dueChip.textContent = meta.status === "none" ? "◷ date" : `◷ ${meta.label}`;
+    const dueLabel = meta.label === "TODAY" ? t("today") : (meta.label === "TOMORROW" ? t("tomorrow") : meta.label);
+    dueChip.textContent = meta.status === "none" ? `◷ ${t("date").toLowerCase()}` : `◷ ${dueLabel}`;
     dueChip.title = "Set due date";
     const editInput = item.querySelector(".edit-input");
     editInput.value = todo.title;
-    item.querySelector(".check").setAttribute("aria-label", todo.done ? "Reopen task" : "Complete task");
+    item.querySelector(".check").setAttribute("aria-label", todo.done ? t("reopenTask") : t("completeTask"));
     els.list.append(item);
     if (state.editingId === todo.id) requestAnimationFrame(() => editInput.focus());
   });
@@ -604,15 +679,17 @@ function render() {
   const done = state.todos.length - active;
   const percent = state.todos.length ? Math.round((done / state.todos.length) * 100) : 0;
   els.activeCount.textContent = active;
-  els.progressText.textContent = `${done} / ${state.todos.length} DONE`;
+  els.progressText.textContent = `${done} / ${state.todos.length} ${t("done")}`;
   els.progressBar.style.width = `${percent}%`;
-  els.empty.querySelector("p").textContent = "all quiet around here.";
-  els.empty.classList.toggle("visible", todos.length === 0);
+  const emptyKey = state.category ? "Category" : ({ active: "Active", today: "Today", done: "Done", overdue: "Late", all: "All" }[state.filter] || "Active");
+  updateEmptyState(todos.length === 0, `empty${emptyKey}`, `empty${emptyKey}Hint`);
   els.clearDone.hidden = done === 0;
   els.urgentToggle.setAttribute("aria-pressed", String(state.urgentOnly));
 
   updateCategoryPicker();
   updateActiveCategoryChip();
+  updateNewDueButton();
+  updateFilterMenu();
 }
 
 function updateCategoryPicker() {
@@ -637,6 +714,37 @@ function updateActiveCategoryChip() {
   }
 }
 
+function updateFilterMenu() {
+  els.filterMenu.hidden = !state.filterMenuOpen;
+  els.filterMenuToggle.setAttribute("aria-expanded", String(state.filterMenuOpen));
+  const advanced = state.urgentOnly || state.filter === "overdue" || state.filter === "all" || Boolean(state.category);
+  els.filterActiveDot.hidden = !advanced;
+  document.querySelectorAll("[data-filter]").forEach((button) => {
+    button.classList.toggle("active", !state.category && button.dataset.filter === state.filter);
+  });
+  els.urgentToggle.setAttribute("aria-pressed", String(state.urgentOnly));
+  els.filterCategoryList.replaceChildren();
+  if (!state.categories.length) {
+    const empty = document.createElement("span");
+    empty.className = "filter-menu-empty";
+    empty.textContent = t("noCategory");
+    els.filterCategoryList.append(empty);
+    return;
+  }
+  state.categories.forEach((category) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "filter-category-option";
+    button.dataset.categoryFilter = category;
+    button.classList.toggle("active", state.category === category);
+    const dot = document.createElement("span");
+    dot.className = "cat-dot";
+    dot.style.background = state.categoryColors[category] || "#c9dfd5";
+    button.append(dot, document.createTextNode(category));
+    els.filterCategoryList.append(button);
+  });
+}
+
 function currentMenuCategory() {
   if (state.categoryMenuTarget) {
     const todo = state.todos.find((entry) => entry.id === state.categoryMenuTarget);
@@ -652,7 +760,7 @@ function renderCategoryMenu() {
   none.type = "button";
   none.className = "cat-menu-item" + (current ? "" : " selected");
   none.dataset.cat = "";
-  none.innerHTML = '<span class="cat-dot cat-dot-none"></span>No category';
+  none.innerHTML = `<span class="cat-dot cat-dot-none"></span>${escapeHtml(t("noCategory"))}`;
   els.categoryMenu.append(none);
   state.categories.forEach((category) => {
     const row = document.createElement("div");
@@ -675,7 +783,7 @@ function renderCategoryMenu() {
   const add = document.createElement("button");
   add.type = "button";
   add.className = "cat-menu-new";
-  add.textContent = "＋ New category";
+  add.textContent = t("newCategory");
   els.categoryMenu.append(add);
 }
 
@@ -686,17 +794,26 @@ function escapeHtml(text) {
 }
 
 function renderBrainInbox() {
-  const notes = state.brainNotes.filter((note) => (
+  let notes = state.brainNotes.filter((note) => (
     state.brainFilter === "processed" ? note.processed : !note.processed
   ));
+  if (state.brainTag) notes = notes.filter((note) => note.tags.includes(state.brainTag));
   notes.forEach((note, index) => {
     const item = els.brainTemplate.content.firstElementChild.cloneNode(true);
     item.dataset.id = note.id;
     item.classList.toggle("processed", note.processed);
     item.classList.toggle("editing", state.editingId === note.id);
     item.querySelector(".quest-title").textContent = note.text;
-    item.querySelector(".brain-tags").textContent = note.tags.join(" ");
-    item.querySelector(".brain-check").setAttribute("aria-label", note.processed ? "Mark as unprocessed" : "Mark as processed");
+    const tags = item.querySelector(".brain-tags");
+    note.tags.forEach((tag) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "brain-tag";
+      button.dataset.brainTag = tag;
+      button.textContent = tag;
+      tags.append(button);
+    });
+    item.querySelector(".brain-check").setAttribute("aria-label", note.processed ? t("markUnprocessed") : t("markProcessed"));
     const editInput = item.querySelector(".edit-input");
     editInput.value = note.text;
     els.list.append(item);
@@ -707,12 +824,38 @@ function renderBrainInbox() {
   const percent = state.brainNotes.length ? Math.round((processed / state.brainNotes.length) * 100) : 0;
   els.progressText.textContent = `${unprocessed} INBOX`;
   els.progressBar.style.width = `${percent}%`;
-  els.empty.classList.toggle("visible", notes.length === 0);
-  els.empty.querySelector("p").textContent = notes.length === 0 ? "nothing waiting to be processed." : "";
+  const emptyKey = state.brainFilter === "processed" ? "emptyBrainProcessed" : "emptyBrain";
+  updateEmptyState(notes.length === 0, emptyKey, `${emptyKey}Hint`);
   els.clearDone.hidden = true;
+  els.processBrain.hidden = state.brainFilter === "processed";
+  els.processBrain.disabled = notes.length === 0;
+  els.brainTagToggle.classList.toggle("active", Boolean(state.brainTag));
+  els.brainTagToggle.querySelector("span").textContent = state.brainTag || t("tags");
+  renderBrainTagMenu();
   document.querySelectorAll("[data-brain-filter]").forEach((button) => {
     button.classList.toggle("active", button.dataset.brainFilter === state.brainFilter);
   });
+}
+
+function renderBrainTagMenu() {
+  els.brainTagMenu.replaceChildren();
+  const tags = [...new Set(state.brainNotes.flatMap((note) => note.tags))].sort();
+  const all = document.createElement("button");
+  all.type = "button";
+  all.dataset.brainTagFilter = "";
+  all.classList.toggle("active", !state.brainTag);
+  all.textContent = t("allTags");
+  els.brainTagMenu.append(all);
+  tags.forEach((tag) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.brainTagFilter = tag;
+    button.classList.toggle("active", state.brainTag === tag);
+    button.textContent = tag;
+    els.brainTagMenu.append(button);
+  });
+  if (!tags.length) all.textContent = t("noTags");
+  els.brainTagMenu.hidden = els.brainTagToggle.getAttribute("aria-expanded") !== "true";
 }
 
 els.form.addEventListener("submit", (event) => {
@@ -724,6 +867,30 @@ els.form.addEventListener("submit", (event) => {
   if (hadText && document.documentElement.hasAttribute("data-compact")) {
     window.desktopGadget?.hide();
   }
+});
+
+els.captureOptionsToggle.addEventListener("click", () => {
+  state.captureOptionsOpen = !state.captureOptionsOpen;
+  updateCaptureOptions();
+  if (!state.captureOptionsOpen) {
+    closeCategoryMenu();
+    closeDuePicker();
+  }
+});
+
+els.newDueButton.addEventListener("click", (event) => {
+  event.stopPropagation();
+  if (els.duePicker.hidden || state.dueTarget !== NEW_TASK_DUE_TARGET) {
+    openDuePicker(els.newDueButton, NEW_TASK_DUE_TARGET);
+  } else {
+    closeDuePicker();
+  }
+});
+
+els.toastAction.addEventListener("click", () => {
+  const action = toastAction;
+  hideToast();
+  if (action) action();
 });
 
 // ----- Compact mode (quick capture) -----
@@ -767,6 +934,45 @@ document.querySelectorAll("[data-brain-filter]").forEach((button) => {
   });
 });
 
+els.brainTagToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const open = els.brainTagToggle.getAttribute("aria-expanded") !== "true";
+  els.brainTagToggle.setAttribute("aria-expanded", String(open));
+  renderBrainTagMenu();
+});
+
+els.brainTagMenu.addEventListener("click", (event) => {
+  const button = event.target.closest("[data-brain-tag-filter]");
+  if (!button) return;
+  state.brainTag = button.dataset.brainTagFilter || null;
+  els.brainTagToggle.setAttribute("aria-expanded", "false");
+  render();
+});
+
+document.addEventListener("click", (event) => {
+  if (els.brainTagMenu.hidden) return;
+  if (els.brainTagMenu.contains(event.target) || els.brainTagToggle.contains(event.target)) return;
+  els.brainTagToggle.setAttribute("aria-expanded", "false");
+  els.brainTagMenu.hidden = true;
+});
+
+els.processBrain.addEventListener("click", () => {
+  const matching = state.brainNotes.filter((note) => !note.processed && (!state.brainTag || note.tags.includes(state.brainTag)));
+  if (!matching.length) return;
+  const ids = new Set(matching.map((note) => note.id));
+  state.brainNotes = state.brainNotes.map((note) => ids.has(note.id) ? { ...note, processed: true } : note);
+  saveBrainNotes();
+  render();
+  showToast(t("brainProcessed"), {
+    actionLabel: t("undo"),
+    action: () => {
+      state.brainNotes = state.brainNotes.map((note) => ids.has(note.id) ? { ...note, processed: false } : note);
+      saveBrainNotes();
+      render();
+    },
+  });
+});
+
 document.querySelectorAll(".priority").forEach((button) => {
   button.addEventListener("click", () => {
     state.priority = button.dataset.priority;
@@ -775,11 +981,11 @@ document.querySelectorAll(".priority").forEach((button) => {
   });
 });
 
-document.querySelectorAll(".filter").forEach((button) => {
+document.querySelectorAll("[data-filter]").forEach((button) => {
   button.addEventListener("click", () => {
     state.filter = button.dataset.filter;
     state.category = null;
-    document.querySelectorAll(".filter").forEach((item) => item.classList.toggle("active", item === button));
+    state.filterMenuOpen = false;
     render();
   });
 });
@@ -787,18 +993,33 @@ document.querySelectorAll(".filter").forEach((button) => {
 function filterByCategory(category) {
   state.category = category;
   state.filter = "category";
-  document.querySelectorAll(".filter").forEach((item) => item.classList.remove("active"));
+  state.filterMenuOpen = false;
   render();
 }
 
 function clearCategoryFilter() {
   state.category = null;
   state.filter = "active";
-  document.querySelectorAll(".filter").forEach((item) => {
-    item.classList.toggle("active", item.dataset.filter === "active");
-  });
   render();
 }
+
+els.filterMenuToggle.addEventListener("click", (event) => {
+  event.stopPropagation();
+  state.filterMenuOpen = !state.filterMenuOpen;
+  updateFilterMenu();
+});
+
+els.filterMenu.addEventListener("click", (event) => {
+  const categoryButton = event.target.closest("[data-category-filter]");
+  if (categoryButton) filterByCategory(categoryButton.dataset.categoryFilter);
+});
+
+document.addEventListener("click", (event) => {
+  if (!state.filterMenuOpen) return;
+  if (els.filterMenu.contains(event.target) || els.filterMenuToggle.contains(event.target)) return;
+  state.filterMenuOpen = false;
+  updateFilterMenu();
+});
 
 function deleteCategory(category) {
   const confirmed = window.confirm(
@@ -828,6 +1049,7 @@ function closeCategoryMenu() {
 // Open the category menu anchored under a trigger button.
 // target = null -> pick the category for NEW tasks; target = todo id -> tag that task.
 function openCategoryMenu(anchor, target) {
+  closeDuePicker();
   state.categoryMenuTarget = target;
   renderCategoryMenu();
   els.categoryMenu.hidden = false;
@@ -866,13 +1088,17 @@ function renderDueCalendar() {
   const view = state.dueView || startOfDay(new Date());
   const year = view.getFullYear();
   const month = view.getMonth();
-  els.dueMonthLabel.textContent = `${MONTHS_LONG[month]} ${year}`;
+  const locale = window.LowstateI18n.language === "pt" ? "pt-BR" : "en-US";
+  const monthLabel = new Intl.DateTimeFormat(locale, { month: "long" }).format(new Date(year, month, 1));
+  els.dueMonthLabel.textContent = `${monthLabel.charAt(0).toUpperCase()}${monthLabel.slice(1)} ${year}`;
   els.dueCalGrid.replaceChildren();
   const startWeekday = new Date(year, month, 1).getDay();
   const days = new Date(year, month + 1, 0).getDate();
   const todayISO = toISODate(new Date());
-  const todo = state.dueTarget ? state.todos.find((t) => t.id === state.dueTarget) : null;
-  const selectedISO = todo ? todo.dueDate : null;
+  const todo = state.dueTarget && state.dueTarget !== NEW_TASK_DUE_TARGET
+    ? state.todos.find((t) => t.id === state.dueTarget)
+    : null;
+  const selectedISO = state.dueTarget === NEW_TASK_DUE_TARGET ? state.newDueDate : (todo ? todo.dueDate : null);
   for (let i = 0; i < startWeekday; i++) {
     const blank = document.createElement("span");
     els.dueCalGrid.append(blank);
@@ -891,9 +1117,12 @@ function renderDueCalendar() {
 }
 
 function openDuePicker(anchor, todoId) {
+  closeCategoryMenu();
   state.dueTarget = todoId;
-  const todo = state.todos.find((t) => t.id === todoId);
-  state.dueView = todo && todo.dueDate ? startOfDay(parseISODate(todo.dueDate)) : startOfDay(new Date());
+  const todo = todoId === NEW_TASK_DUE_TARGET ? null : state.todos.find((t) => t.id === todoId);
+  const selectedDate = todoId === NEW_TASK_DUE_TARGET ? state.newDueDate : todo?.dueDate;
+  const parsedDate = selectedDate ? parseISODate(selectedDate) : null;
+  state.dueView = parsedDate ? startOfDay(parsedDate) : startOfDay(new Date());
   renderDueCalendar();
   els.duePicker.hidden = false;
   anchorPopup(els.duePicker, anchor);
@@ -905,7 +1134,12 @@ function closeDuePicker() {
 }
 
 function setDue(iso) {
-  if (state.dueTarget) updateTodo(state.dueTarget, { dueDate: iso });
+  if (state.dueTarget === NEW_TASK_DUE_TARGET) {
+    state.newDueDate = iso;
+    updateNewDueButton();
+  } else if (state.dueTarget) {
+    updateTodo(state.dueTarget, { dueDate: iso });
+  }
   closeDuePicker();
 }
 
@@ -924,7 +1158,7 @@ els.duePicker.addEventListener("click", (event) => {
 
 document.addEventListener("click", (event) => {
   if (els.duePicker.hidden) return;
-  if (els.duePicker.contains(event.target) || event.target.closest(".due-chip")) return;
+  if (els.duePicker.contains(event.target) || event.target.closest(".due-chip") || event.target.closest("#newDueButton")) return;
   closeDuePicker();
 });
 
@@ -976,6 +1210,7 @@ document.addEventListener("click", (event) => {
 
 els.urgentToggle.addEventListener("click", () => {
   state.urgentOnly = !state.urgentOnly;
+  state.filterMenuOpen = false;
   render();
 });
 
@@ -1010,19 +1245,44 @@ els.list.addEventListener("click", (event) => {
   const id = item.dataset.id;
   if (state.mode === "brain") {
     const note = state.brainNotes.find((entry) => entry.id === id);
-    if (event.target.closest(".brain-check")) {
+    const tagButton = event.target.closest(".brain-tag");
+    if (tagButton) {
+      state.brainTag = tagButton.dataset.brainTag;
+      render();
+    } else if (event.target.closest(".brain-check")) {
       note.processed = !note.processed;
       saveBrainNotes();
       render();
     } else if (event.target.closest(".copy-note")) {
-      navigator.clipboard.writeText(formatBrainNote(note));
+      navigator.clipboard.writeText(formatBrainNote(note))
+        .then(() => showToast(t("copied")))
+        .catch(() => showToast(t("copyFailed")));
+    } else if (event.target.closest(".convert-note")) {
+      addTodo(note.text);
+      state.brainNotes = state.brainNotes.map((entry) => entry.id === id ? { ...entry, processed: true } : entry);
+      saveBrainNotes();
+      render();
+      showToast(t("converted"));
     } else if (event.target.closest(".edit-note")) {
       state.editingId = id;
       render();
     } else if (event.target.closest(".delete-note")) {
-      state.brainNotes = state.brainNotes.filter((entry) => entry.id !== id);
+      const index = state.brainNotes.findIndex((entry) => entry.id === id);
+      const [deleted] = state.brainNotes.splice(index, 1);
+      state.trash = store.trash("brain", deleted, index);
+      const trashId = state.trash[0].id;
       saveBrainNotes();
       render();
+      showToast(t("noteDeleted"), {
+        actionLabel: t("undo"),
+        action: () => {
+          store.removeTrashEntry(trashId);
+          state.trash = store.pruneTrash();
+          state.brainNotes.splice(index, 0, deleted);
+          saveBrainNotes();
+          render();
+        },
+      });
     }
     return;
   }
@@ -1045,9 +1305,9 @@ els.list.addEventListener("click", (event) => {
     const nowDone = !todo.done;
     if (nowDone && !prefersReducedMotion()) {
       item.classList.add("just-done");
-      setTimeout(() => updateTodo(id, { done: true }), 300);
+      setTimeout(() => setTodoCompleted(id, true), 300);
     } else {
-      updateTodo(id, { done: nowDone });
+      setTodoCompleted(id, nowDone);
     }
   } else if (event.target.closest(".delete")) {
     deleteTodo(id);
@@ -1146,9 +1406,28 @@ els.list.addEventListener("drop", (event) => {
 });
 
 els.clearDone.addEventListener("click", () => {
+  const previousTodos = state.todos.slice();
+  const removed = state.todos.map((todo, index) => ({ todo, index })).filter((entry) => entry.todo.done);
+  const removedCount = removed.length;
+  if (!removedCount) return;
+  const trashIds = [];
+  removed.forEach(({ todo, index }) => {
+    state.trash = store.trash("todo", todo, index);
+    trashIds.push(state.trash[0].id);
+  });
   state.todos = state.todos.filter((todo) => !todo.done);
   saveTodos();
   render();
+  showToast(t("clearedTasks").replace("{count}", removedCount), {
+    actionLabel: t("undo"),
+    action: () => {
+      trashIds.forEach((id) => store.removeTrashEntry(id));
+      state.trash = store.pruneTrash();
+      state.todos = previousTodos;
+      saveTodos();
+      render();
+    },
+  });
 });
 
 // ----- Backup / restore (all data lives in localStorage) -----
@@ -1162,16 +1441,16 @@ els.exportData.addEventListener("click", () => {
     const key = localStorage.key(i);
     if (isAppKey(key)) data[key] = localStorage.getItem(key);
   }
-  const payload = { app: "type-todo", version: 1, exportedAt: new Date().toISOString(), data };
+  const payload = { app: "lowstate", version: 2, exportedAt: new Date().toISOString(), data };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `type-todo-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `lowstate-backup-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   URL.revokeObjectURL(url);
   const previous = els.installHint.textContent;
-  els.installHint.textContent = "BACKUP SAVED";
+  els.installHint.textContent = t("backupSaved");
   setTimeout(() => { els.installHint.textContent = previous; }, 1600);
 });
 
@@ -1217,10 +1496,13 @@ function brainMarkdown() {
   return `# ${title} — Brain Inbox\n\n${notes || "_Inbox empty._"}\n`;
 }
 
-els.copyBrain.addEventListener("click", () => {
-  navigator.clipboard.writeText(brainMarkdown());
-  els.copyBrain.textContent = "COPIED";
-  setTimeout(() => { els.copyBrain.textContent = "COPY ALL"; }, 1200);
+els.copyBrain.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(brainMarkdown());
+    showToast("Brain Inbox copied");
+  } catch {
+    showToast("Couldn't copy to clipboard", { duration: 3500 });
+  }
 });
 
 els.exportBrain.addEventListener("click", () => {
@@ -1243,6 +1525,45 @@ document.querySelectorAll("[data-theme-value]").forEach((btn) => {
 
 document.querySelectorAll("[data-font-size-value]").forEach((btn) => {
   btn.addEventListener("click", () => applyFontSize(btn.dataset.fontSizeValue));
+});
+
+document.querySelectorAll("[data-language-value]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    window.LowstateI18n.setLanguage(btn.dataset.languageValue);
+    render();
+  });
+});
+
+els.dismissOnboarding.addEventListener("click", () => {
+  localStorage.setItem(ONBOARDING_KEY, "1");
+  els.onboardingTip.hidden = true;
+});
+
+els.restoreTrash.addEventListener("click", () => {
+  const entry = store.restoreLast();
+  if (!entry) {
+    showToast(t("trashEmpty"));
+    return;
+  }
+  if (entry.type === "todo") {
+    state.todos.splice(Math.min(entry.index ?? 0, state.todos.length), 0, entry.item);
+    saveTodos();
+  } else if (entry.type === "brain") {
+    state.brainNotes.splice(Math.min(entry.index ?? 0, state.brainNotes.length), 0, entry.item);
+    saveBrainNotes();
+  }
+  state.trash = store.pruneTrash();
+  render();
+  showToast(t("restored"));
+});
+
+els.emptyTrash.addEventListener("click", () => {
+  if (!state.trash.length) return;
+  if (!window.confirm(t("confirmEmptyTrash"))) return;
+  store.emptyTrash();
+  state.trash = [];
+  render();
+  showToast(t("trashCleared"));
 });
 
 document.querySelectorAll(".shortcut-key").forEach((btn) => {

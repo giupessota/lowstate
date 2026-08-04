@@ -34,11 +34,11 @@
           <span>TO-DO LIST</span>
         </div>
         <div class="paper-toolbar">
-          <button id="settingsBack" class="mini-button" type="button" aria-label="Back" title="Back" hidden>←</button>
+          <button id="settingsBack" class="mini-button" type="button" aria-label="Back" title="Back" data-i18n-aria="back" hidden>←</button>
           <div class="toolbar-center">
             <div class="mode-switch" aria-label="Notebook mode">
-              <button type="button" class="active" data-mode="tasks">TASKS</button>
-              <button type="button" data-mode="brain">BRAIN INBOX</button>
+              <button type="button" class="active" data-mode="tasks" data-i18n="tasks">TASKS</button>
+              <button type="button" data-mode="brain" data-i18n="brainInbox">BRAIN INBOX</button>
             </div>
           </div>
           <button id="clearDone" class="mini-button" type="button" title="Clear completed tasks">×</button>
@@ -53,21 +53,26 @@
             maxlength="160"
             autocomplete="off"
             placeholder="type a task..."
+            data-i18n-placeholder="taskPlaceholder"
             autofocus
           />
-          <div class="cat-picker">
-            <button id="catPickerBtn" class="cat-picker-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Tag this task with a category">
-              <span class="cat-dot" id="catPickerDot" aria-hidden="true"></span>
-              <span id="catPickerLabel">TAG</span>
-              <svg aria-hidden="true" viewBox="0 0 10 6"><path d="m1 1 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-            </button>
-            <div id="categoryMenu" class="category-menu" role="menu" aria-label="Choose category" hidden></div>
-          </div>
-          <div class="priority-picker" aria-label="Priority">
-            <button type="button" class="priority active" data-priority="normal">NORMAL</button>
-            <button type="button" class="priority" data-priority="boss">URGENT</button>
-          </div>
+          <button id="captureOptionsToggle" class="capture-options-toggle" type="button" aria-label="Task options" aria-expanded="false" title="Category, priority and due date">＋</button>
           <button type="submit" aria-label="Add task">↵</button>
+          <div id="captureOptions" class="capture-options" hidden>
+            <div class="cat-picker">
+              <button id="catPickerBtn" class="cat-picker-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Tag this task with a category">
+                <span class="cat-dot" id="catPickerDot" aria-hidden="true"></span>
+                <span id="catPickerLabel">TAG</span>
+                <svg aria-hidden="true" viewBox="0 0 10 6"><path d="m1 1 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+              </button>
+              <div id="categoryMenu" class="category-menu" role="menu" aria-label="Choose category" hidden></div>
+            </div>
+            <div class="priority-picker" aria-label="Priority">
+              <button type="button" class="priority active" data-priority="normal" data-i18n="normal">NORMAL</button>
+              <button type="button" class="priority" data-priority="boss" data-i18n="urgent">URGENT</button>
+            </div>
+            <button id="newDueButton" class="new-due-button" type="button" aria-label="Set due date for new task">◷ DATE</button>
+          </div>
         </form>
 
         <div class="progress-row">
@@ -75,18 +80,23 @@
           <strong id="progressText" aria-live="polite">0 / 0 DONE</strong>
         </div>
 
-        <nav class="filters" aria-label="Task filters">
+        <nav class="filters" aria-label="Task filters" data-i18n-aria="taskFilters">
           <div id="taskFilters" class="filter-row">
             <div class="status-row">
-              <button class="filter active" data-filter="active">TO DO <span id="activeCount">0</span></button>
-              <button class="filter" data-filter="all">ALL</button>
-              <button class="filter" data-filter="done">DONE</button>
-              <button class="filter" data-filter="today">TODAY</button>
-              <button class="filter" data-filter="overdue">LATE</button>
+              <button class="filter active" data-filter="active"><span data-i18n="todo">TO DO</span> <span id="activeCount">0</span></button>
+              <button class="filter" data-filter="today" data-i18n="today">TODAY</button>
+              <button class="filter" data-filter="done" data-i18n="done">DONE</button>
               <button id="activeCategoryChip" class="active-category-chip" type="button" hidden aria-label="Clear category filter">
                 <span class="cat-dot" aria-hidden="true"></span><span class="chip-name"></span><span class="chip-x" aria-hidden="true">×</span>
               </button>
-              <button id="urgentToggle" class="urgent-toggle" type="button" aria-pressed="false" title="Show urgent tasks only">! URGENT</button>
+              <button id="filterMenuToggle" class="filter-menu-toggle" type="button" aria-expanded="false" aria-controls="filterMenu"><span data-i18n="filter">FILTER</span> <span id="filterActiveDot" class="filter-active-dot" hidden></span></button>
+              <div id="filterMenu" class="filter-menu" hidden>
+                <button class="filter-option" type="button" data-filter="all" data-i18n="all">ALL</button>
+                <button class="filter-option" type="button" data-filter="overdue" data-i18n="late">LATE</button>
+                <button id="urgentToggle" class="filter-option" type="button" aria-pressed="false">! <span data-i18n="urgent">URGENT</span></button>
+                <div class="filter-menu-divider"></div>
+                <div id="filterCategoryList" class="filter-category-list"></div>
+              </div>
             </div>
             <form id="categoryForm" class="category-form" hidden>
               <input id="categoryInput" maxlength="10" placeholder="NAME" aria-label="Category name" />
@@ -101,10 +111,13 @@
             </form>
           </div>
           <div id="brainFilters" class="brain-filters" hidden>
-            <button class="brain-filter active" type="button" data-brain-filter="unprocessed">UNPROCESSED</button>
-            <button class="brain-filter" type="button" data-brain-filter="processed">PROCESSED</button>
-            <button id="copyBrain" class="brain-action" type="button">COPY ALL</button>
+            <button class="brain-filter active" type="button" data-brain-filter="unprocessed" data-i18n="unprocessed">UNPROCESSED</button>
+            <button class="brain-filter" type="button" data-brain-filter="processed" data-i18n="processed">PROCESSED</button>
+            <button id="brainTagToggle" class="brain-action" type="button" aria-expanded="false"># <span data-i18n="tags">TAGS</span></button>
+            <button id="processBrain" class="brain-action" type="button" data-i18n="processAll">PROCESS ALL</button>
+            <button id="copyBrain" class="brain-action" type="button" data-i18n="copyAll">COPY ALL</button>
             <button id="exportBrain" class="brain-action" type="button">EXPORT .MD</button>
+            <div id="brainTagMenu" class="brain-tag-menu" hidden></div>
           </div>
         </nav>
 
@@ -112,8 +125,15 @@
 
         <div id="emptyState" class="empty-state">
           <span class="pixel-face" aria-hidden="true">•ᴗ•</span>
-          <p>all quiet around here.</p>
+          <p id="emptyTitle">all quiet around here.</p>
+          <small id="emptyHint"></small>
         </div>
+
+        <aside id="onboardingTip" class="onboarding-tip" hidden>
+          <button id="dismissOnboarding" type="button" aria-label="Dismiss">×</button>
+          <strong data-i18n="welcomeTitle">CAPTURE FIRST. ORGANIZE LATER.</strong>
+          <span data-i18n="welcomeBody">Type a task, use ＋ for details, or press the global shortcut for instant capture.</span>
+        </aside>
 
         <section id="settingsPage" class="settings-page" aria-label="Settings" hidden>
           <div class="settings-section update-banner" id="updateBanner" hidden>
@@ -124,31 +144,38 @@
           </div>
 
           <div class="settings-section">
-            <h3 class="settings-section-title">Appearance</h3>
+            <h3 class="settings-section-title" data-i18n="appearance">Appearance</h3>
             <div class="settings-row">
-              <span class="settings-label">Style</span>
+              <span class="settings-label" data-i18n="style">Style</span>
               <div class="mode-switch settings-switch" role="group" aria-label="Notebook style">
-                <button type="button" class="active" data-style-value="notebook">NOTEBOOK</button>
-                <button type="button" data-style-value="minimal">MINIMAL</button>
+                <button type="button" class="active" data-style-value="notebook" data-i18n="notebook">NOTEBOOK</button>
+                <button type="button" data-style-value="minimal" data-i18n="minimal">MINIMAL</button>
               </div>
             </div>
             <div class="settings-row">
-              <span class="settings-label">Theme</span>
+              <span class="settings-label" data-i18n="theme">Theme</span>
               <div class="mode-switch settings-switch" role="group" aria-label="Notebook theme">
-                <button type="button" class="active" data-theme-value="light">LIGHT</button>
-                <button type="button" data-theme-value="dark">DARK</button>
+                <button type="button" class="active" data-theme-value="light" data-i18n="light">LIGHT</button>
+                <button type="button" data-theme-value="dark" data-i18n="dark">DARK</button>
               </div>
             </div>
             <div class="settings-row">
-              <span class="settings-label">Text size</span>
+              <span class="settings-label" data-i18n="textSize">Text size</span>
               <div class="mode-switch settings-switch" role="group" aria-label="Text size">
-                <button type="button" data-font-size-value="small">SMALL</button>
-                <button type="button" class="active" data-font-size-value="normal">NORMAL</button>
-                <button type="button" data-font-size-value="large">LARGE</button>
+                <button type="button" data-font-size-value="small" data-i18n="small">SMALL</button>
+                <button type="button" class="active" data-font-size-value="normal" data-i18n="normal">NORMAL</button>
+                <button type="button" data-font-size-value="large" data-i18n="large">LARGE</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <span class="settings-label" data-i18n="language">Language</span>
+              <div class="mode-switch settings-switch" role="group" aria-label="Language">
+                <button type="button" data-language-value="en">EN</button>
+                <button type="button" data-language-value="pt">PT</button>
               </div>
             </div>
             <div class="settings-row settings-cover-row">
-              <span class="settings-label">Cover</span>
+              <span class="settings-label" data-i18n="cover">Cover</span>
               <div id="themePalette" class="theme-palette" aria-label="Notebook colors">
                 <button type="button" data-cover="forest" aria-label="Forest cover"></button>
                 <button type="button" data-cover="rose" aria-label="Rose cover"></button>
@@ -172,54 +199,61 @@
           </div>
 
           <div class="settings-section" id="settingsWindowSection" hidden>
-            <h3 class="settings-section-title">Window</h3>
+            <h3 class="settings-section-title" data-i18n="window">Window</h3>
             <div class="settings-row">
-              <span class="settings-label">Always on top</span>
+              <span class="settings-label" data-i18n="alwaysOnTop">Always on top</span>
               <div class="mode-switch settings-switch" role="group" aria-label="Always on top">
-                <button type="button" class="active" data-aot-value="on">ON</button>
-                <button type="button" data-aot-value="off">OFF</button>
+                <button type="button" class="active" data-aot-value="on" data-i18n="on">ON</button>
+                <button type="button" data-aot-value="off" data-i18n="off">OFF</button>
               </div>
             </div>
           </div>
 
           <div class="settings-section">
-            <h3 class="settings-section-title">Data</h3>
+            <h3 class="settings-section-title" data-i18n="data">Data</h3>
             <div class="settings-row settings-data-row">
-              <button id="exportData" class="foot-btn" type="button" title="Download a backup (.json)">⤓ BACKUP</button>
-              <button id="importData" class="foot-btn" type="button" title="Restore from a backup (.json)">⤒ RESTORE</button>
+              <button id="exportData" class="foot-btn" type="button" title="Download a backup (.json)" data-i18n="backup">⤓ BACKUP</button>
+              <button id="importData" class="foot-btn" type="button" title="Restore from a backup (.json)" data-i18n="restore">⤒ RESTORE</button>
+            </div>
+            <div class="settings-row trash-row">
+              <span class="settings-label"><span data-i18n="trash">Trash</span> <small id="trashCount">0</small></span>
+              <div class="settings-data-row">
+                <button id="restoreTrash" class="foot-btn" type="button" data-i18n="restoreLast">RESTORE LAST</button>
+                <button id="emptyTrash" class="foot-btn danger" type="button" data-i18n="emptyTrash">EMPTY</button>
+              </div>
             </div>
           </div>
 
           <div class="settings-section">
-            <h3 class="settings-section-title">Shortcuts</h3>
-            <p class="settings-hint">Global (desktop app)</p>
+            <h3 class="settings-section-title" data-i18n="shortcuts">Shortcuts</h3>
+            <p class="settings-hint" data-i18n="globalDesktop">Global (desktop app)</p>
             <ul class="settings-shortcuts" id="globalShortcuts">
               <li>
                 <span class="shortcut-key-group">
                   <button type="button" class="shortcut-key" data-shortcut="toggle">⌘⇧Space</button>
                   <button type="button" class="shortcut-reset" data-shortcut-reset="toggle" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
                 </span>
-                <span>Show / hide the gadget</span>
+                <span data-i18n="showHide">Show / hide the gadget</span>
               </li>
               <li>
                 <span class="shortcut-key-group">
                   <button type="button" class="shortcut-key" data-shortcut="capture">⌘⇧N</button>
                   <button type="button" class="shortcut-reset" data-shortcut-reset="capture" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
                 </span>
-                <span>Quick-capture a task</span>
+                <span data-i18n="quickCapture">Quick-capture a task</span>
               </li>
               <li>
                 <span class="shortcut-key-group">
                   <button type="button" class="shortcut-key" data-shortcut="brain">⌘⇧B</button>
                   <button type="button" class="shortcut-reset" data-shortcut-reset="brain" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
                 </span>
-                <span>Brain dump</span>
+                <span data-i18n="brainDump">Brain dump</span>
               </li>
             </ul>
-            <p class="settings-hint">In-app</p>
+            <p class="settings-hint" data-i18n="inApp">In-app</p>
             <ul class="settings-shortcuts">
-              <li><kbd>N</kbd><span>Focus the input</span></li>
-              <li><kbd>Esc</kbd><span>Close / cancel</span></li>
+              <li><kbd>N</kbd><span data-i18n="focusInput">Focus the input</span></li>
+              <li><kbd>Esc</kbd><span data-i18n="closeCancel">Close / cancel</span></li>
             </ul>
           </div>
         </section>
@@ -232,10 +266,10 @@
 
       <div id="duePicker" class="due-picker" aria-label="Due date" hidden>
         <div class="due-quick">
-          <button type="button" data-due="today">TODAY</button>
-          <button type="button" data-due="tomorrow">TOMORROW</button>
-          <button type="button" data-due="weekend">WEEKEND</button>
-          <button type="button" data-due="nextweek">NEXT WEEK</button>
+          <button type="button" data-due="today" data-i18n="today">TODAY</button>
+          <button type="button" data-due="tomorrow" data-i18n="tomorrow">TOMORROW</button>
+          <button type="button" data-due="weekend" data-i18n="weekend">WEEKEND</button>
+          <button type="button" data-due="nextweek" data-i18n="nextWeek">NEXT WEEK</button>
         </div>
         <div class="due-cal-head">
           <button type="button" data-cal-nav="-1" aria-label="Previous month">‹</button>
@@ -244,7 +278,12 @@
         </div>
         <div class="due-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
         <div id="dueCalGrid" class="due-cal-grid"></div>
-        <button type="button" class="due-clear" data-due="clear">✕ NO DATE</button>
+        <button type="button" class="due-clear" data-due="clear" data-i18n="noDate">✕ NO DATE</button>
+      </div>
+
+      <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+        <span id="toastMessage"></span>
+        <button id="toastAction" type="button" hidden></button>
       </div>
     </main>
 
@@ -280,6 +319,7 @@
           <input class="edit-input" maxlength="160" aria-label="Edit note" />
         </div>
         <div class="quest-actions">
+          <button class="icon-button convert-note" type="button" aria-label="Convert to task" title="Convert to task">↗</button>
           <button class="icon-button copy-note" type="button" aria-label="Copy note" title="Copy">⧉</button>
           <button class="icon-button edit-note" type="button" aria-label="Edit note" title="Edit">✎</button>
           <button class="icon-button delete-note" type="button" aria-label="Delete note" title="Delete">×</button>
@@ -287,6 +327,9 @@
       </li>
     </template>
 
+    <script src="storage.js" defer></script>
+    <script src="i18n.js" defer></script>
+    <script src="core.js" defer></script>
     <script src="app.js" defer></script>
   </body>
 </html>
