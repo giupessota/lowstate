@@ -26,14 +26,9 @@ jobs:
             artifact: "lowstate-windows-x64"
           - os: macos-latest
             script: "dist:mac"
-            arch: "--x64"
-            pattern: "dist/*-x64.dmg"
-            artifact: "lowstate-macos-x64"
-          - os: macos-latest
-            script: "dist:mac"
-            arch: "--arm64"
-            pattern: "dist/*-arm64.dmg"
-            artifact: "lowstate-macos-arm64"
+            arch: "--universal"
+            pattern: "dist/*-universal.dmg"
+            artifact: "lowstate-macos-universal"
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -48,6 +43,13 @@ jobs:
         run: npm run ${{ matrix.script }} -- ${{ matrix.arch }}
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
+      - name: Verify macOS signature and architectures
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          codesign --verify --deep --strict --verbose=2 dist/mac-universal/Lowstate.app
+          lipo -archs dist/mac-universal/Lowstate.app/Contents/MacOS/Lowstate | grep -q x86_64
+          lipo -archs dist/mac-universal/Lowstate.app/Contents/MacOS/Lowstate | grep -q arm64
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}

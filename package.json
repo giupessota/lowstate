@@ -1,6 +1,6 @@
 {
   "name": "lowstate-desktop",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "Lowstate — lower your mental entropy. A retro notebook to-do gadget for Windows and macOS.",
   "author": "Giuliana Pessota",
@@ -32,10 +32,10 @@
       "sw.js",
       "assets/**/*"
     ],
-    "afterSign": "scripts/after-sign.cjs",
     "mac": {
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity",
+      "identity": "-",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         "dmg"
