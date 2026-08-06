@@ -884,6 +884,7 @@ button { cursor: pointer; }
   height: 23px;
   display: grid;
   place-items: center;
+  margin-left: 8px;
   padding: 0;
   border: 2px solid #66758b;
   border-radius: 3px;
@@ -1342,7 +1343,7 @@ input:focus-visible {
 [data-style="minimal"] .todo-list { padding-left: 20px; }
 [data-style="minimal"] .quest-title { line-height: 1.45; }
 [data-style="minimal"] .quest-item { padding-bottom: 7px; }
-[data-style="minimal"] .check { transform: none; }
+[data-style="minimal"] .check { margin-left: 0; transform: none; }
 [data-style="minimal"] .priority-picker { transform: none; }
 [data-style="minimal"] .priority-picker { border-color: color-mix(in srgb, var(--ink) 18%, transparent); border-radius: 6px; background: transparent; }
 [data-style="minimal"] .priority { border-left-color: color-mix(in srgb, var(--ink) 14%, transparent); color: var(--muted); }
