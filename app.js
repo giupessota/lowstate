@@ -592,6 +592,7 @@ function updateCaptureOptions() {
 }
 
 function updateEmptyState(empty, titleKey, hintKey) {
+  els.list.classList.toggle("empty", empty);
   els.empty.classList.toggle("visible", empty);
   els.emptyTitle.textContent = empty ? t(titleKey) : "";
   els.emptyHint.textContent = empty ? t(hintKey) : "";

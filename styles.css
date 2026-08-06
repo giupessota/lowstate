@@ -959,7 +959,8 @@ button { cursor: pointer; }
 .edit-input { display: none; width: 100%; border: 0; border-bottom: 1px solid var(--ink); outline: 0; background: transparent; font: 600 20px var(--hand); }
 .editing .quest-title { display: none; }
 .editing .edit-input { display: block; }
-.empty-state { display: none; height: 300px; place-content: center; padding-left: 45px; text-align: center; color: #989ca3; }
+.todo-list.empty { flex: 0 0 auto; padding-bottom: 0; }
+.empty-state { display: none; flex: 1 1 auto; min-height: 0; place-content: center; text-align: center; color: #989ca3; }
 .empty-state.visible { display: grid; }
 .empty-state p { margin: 5px 0; font: 20px var(--hand); }
 .empty-state small { display: block; max-width: 260px; margin: 0 auto; font-size: 8px; line-height: 1.5; }
