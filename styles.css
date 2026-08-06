@@ -176,6 +176,7 @@ button { cursor: pointer; }
 .title-form button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.35); color: var(--cover-ink); }
 #compactToggle { margin-left: auto; }
 #compactToggle[hidden] { display: none; }
+#compactToggle[hidden] + #settingsToggle { margin-left: auto; }
 .night-toggle {
   width: 26px;
   height: 26px;
