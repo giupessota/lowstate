@@ -1,11 +1,14 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, session } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, session, Tray } = require("electron");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
 const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
+const { hideWindowOnClose } = require("./desktop-lifecycle.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
+let tray;
+let isQuitting = false;
 
 const FULL_HEIGHT = 654;
 const COMPACT_HEIGHT = 110;
@@ -40,6 +43,9 @@ function createWindow() {
 
   window.setAlwaysOnTop(true, "floating");
   window.loadFile(path.join(__dirname, "index.html"));
+  window.on("close", (event) => {
+    hideWindowOnClose(event, window, isQuitting);
+  });
 }
 
 const DEFAULT_SHORTCUTS = {
@@ -165,6 +171,26 @@ const SHORTCUT_HANDLERS = {
   },
 };
 
+function showFullWindow() {
+  if (!window) return;
+  window.webContents.send("set-compact-ui", false);
+  focusWindow(false);
+}
+
+function createTray() {
+  if (process.platform === "darwin" || tray) return;
+  tray = new Tray(iconPath);
+  tray.setToolTip("Lowstate");
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: "Show Lowstate", click: showFullWindow },
+    { label: "Quick task", click: SHORTCUT_HANDLERS.capture },
+    { label: "Quick note", click: SHORTCUT_HANDLERS.brain },
+    { type: "separator" },
+    { label: "Quit", click: () => { isQuitting = true; app.quit(); } },
+  ]));
+  tray.on("double-click", showFullWindow);
+}
+
 // Registers every shortcut in `map`; returns the keys that failed (e.g.
 // already claimed by another app). Always unregisters everything first so a
 // partial failure can't leave a stale accelerator pointing at an old handler.
@@ -226,6 +252,7 @@ app.whenReady().then(async () => {
   }
   await migrateLegacyProfile();
   createWindow();
+  createTray();
   registerShortcuts(shortcuts);
   setTimeout(checkForUpdate, 2000);
 });
@@ -263,6 +290,8 @@ app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
 });
 
+app.on("before-quit", () => { isQuitting = true; });
+
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) { createWindow(); return; }
   if (window.isMinimized()) window.restore();
@@ -270,4 +299,7 @@ app.on("activate", () => {
   window.focus();
 });
 
-app.on("will-quit", () => globalShortcut.unregisterAll());
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+  tray?.destroy();
+});

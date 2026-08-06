@@ -7,6 +7,7 @@ const {
   quickDueISO,
   filterAndSortTodos,
   parseTaskCapture,
+  formatAccelerator,
 } = require("../core.js");
 
 const NOW = new Date(2026, 7, 2, 14, 30);
@@ -66,4 +67,10 @@ test("quick capture syntax extracts category, urgency and relative date", () => 
     dueDate: "2026-08-03",
     category: null,
   });
+});
+
+test("global shortcuts use native labels on macOS and Windows", () => {
+  assert.equal(formatAccelerator("CommandOrControl+Shift+Space", "darwin"), "⌘⇧Space");
+  assert.equal(formatAccelerator("CommandOrControl+Shift+Space", "win32"), "Ctrl+Shift+Space");
+  assert.equal(formatAccelerator("CommandOrControl+Shift+N", "win32"), "Ctrl+Shift+N");
 });

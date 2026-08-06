@@ -19,7 +19,7 @@ const DEFAULT_SHORTCUTS = {
 const BRAIN_KEY = "type-todo.brain-inbox.v1";
 const ONBOARDING_KEY = "type-todo.onboarding-dismissed.v1";
 const NEW_TASK_DUE_TARGET = "__new_task__";
-const { startOfDay, toISODate, parseISODate, dueMeta, quickDueISO, filterAndSortTodos, parseTaskCapture } = window.LowstateCore;
+const { startOfDay, toISODate, parseISODate, dueMeta, quickDueISO, filterAndSortTodos, parseTaskCapture, formatAccelerator } = window.LowstateCore;
 const store = window.LowstateStorage;
 const { t } = window.LowstateI18n;
 
@@ -210,11 +210,8 @@ function loadShortcuts() {
 }
 const shortcuts = loadShortcuts();
 let recordingShortcut = null;
-
-const ACCELERATOR_SYMBOLS = { CommandOrControl: "⌘", Shift: "⇧", Alt: "⌥" };
-function formatAccelerator(accelerator) {
-  return accelerator.split("+").map((part) => ACCELERATOR_SYMBOLS[part] || part).join("");
-}
+const desktopPlatform = window.desktopGadget?.platform
+  || (/Mac|iPhone|iPad/.test(navigator.platform) ? "darwin" : "win32");
 
 const NAMED_KEYS = {
   ArrowUp: "Up", ArrowDown: "Down", ArrowLeft: "Left", ArrowRight: "Right",
@@ -236,7 +233,7 @@ function renderShortcut(key) {
   const button = shortcutButton(key);
   if (!button) return;
   button.classList.remove("recording", "shortcut-error");
-  button.textContent = formatAccelerator(shortcuts[key]);
+  button.textContent = formatAccelerator(shortcuts[key], desktopPlatform);
   const resetButton = document.querySelector(`[data-shortcut-reset="${key}"]`);
   if (resetButton) resetButton.hidden = shortcuts[key] === DEFAULT_SHORTCUTS[key];
 }

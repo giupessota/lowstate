@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld("desktopTheme", {
 });
 
 contextBridge.exposeInMainWorld("desktopGadget", {
+  platform: process.platform,
   setCompact: (on) => ipcRenderer.send("set-compact", on),
   hide: () => ipcRenderer.send("hide-window"),
   setAlwaysOnTop: (on) => ipcRenderer.send("set-always-on-top", on),

@@ -18,6 +18,7 @@ instantly, with global shortcuts for quick capture.
 - English and Portuguese interface
 - Automatic durable desktop snapshots plus manual backup and restore
 - Installable offline PWA and always-on-top Electron desktop app
+- Windows tray support so global shortcuts keep working after the window is closed
 
 ## Download
 
@@ -26,7 +27,7 @@ instantly, with global shortcuts for quick capture.
 
 Every push to `main` also creates downloadable GitHub Actions artifacts for
 Windows x64 and a universal macOS build that supports both Intel and Apple
-Silicon. Version tags such as `v1.1.5`
+Silicon. Version tags such as `v1.1.6`
 publish those installers to the corresponding GitHub Release.
 
 The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
@@ -100,7 +101,7 @@ npm run dist:win
 ```
 
 Installer filenames include the target architecture, for example
-`Lowstate-1.1.5-universal.dmg` and `Lowstate-Setup-1.1.5-x64.exe`.
+`Lowstate-1.1.6-universal.dmg` and `Lowstate-Setup-1.1.6-x64.exe`.
 
 To run syntax checks and the automated tests:
 
@@ -115,6 +116,10 @@ npm run check
 - `Ctrl/Cmd + Shift + Space`: show / hide the gadget
 - `Ctrl/Cmd + Shift + N`: quick-capture a task
 - `Ctrl/Cmd + Shift + B`: brain dump — capture straight into the Brain Inbox
+
+On Windows, clicking the window's **X** hides Lowstate in the system tray so
+these shortcuts remain active. Use the tray menu's **Quit** command to exit it
+completely.
 
 **In-app (while the window is focused):**
 

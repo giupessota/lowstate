@@ -101,5 +101,15 @@
     return { title: title.replace(/\s+/g, " ").trim(), priority, dueDate, category };
   }
 
-  return { startOfDay, toISODate, parseISODate, dueMeta, quickDueISO, filterAndSortTodos, parseTaskCapture };
+  function formatAccelerator(accelerator, platform = "darwin") {
+    const parts = String(accelerator || "").split("+").filter(Boolean);
+    if (platform === "darwin") {
+      const symbols = { CommandOrControl: "⌘", Command: "⌘", Control: "⌃", Shift: "⇧", Alt: "⌥" };
+      return parts.map((part) => symbols[part] || part).join("");
+    }
+    const labels = { CommandOrControl: "Ctrl", Command: "Win", Control: "Ctrl", Shift: "Shift", Alt: "Alt" };
+    return parts.map((part) => labels[part] || part).join("+");
+  }
+
+  return { startOfDay, toISODate, parseISODate, dueMeta, quickDueISO, filterAndSortTodos, parseTaskCapture, formatAccelerator };
 });
