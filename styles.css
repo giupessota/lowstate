@@ -1339,6 +1339,7 @@ input:focus-visible {
   margin-left: 16px;
 }
 [data-style="minimal"] .type-line { padding-left: 20px; }
+:root[data-style="minimal"][data-compact] .type-line { padding-left: 20px; }
 [data-style="minimal"] .filters { padding-left: 18px; }
 [data-style="minimal"] .todo-list { padding-left: 20px; }
 [data-style="minimal"] .quest-title { line-height: 1.45; }
