@@ -607,6 +607,7 @@ function render() {
   els.paper.classList.toggle("settings-mode", state.settingsOpen);
   els.settingsPage.hidden = !state.settingsOpen;
   els.settingsBack.hidden = !state.settingsOpen;
+  els.compactToggle.hidden = state.settingsOpen;
   els.paperSlot.textContent = state.settingsOpen
     ? "SETTINGS"
     : (state.mode === "brain" ? "BRAIN INBOX" : "TO-DO LIST");

@@ -26,7 +26,7 @@ instantly, with global shortcuts for quick capture.
 
 Every push to `main` also creates downloadable GitHub Actions artifacts for
 Windows x64 and a universal macOS build that supports both Intel and Apple
-Silicon. Version tags such as `v1.1.4`
+Silicon. Version tags such as `v1.1.5`
 publish those installers to the corresponding GitHub Release.
 
 The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
@@ -100,7 +100,7 @@ npm run dist:win
 ```
 
 Installer filenames include the target architecture, for example
-`Lowstate-1.1.4-universal.dmg` and `Lowstate-Setup-1.1.4-x64.exe`.
+`Lowstate-1.1.5-universal.dmg` and `Lowstate-Setup-1.1.5-x64.exe`.
 
 To run syntax checks and the automated tests:
 
