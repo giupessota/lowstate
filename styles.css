@@ -496,27 +496,48 @@ svg.i {
 }
 
 /* Washi tape across the top of the left page */
+/* Translucent paper tape stuck over the page's top edge: straight long
+   edges, finely torn ends, a faint fibre texture, and the grid showing
+   through (multiply). */
 .washi {
+  --tape-base: color-mix(in srgb, var(--tape) 58%, transparent);
+  --tape-fibre: repeating-linear-gradient(90deg, rgba(255, 255, 255, .07) 0 1px, transparent 1px 3px);
   position: absolute;
-  top: -30px;
-  left: 18px;
-  width: 150px;
-  height: 24px;
-  opacity: .82;
-  transform: rotate(-2.5deg);
-  clip-path: polygon(0 8%, 3% 0, 6% 10%, 9% 0, 12% 8%, 88% 6%, 91% 0, 94% 10%, 97% 0, 100% 8%, 100% 92%, 97% 100%, 94% 90%, 91% 100%, 88% 92%, 12% 94%, 9% 100%, 6% 90%, 3% 100%, 0 92%);
+  top: -33px; /* half over the page's top edge (22px padding above the head) */
+  left: 22px;
+  width: 128px;
+  height: 22px;
+  transform: rotate(-3deg);
+  mix-blend-mode: multiply;
+  clip-path: polygon(1.5% 0, 98.6% 0, 100% 11%, 98.2% 24%, 99.6% 37%, 97.9% 51%, 99.5% 64%, 98.1% 78%, 100% 90%, 98.7% 100%, 1.3% 100%, 0 89%, 1.9% 75%, .4% 61%, 2.1% 47%, .5% 33%, 1.7% 19%, 0 7%);
+  filter: drop-shadow(0 1px 0 rgba(60, 50, 30, .06));
   pointer-events: none;
 }
-.washi[data-pattern="stripes"] { background: repeating-linear-gradient(-45deg, var(--tape) 0 6px, color-mix(in srgb, var(--tape) 45%, var(--paper)) 6px 12px); }
-.washi[data-pattern="dots"] { background: radial-gradient(circle, color-mix(in srgb, var(--paper) 85%, transparent) 2.2px, transparent 2.6px) 0 0 / 10px 10px, var(--tape); }
+:root[data-theme="dark"] .washi { --tape-base: color-mix(in srgb, var(--tape) 42%, transparent); mix-blend-mode: normal; }
+.washi[data-pattern="stripes"] {
+  background:
+    var(--tape-fibre),
+    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(255, 255, 255, .38) 5px 8px),
+    var(--tape-base);
+}
+.washi[data-pattern="dots"] {
+  background:
+    var(--tape-fibre),
+    radial-gradient(circle, rgba(255, 255, 255, .55) 1.3px, transparent 1.7px) 2px 3px / 8px 8px,
+    var(--tape-base);
+}
 .washi[data-pattern="gingham"] {
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--paper) 45%, transparent) 50%, transparent 50%) 0 0 / 12px 12px,
-    linear-gradient(color-mix(in srgb, var(--paper) 45%, transparent) 50%, transparent 50%) 0 0 / 12px 12px,
-    var(--tape);
+    var(--tape-fibre),
+    linear-gradient(90deg, rgba(255, 255, 255, .28) 50%, transparent 50%) 0 0 / 10px 10px,
+    linear-gradient(rgba(255, 255, 255, .28) 50%, transparent 50%) 0 0 / 10px 10px,
+    var(--tape-base);
 }
 .washi[data-pattern="waves"] {
-  background: radial-gradient(circle at 50% 100%, transparent 5px, color-mix(in srgb, var(--paper) 60%, transparent) 5.5px 6.5px, transparent 7px) 0 0 / 14px 9px, var(--tape);
+  background:
+    var(--tape-fibre),
+    radial-gradient(circle at 50% 100%, transparent 4px, rgba(255, 255, 255, .4) 4.5px 5.5px, transparent 6px) 0 2px / 12px 8px,
+    var(--tape-base);
 }
 
 .month-mark { display: flex; align-items: flex-end; gap: 10px; }
@@ -1185,7 +1206,8 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
 
 /* ===== Smaller windows ===== */
 @media (max-width: 1100px) {
-  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, auto); overflow-y: auto; gap: 14px; }
+  /* padding-top keeps the washi tape from being clipped by the scroller */
+  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, auto); overflow-y: auto; gap: 14px; padding-top: 14px; }
   .timeline { flex: none; height: 60vh; }
   .month-grid { grid-auto-rows: minmax(90px, auto); }
   .page-left, .page-right { border-radius: 12px; }
