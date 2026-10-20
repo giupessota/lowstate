@@ -6,7 +6,11 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, (core) => {
   const { startOfDay, toISODate, parseISODate } = core;
 
-  const PALETTE = ["#5d8fb8", "#d98585", "#5d9d88", "#c79b3f", "#8f75b5", "#6b7480", "#d27c4a", "#4f9aa6"];
+  // Traditional ink colors: 藍 indigo, 朱 vermilion, 抹茶 matcha, 山吹 yamabuki,
+  // 藤 wisteria, 浅葱 asagi, 桜 sakura, 鼠 nezumi.
+  const PALETTE = ["#34508a", "#d64a32", "#7c8c4a", "#e2a43a", "#8b78bd", "#3e9aa8", "#e59aa6", "#8d8a85"];
+  const WEEKDAY_KANJI = ["日", "月", "火", "水", "木", "金", "土"];
+  const MONTH_KANJI = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
   const DEFAULT_CATEGORY_NAMES = {
     en: ["Work", "Personal", "Health", "Study"],
     pt: ["Trabalho", "Pessoal", "Saúde", "Estudos"],
@@ -253,8 +257,148 @@
     return { items, categories: migratedCategories };
   }
 
+  // ISO-8601 week key ("2026-W43"). Notes and goals are keyed by it so they
+  // stay attached to the same week whether it starts on Monday or Sunday.
+  function isoWeekKey(date) {
+    const day = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    day.setUTCDate(day.getUTCDate() + 4 - (day.getUTCDay() || 7));
+    return `${day.getUTCFullYear()}-W${String(isoWeekNumber(date)).padStart(2, "0")}`;
+  }
+
+  // ---------- Moon ----------
+  const SYNODIC_MONTH = 29.530588853;
+  const REFERENCE_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
+  const MOON_PHASES = ["new", "waxing-crescent", "first-quarter", "waxing-gibbous", "full", "waning-gibbous", "last-quarter", "waning-crescent"];
+
+  // Fraction of the lunar cycle at local noon: 0 = new moon, 0.5 = full moon.
+  function moonPhase(date) {
+    const noon = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12);
+    const days = (noon.getTime() - REFERENCE_NEW_MOON) / 86400000;
+    return (((days % SYNODIC_MONTH) + SYNODIC_MONTH) % SYNODIC_MONTH) / SYNODIC_MONTH;
+  }
+
+  function moonPhaseName(phase) {
+    return MOON_PHASES[Math.round(phase * 8) % 8];
+  }
+
+  // SVG path of the lit part of the moon for a circle of radius r at (cx, cy).
+  // The terminator is an ellipse whose x-radius follows cos(2π·phase).
+  function moonLitPath(phase, cx = 6, cy = 6, r = 5) {
+    const k = Math.cos(2 * Math.PI * phase);
+    const rx = Math.abs(k) * r;
+    const top = `${cx} ${cy - r}`;
+    const bottom = `${cx} ${cy + r}`;
+    const fmt = (value) => Number(value.toFixed(3));
+    if (phase < 0.5) {
+      return `M${top}A${r} ${r} 0 0 1 ${bottom}A${fmt(rx)} ${r} 0 0 ${k > 0 ? 0 : 1} ${top}Z`;
+    }
+    return `M${top}A${r} ${r} 0 0 0 ${bottom}A${fmt(rx)} ${r} 0 0 ${k < 0 ? 0 : 1} ${top}Z`;
+  }
+
+  // ---------- Brazilian national holidays ----------
+  const HOLIDAY_NAMES = {
+    newYear: { pt: "Confraternização Universal", en: "New Year's Day" },
+    carnival: { pt: "Carnaval", en: "Carnival" },
+    goodFriday: { pt: "Sexta-feira Santa", en: "Good Friday" },
+    tiradentes: { pt: "Tiradentes", en: "Tiradentes Day" },
+    labour: { pt: "Dia do Trabalho", en: "Labour Day" },
+    corpusChristi: { pt: "Corpus Christi", en: "Corpus Christi" },
+    independence: { pt: "Independência do Brasil", en: "Independence Day" },
+    aparecida: { pt: "Nossa Senhora Aparecida", en: "Our Lady of Aparecida" },
+    allSouls: { pt: "Finados", en: "All Souls' Day" },
+    republic: { pt: "Proclamação da República", en: "Republic Day" },
+    blackConsciousness: { pt: "Consciência Negra", en: "Black Consciousness Day" },
+    christmas: { pt: "Natal", en: "Christmas" },
+  };
+
+  // Anonymous Gregorian algorithm (Meeus/Jones/Butcher).
+  function easterSunday(year) {
+    const a = year % 19;
+    const b = Math.floor(year / 100);
+    const c = year % 100;
+    const d = Math.floor(b / 4);
+    const e = b % 4;
+    const f = Math.floor((b + 8) / 25);
+    const g = Math.floor((b - f + 1) / 3);
+    const h = (19 * a + b - d - g + 15) % 30;
+    const i = Math.floor(c / 4);
+    const k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h - k) % 7;
+    const m = Math.floor((a + 11 * h + 22 * l) / 451);
+    const month = Math.floor((h + l - 7 * m + 114) / 31);
+    const day = ((h + l - 7 * m + 114) % 31) + 1;
+    return new Date(year, month - 1, day);
+  }
+
+  const holidayCache = new Map();
+
+  // National holidays plus the Carnival and Corpus Christi "pontos
+  // facultativos" most people treat as days off. Returns Map<ISO, key>.
+  function brazilHolidays(year) {
+    if (holidayCache.has(year)) return holidayCache.get(year);
+    const easter = easterSunday(year);
+    const fixed = [
+      ["01-01", "newYear"], ["04-21", "tiradentes"], ["05-01", "labour"], ["09-07", "independence"],
+      ["10-12", "aparecida"], ["11-02", "allSouls"], ["11-15", "republic"], ["12-25", "christmas"],
+    ];
+    if (year >= 2024) fixed.push(["11-20", "blackConsciousness"]);
+    const holidays = new Map(fixed.map(([monthDay, key]) => [`${year}-${monthDay}`, key]));
+    [[-48, "carnival"], [-47, "carnival"], [-2, "goodFriday"], [60, "corpusChristi"]].forEach(([offset, key]) => {
+      holidays.set(toISODate(addDays(easter, offset)), key);
+    });
+    holidayCache.set(year, holidays);
+    return holidays;
+  }
+
+  function holidayName(iso, language = "en") {
+    const date = parseISODate(iso);
+    if (!date) return null;
+    const key = brazilHolidays(date.getFullYear()).get(iso);
+    return key ? HOLIDAY_NAMES[key][language] || HOLIDAY_NAMES[key].en : null;
+  }
+
+  // ---------- Weekly proverb (ことわざ) ----------
+  const PROVERBS = [
+    { jp: "七転び八起き", en: "Fall seven times, get up eight.", pt: "Caia sete vezes, levante-se oito." },
+    { jp: "千里の道も一歩から", en: "A journey of a thousand miles begins with a single step.", pt: "Uma jornada de mil léguas começa com um passo." },
+    { jp: "塵も積もれば山となる", en: "Even dust, piled up, becomes a mountain.", pt: "Até a poeira, acumulada, vira montanha." },
+    { jp: "急がば回れ", en: "When in a hurry, take the long way round.", pt: "Se está com pressa, vá pelo caminho mais longo." },
+    { jp: "継続は力なり", en: "Persistence is power.", pt: "Persistência é força." },
+    { jp: "一期一会", en: "One time, one meeting — treasure each moment.", pt: "Um encontro, uma única vez — valorize cada momento." },
+    { jp: "石の上にも三年", en: "Sit on a cold stone for three years and it grows warm.", pt: "Sente-se três anos numa pedra fria e ela se aquece." },
+    { jp: "雨降って地固まる", en: "After the rain, the ground grows firm.", pt: "Depois da chuva, a terra fica firme." },
+    { jp: "笑う門には福来る", en: "Good fortune comes to the house that laughs.", pt: "A sorte chega à casa onde se ri." },
+    { jp: "案ずるより産むが易し", en: "Doing it is easier than worrying about it.", pt: "Fazer é mais fácil do que se preocupar." },
+    { jp: "猿も木から落ちる", en: "Even monkeys fall from trees.", pt: "Até os macacos caem das árvores." },
+    { jp: "明日は明日の風が吹く", en: "Tomorrow's winds will blow tomorrow.", pt: "Amanhã sopram os ventos de amanhã." },
+    { jp: "十人十色", en: "Ten people, ten colors.", pt: "Dez pessoas, dez cores." },
+    { jp: "腹八分目", en: "Stop when you are eight-tenths full.", pt: "Pare quando estiver oito décimos satisfeito." },
+    { jp: "能ある鷹は爪を隠す", en: "The skilled hawk hides its talons.", pt: "O falcão habilidoso esconde as garras." },
+    { jp: "一石二鳥", en: "One stone, two birds.", pt: "Uma pedra, dois pássaros." },
+    { jp: "備えあれば憂いなし", en: "Be prepared and you will have nothing to fear.", pt: "Quem se prepara não tem o que temer." },
+    { jp: "早起きは三文の徳", en: "Rising early is worth three coins.", pt: "Acordar cedo vale três moedas." },
+    { jp: "初心忘るべからず", en: "Never forget your beginner's mind.", pt: "Nunca esqueça o espírito de iniciante." },
+    { jp: "塞翁が馬", en: "Old Saiō's horse — luck and misfortune are hard to tell apart.", pt: "O cavalo do velho Saiō — sorte e azar são difíceis de distinguir." },
+  ];
+
+  function proverbForWeek(weekNumber) {
+    const index = ((Math.round(weekNumber) - 1) % PROVERBS.length + PROVERBS.length) % PROVERBS.length;
+    return PROVERBS[index];
+  }
+
   return {
     PALETTE,
+    WEEKDAY_KANJI,
+    MONTH_KANJI,
+    PROVERBS,
+    isoWeekKey,
+    moonPhase,
+    moonPhaseName,
+    moonLitPath,
+    easterSunday,
+    brazilHolidays,
+    holidayName,
+    proverbForWeek,
     newId,
     addDays,
     startOfWeek,

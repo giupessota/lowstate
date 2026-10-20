@@ -129,6 +129,51 @@ test("migrateLegacy converts 1.x tasks and categories", () => {
   assert.equal(items.find((item) => item.id === "2").order, 10);
 });
 
+test("ISO week keys follow the ISO week-year", () => {
+  assert.equal(P.isoWeekKey(NOW), "2026-W43");
+  assert.equal(P.isoWeekKey(new Date(2027, 0, 1)), "2026-W53");
+  assert.equal(P.isoWeekKey(new Date(2026, 11, 31)), "2026-W53");
+  assert.equal(P.isoWeekKey(new Date(2025, 11, 29)), "2026-W01");
+});
+
+test("moon phase matches known 2026 new and full moons", () => {
+  assert.equal(P.moonPhaseName(P.moonPhase(new Date(2026, 9, 10))), "new");
+  assert.equal(P.moonPhaseName(P.moonPhase(new Date(2026, 9, 26))), "full");
+  assert.equal(P.moonPhaseName(P.moonPhase(new Date(2026, 0, 3))), "full");
+  assert.equal(P.moonPhaseName(P.moonPhase(new Date(2026, 1, 17))), "new");
+  const phase = P.moonPhase(NOW);
+  assert.ok(phase >= 0 && phase < 1);
+});
+
+test("moon path draws a crescent, a half and a full disc", () => {
+  assert.match(P.moonLitPath(0.25), /A0 5/);
+  // Full moon: left half arc, then the terminator sweeps back over the right half.
+  assert.equal(P.moonLitPath(0.5), "M6 1A5 5 0 0 0 6 11A5 5 0 0 0 6 1Z");
+  assert.ok(P.moonLitPath(0.1).startsWith("M6 1A5 5 0 0 1 6 11"));
+  assert.ok(P.moonLitPath(0.9).startsWith("M6 1A5 5 0 0 0 6 11"));
+});
+
+test("Easter and the Brazilian holidays derived from it", () => {
+  assert.equal(toISODate(P.easterSunday(2026)), "2026-04-05");
+  assert.equal(toISODate(P.easterSunday(2027)), "2027-03-28");
+  const holidays = P.brazilHolidays(2026);
+  assert.equal(holidays.get("2026-02-16"), "carnival");
+  assert.equal(holidays.get("2026-02-17"), "carnival");
+  assert.equal(holidays.get("2026-04-03"), "goodFriday");
+  assert.equal(holidays.get("2026-06-04"), "corpusChristi");
+  assert.equal(holidays.get("2026-11-20"), "blackConsciousness");
+  assert.equal(P.holidayName("2026-11-02", "pt"), "Finados");
+  assert.equal(P.holidayName("2026-10-12", "en"), "Our Lady of Aparecida");
+  assert.equal(P.holidayName("2026-10-20", "pt"), null);
+  assert.equal(P.brazilHolidays(2023).has("2023-11-20"), false);
+});
+
+test("weekly proverb cycles through the list", () => {
+  assert.equal(P.proverbForWeek(1), P.PROVERBS[0]);
+  assert.equal(P.proverbForWeek(P.PROVERBS.length + 1), P.PROVERBS[0]);
+  assert.ok(P.proverbForWeek(43).jp);
+});
+
 test("default categories are localized but keep stable ids", () => {
   assert.deepEqual(P.defaultCategories("pt").map((category) => category.id), ["work", "personal", "health", "study"]);
   assert.equal(P.defaultCategories("pt")[2].name, "Saúde");

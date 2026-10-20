@@ -11,6 +11,8 @@
     items: "type-todo.planner.items.v1",
     categories: "type-todo.planner.categories.v1",
     settings: "type-todo.planner.settings.v1",
+    goals: "type-todo.planner.goals.v1",
+    notes: "type-todo.planner.notes.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     alwaysOnTop: "type-todo.always-on-top.v1",
@@ -22,6 +24,10 @@
 
   const ICON_CHECK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
   const ICON_TODAY = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 7l5 5-5 5"/></svg>';
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  const TAPE_PATTERNS = ["stripes", "dots", "gingham", "waves"];
+  const TAPE_COLORS = ["--sakura", "--asagi", "--yamabuki", "--matcha", "--fuji"];
+  const TAB_COLORS = ["--indigo", "--vermilion", "--matcha", "--yamabuki", "--fuji", "--asagi"];
   const START_OPTIONS = Array.from({ length: 96 }, (_, index) => Planner.minutesToTime(index * 15));
   const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
   const PLACEHOLDER_TEXT = { day: "comingDay", month: "comingMonth", habits: "comingHabits" };
@@ -29,6 +35,21 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     weekGrid: $("weekGrid"),
+    washi: $("washi"),
+    monthNum: $("monthNum"),
+    monthName: $("monthName"),
+    monthKanji: $("monthKanji"),
+    yearMark: $("yearMark"),
+    proverbJp: $("proverbJp"),
+    proverbTr: $("proverbTr"),
+    weekLabel: $("weekLabel"),
+    weekKanji: $("weekKanji"),
+    weekRange: $("weekRange"),
+    goalsList: $("goalsList"),
+    goalForm: $("goalForm"),
+    goalInput: $("goalInput"),
+    weekNotes: $("weekNotes"),
+    monthTabs: $("monthTabs"),
     weekView: $("weekView"),
     placeholderView: $("placeholderView"),
     placeholderIcon: $("placeholderIcon"),
@@ -198,7 +219,12 @@
     anchor: Core.startOfDay(new Date()),
     items: initial.items,
     categories: initial.categories,
-    settings: { weekStart: savedSettings.weekStart === 0 ? 0 : 1 },
+    settings: {
+      weekStart: savedSettings.weekStart === 0 ? 0 : 1,
+      holidays: savedSettings.holidays === "off" ? "off" : "br",
+    },
+    goals: Store.loadObject(KEYS.goals),
+    notes: Store.loadObject(KEYS.notes),
     editingId: null,
     draft: null,
     dragId: null,
@@ -207,6 +233,8 @@
   const persistItems = () => Store.save(KEYS.items, state.items);
   const persistCategories = () => Store.save(KEYS.categories, state.categories);
   const persistSettings = () => Store.save(KEYS.settings, state.settings);
+  const persistGoals = () => Store.save(KEYS.goals, state.goals);
+  const persistNotes = () => Store.save(KEYS.notes, state.notes);
 
   if (initial.changed) {
     persistItems();
@@ -292,32 +320,50 @@
   }
 
   // ---------- rendering ----------
-  function cardEl(item, context = "day") {
-    const category = categoryById(item.category);
-    const meta = [];
-    if (context === "overdue") meta.push(h("span", { class: "meta-date", text: shortDate(item.date) }));
-    if (item.start) meta.push(h("span", { class: "meta-time", text: timeRange(item) }));
-    if (category) meta.push(h("span", { class: "meta-cat" }, h("i"), category.name));
-    if (item.priority === "urgent") meta.push(h("span", { class: "meta-urgent", text: `! ${t("urgentToggle")}` }));
-    if (item.notes.trim()) meta.push(h("span", { class: "meta-notes", title: item.notes, text: "≡" }));
+  function checkButton(done, attrs) {
+    return h("button", {
+      type: "button",
+      class: "check",
+      "aria-pressed": String(done),
+      "aria-label": t(done ? "markOpen" : "markDone"),
+      ...attrs,
+    }, icon(ICON_CHECK));
+  }
 
-    const classes = ["card"];
-    if (context === "overdue") classes.push("has-action");
+  // "line" = written on a day row; "inbox"/"overdue" = loose slip on the cover.
+  function itemEl(item, variant = "line") {
+    const category = categoryById(item.category);
+    const classes = ["item", variant === "line" ? "line" : "slip"];
+    if (variant === "overdue") classes.push("overdue");
     if (item.done) classes.push("is-done");
     if (item.priority === "urgent") classes.push("is-urgent");
 
-    const check = h("button", {
-      type: "button",
-      class: "check",
-      "data-action": "toggle",
-      "aria-pressed": String(item.done),
-      "aria-label": t(item.done ? "markOpen" : "markDone"),
-    }, icon(ICON_CHECK));
-    const body = h("div", { class: "card-body", "data-action": "edit", role: "button", tabindex: "0" },
-      h("div", { class: "card-title", text: item.title }),
-      meta.length ? h("div", { class: "card-meta" }, meta) : null);
-    const action = context === "overdue"
-      ? h("button", { type: "button", class: "card-action", "data-action": "today", title: t("moveToday"), "aria-label": t("moveToday") }, icon(ICON_TODAY))
+    const stamp = category ? h("span", { class: "stamp", text: category.name }) : null;
+    // 急 ("urgent") as a little hanko seal.
+    const seal = item.priority === "urgent"
+      ? h("span", { class: "seal", title: t("urgentToggle"), "aria-label": t("urgentToggle"), role: "img" }, "急")
+      : null;
+    const notesMark = item.notes.trim() ? h("span", { class: "notes-mark", title: item.notes, text: "≡" }) : null;
+
+    let body;
+    if (variant === "line") {
+      body = h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0" },
+        item.start ? h("span", { class: "line-time", text: timeRange(item) }) : null,
+        h("span", { class: "line-title", text: item.title }),
+        stamp, seal, notesMark);
+    } else {
+      const meta = [
+        variant === "overdue" ? h("span", { class: "slip-date", text: shortDate(item.date) }) : null,
+        item.start && variant !== "overdue" ? h("span", { class: "line-time", text: item.start }) : null,
+        stamp,
+        seal,
+      ].filter(Boolean);
+      body = h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0" },
+        h("div", { class: "slip-title", text: item.title }),
+        meta.length ? h("div", { class: "slip-meta" }, meta) : null);
+    }
+    const action = variant === "overdue"
+      ? h("button", { type: "button", class: "item-action", "data-action": "today", title: t("moveToday"), "aria-label": t("moveToday") }, icon(ICON_TODAY))
       : null;
 
     return h("li", {
@@ -325,26 +371,47 @@
       "data-id": item.id,
       draggable: "true",
       style: category ? `--cat: ${category.color}` : null,
-    }, check, body, action);
+    }, checkButton(item.done, { "data-action": "toggle" }), body, action);
+  }
+
+  function svgEl(tag, attrs) {
+    const node = document.createElementNS(SVG_NS, tag);
+    Object.entries(attrs).forEach(([key, value]) => node.setAttribute(key, value));
+    return node;
+  }
+
+  function moonEl(date) {
+    const phase = Planner.moonPhase(date);
+    const label = t(`moon-${Planner.moonPhaseName(phase)}`);
+    const svg = svgEl("svg", { class: "moon", viewBox: "0 0 12 12", role: "img", "aria-label": label });
+    const title = svgEl("title", {});
+    title.textContent = label;
+    svg.append(
+      title,
+      svgEl("circle", { class: "shadow", cx: 6, cy: 6, r: 5 }),
+      svgEl("path", { class: "lit", d: Planner.moonLitPath(phase) }),
+      svgEl("circle", { class: "rim", cx: 6, cy: 6, r: 5 }));
+    return svg;
   }
 
   function weekDays() {
     return Planner.weekDays(state.anchor, state.settings.weekStart);
   }
 
+  const currentWeekKey = () => Planner.isoWeekKey(weekDays()[3]);
+
   function renderTopbar() {
     const isWeek = state.view === "week";
     els.navControls.hidden = !isWeek;
+    els.rangeSub.textContent = "";
     if (!isWeek) {
       els.weekProgress.hidden = true;
       els.rangeTitle.textContent = t({ day: "viewDay", month: "viewMonth", habits: "viewHabits" }[state.view]);
-      els.rangeSub.textContent = "";
       return;
     }
     const days = weekDays();
     const today = todayISO();
     els.rangeTitle.textContent = formatRange(days[0], days[6]);
-    els.rangeSub.textContent = t("weekNumber", { n: Planner.isoWeekNumber(days[3]) });
     els.todayBtn.disabled = days.some((day) => Core.toISODate(day) === today);
 
     const stats = Planner.weekStats(state.items, days);
@@ -353,31 +420,135 @@
     els.progressText.textContent = t("weekProgress", stats);
   }
 
-  function renderWeek() {
+  function renderDays(days) {
     const today = todayISO();
-    els.weekGrid.replaceChildren(...weekDays().map((day) => {
+    const holidaysOn = state.settings.holidays === "br";
+    els.weekGrid.replaceChildren(...days.map((day) => {
       const iso = Core.toISODate(day);
-      const items = Planner.itemsForDay(state.items, iso);
-      const done = items.filter((item) => item.done).length;
-      const classes = ["day-col"];
+      const holiday = holidaysOn ? Planner.holidayName(iso, I18n.language) : null;
+      const classes = ["day-row"];
       if (iso === today) classes.push("is-today");
       else if (iso < today) classes.push("is-past");
-      if (day.getDay() === 0 || day.getDay() === 6) classes.push("is-weekend");
+      if (day.getDay() === 6) classes.push("is-sat");
+      if (day.getDay() === 0) classes.push("is-sun");
+      if (holiday) classes.push("is-holiday");
 
-      return h("section", { class: classes.join(" "), "data-date": iso, "aria-label": longDate(iso) },
-        h("header", { class: "day-head" },
-          h("span", { class: "day-name", text: formatDate(day, { weekday: "short" }) }),
-          h("span", { class: "day-num", text: day.getDate() }),
-          items.length ? h("span", { class: "day-count", text: `${done}/${items.length}` }) : null),
-        h("ul", { class: "day-list", "data-date": iso, "data-empty": t("dayEmpty") }, items.map((item) => cardEl(item))),
-        h("form", { class: "day-add", "data-date": iso },
-          h("input", {
-            name: "title",
-            autocomplete: "off",
-            maxlength: "200",
-            placeholder: `+ ${t("addInline")}`,
-            "aria-label": `${t("addInline")} — ${longDate(iso)}`,
-          })));
+      return h("section", {
+        class: classes.join(" "),
+        "data-date": iso,
+        "aria-label": holiday ? `${longDate(iso)} — ${holiday}` : longDate(iso),
+      },
+        h("div", { class: "day-stamp" },
+          h("span", { class: "date-num", text: String(day.getDate()).padStart(2, "0") }),
+          h("span", { class: "dow" },
+            formatDate(day, { weekday: "short" }),
+            h("span", { class: "kanji", text: Planner.WEEKDAY_KANJI[day.getDay()] })),
+          moonEl(day)),
+        h("div", { class: "day-body" },
+          holiday ? h("p", { class: "holiday", text: holiday }) : null,
+          h("ul", { class: "day-items", "data-date": iso },
+            Planner.itemsForDay(state.items, iso).map((item) => itemEl(item, "line"))),
+          h("form", { class: "day-add", "data-date": iso },
+            h("input", {
+              name: "title",
+              autocomplete: "off",
+              maxlength: "200",
+              placeholder: "+",
+              "aria-label": `${t("addInline")} — ${longDate(iso)}`,
+            }))));
+    }));
+  }
+
+  function renderSpread() {
+    const days = weekDays();
+    const reference = days[3];
+    const weekNumber = Planner.isoWeekNumber(reference);
+    const sameMonth = days[0].getMonth() === days[6].getMonth();
+
+    els.monthNum.textContent = String(reference.getMonth() + 1).padStart(2, "0");
+    els.monthName.textContent = sameMonth
+      ? formatDate(reference, { month: "long" })
+      : `${formatDate(days[0], { month: "short" })} – ${formatDate(days[6], { month: "short" })}`;
+    els.monthKanji.textContent = Planner.MONTH_KANJI[reference.getMonth()];
+    els.yearMark.textContent = String(reference.getFullYear());
+    els.washi.dataset.pattern = TAPE_PATTERNS[weekNumber % TAPE_PATTERNS.length];
+    els.washi.style.setProperty("--tape", `var(${TAPE_COLORS[weekNumber % TAPE_COLORS.length]})`);
+
+    renderDays(days);
+
+    const proverb = Planner.proverbForWeek(weekNumber);
+    els.proverbJp.textContent = proverb.jp;
+    els.proverbTr.textContent = `— ${proverb[I18n.language] || proverb.en}`;
+
+    els.weekLabel.textContent = t("weekNumber", { n: weekNumber });
+    els.weekKanji.textContent = `第${weekNumber}週`;
+    els.weekRange.textContent = `${formatDate(days[0], { day: "2-digit", month: "2-digit" })} — ${formatDate(days[6], { day: "2-digit", month: "2-digit" })}`;
+    renderGoals();
+    renderNotes();
+    renderMonthTabs(reference);
+  }
+
+  // ---------- weekly goals & notes (right page) ----------
+  function weekGoals() {
+    const goals = state.goals[currentWeekKey()];
+    return Array.isArray(goals) ? goals : [];
+  }
+
+  function setWeekGoals(goals) {
+    const key = currentWeekKey();
+    const { [key]: _previous, ...rest } = state.goals;
+    state.goals = goals.length ? { ...rest, [key]: goals } : rest;
+    persistGoals();
+    renderGoals();
+  }
+
+  function renderGoals() {
+    els.goalsList.replaceChildren(...weekGoals().map((goal) => h("li", { class: `goal${goal.done ? " is-done" : ""}`, "data-goal": goal.id },
+      checkButton(goal.done, { "data-goal-action": "toggle" }),
+      h("span", { class: "goal-text", text: goal.text }),
+      h("button", {
+        type: "button",
+        class: "goal-remove",
+        "data-goal-action": "remove",
+        title: t("removeGoal"),
+        "aria-label": t("removeGoal"),
+      }, "×"))));
+  }
+
+  let notesKey = null;
+  let notesTimer = null;
+
+  function renderNotes() {
+    const key = currentWeekKey();
+    // Never overwrite what someone is typing in the same week.
+    if (key === notesKey && document.activeElement === els.weekNotes) return;
+    notesKey = key;
+    els.weekNotes.value = state.notes[key] || "";
+  }
+
+  function saveNotes() {
+    clearTimeout(notesTimer);
+    if (!notesKey) return;
+    const text = els.weekNotes.value;
+    const { [notesKey]: _previous, ...rest } = state.notes;
+    state.notes = text.trim() ? { ...rest, [notesKey]: text } : rest;
+    persistNotes();
+  }
+
+  function renderMonthTabs(reference) {
+    const year = reference.getFullYear();
+    const active = reference.getMonth();
+    els.monthTabs.replaceChildren(...Array.from({ length: 12 }, (_, month) => {
+      const label = capitalize(formatDate(new Date(year, month, 1), { month: "long", year: "numeric" }));
+      return h("button", {
+        type: "button",
+        class: `month-tab${month === active ? " active" : ""}`,
+        "data-month": month,
+        title: label,
+        "aria-label": label,
+        "aria-current": month === active ? "true" : null,
+        style: `--tab: var(${TAB_COLORS[month % TAB_COLORS.length]})`,
+      }, String(month + 1));
     }));
   }
 
@@ -391,11 +562,11 @@
     const overdue = Planner.overdueItems(state.items, todayISO());
     els.overdueSection.hidden = overdue.length === 0;
     els.overdueCount.textContent = overdue.length || "";
-    els.overdueList.replaceChildren(...overdue.map((item) => cardEl(item, "overdue")));
+    els.overdueList.replaceChildren(...overdue.map((item) => itemEl(item, "overdue")));
 
     const inbox = Planner.inboxItems(state.items);
     els.inboxCount.textContent = inbox.length || "";
-    els.inboxList.replaceChildren(...inbox.map((item) => cardEl(item, "inbox")));
+    els.inboxList.replaceChildren(...inbox.map((item) => itemEl(item, "inbox")));
     els.inboxEmpty.hidden = inbox.length > 0;
   }
 
@@ -410,7 +581,7 @@
     els.weekView.hidden = !isWeek;
     els.placeholderView.hidden = isWeek;
     renderTopbar();
-    if (isWeek) renderWeek();
+    if (isWeek) renderSpread();
     else renderPlaceholder();
     renderSidebar();
   }
@@ -606,6 +777,7 @@
       theme: currentTheme(),
       language: I18n.language,
       weekStart: String(state.settings.weekStart),
+      holidays: state.settings.holidays,
       alwaysOnTop: alwaysOnTop() ? "on" : "off",
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
@@ -632,6 +804,10 @@
       render();
     } else if (setting === "weekStart") {
       state.settings.weekStart = value === "0" ? 0 : 1;
+      persistSettings();
+      render();
+    } else if (setting === "holidays") {
+      state.settings.holidays = value === "off" ? "off" : "br";
       persistSettings();
       render();
     } else if (setting === "alwaysOnTop") {
@@ -727,6 +903,37 @@
     moveToToday(Planner.overdueItems(state.items, todayISO()).map((item) => item.id));
   });
 
+  els.goalForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const text = els.goalInput.value.trim();
+    if (!text) return;
+    setWeekGoals([...weekGoals(), { id: Planner.newId(), text, done: false }]);
+    els.goalInput.value = "";
+  });
+  els.goalsList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-goal-action]");
+    const id = button?.closest("[data-goal]")?.dataset.goal;
+    if (!id) return;
+    if (button.dataset.goalAction === "remove") setWeekGoals(weekGoals().filter((goal) => goal.id !== id));
+    else setWeekGoals(weekGoals().map((goal) => (goal.id === id ? { ...goal, done: !goal.done } : goal)));
+  });
+  els.weekNotes.addEventListener("input", () => {
+    clearTimeout(notesTimer);
+    notesTimer = setTimeout(saveNotes, 500);
+  });
+  els.weekNotes.addEventListener("blur", saveNotes);
+
+  // Month index tabs jump to the first week that mostly belongs to that month.
+  els.monthTabs.addEventListener("click", (event) => {
+    const tab = event.target.closest("[data-month]");
+    if (!tab) return;
+    const month = Number(tab.dataset.month);
+    let anchor = new Date(weekDays()[3].getFullYear(), month, 1);
+    if (Planner.weekDays(anchor, state.settings.weekStart)[3].getMonth() !== month) anchor = Planner.addDays(anchor, 7);
+    state.anchor = anchor;
+    render();
+  });
+
   els.inboxForm.addEventListener("submit", (event) => {
     event.preventDefault();
     if (capture(els.inboxInput.value)) els.inboxInput.value = "";
@@ -744,7 +951,7 @@
 
   document.addEventListener("click", (event) => {
     const action = event.target.closest("[data-action]");
-    const card = action?.closest(".card");
+    const card = action?.closest(".item");
     if (!card) return;
     const id = card.dataset.id;
     if (action.dataset.action === "toggle") toggleItem(id);
@@ -753,9 +960,9 @@
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.target.matches?.(".card-body") && (event.key === "Enter" || event.key === " ")) {
+    if (event.target.matches?.(".item-body") && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
-      openEditor(event.target.closest(".card").dataset.id);
+      openEditor(event.target.closest(".item").dataset.id);
       return;
     }
     if (document.querySelector("dialog[open]") || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -775,14 +982,14 @@
 
   // ---------- drag & drop ----------
   function dropZoneFrom(target) {
-    const column = target.closest?.(".day-col");
-    if (column) return { container: column, list: column.querySelector(".day-list"), date: column.dataset.date };
+    const row = target.closest?.(".day-row");
+    if (row) return { container: row, list: row.querySelector(".day-items"), date: row.dataset.date };
     if (target.closest?.("#inboxSection")) return { container: els.inboxSection, list: els.inboxList, date: null };
     return null;
   }
 
   function cardBefore(list, y) {
-    return [...list.querySelectorAll(".card:not(.dragging)")].find((card) => {
+    return [...list.querySelectorAll(".item:not(.dragging)")].find((card) => {
       const rect = card.getBoundingClientRect();
       return y < rect.top + rect.height / 2;
     }) || null;
@@ -795,7 +1002,7 @@
   }
 
   document.addEventListener("dragstart", (event) => {
-    const card = event.target.closest?.(".card");
+    const card = event.target.closest?.(".item");
     if (!card) return;
     state.dragId = card.dataset.id;
     event.dataTransfer.effectAllowed = "move";

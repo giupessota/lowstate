@@ -97,7 +97,49 @@
         </header>
 
         <section class="view week-view" id="weekView">
-          <div class="week-grid" id="weekGrid"></div>
+          <div class="spread">
+            <article class="page page-left">
+              <header class="page-head">
+                <span class="washi" id="washi" aria-hidden="true"></span>
+                <div class="month-mark">
+                  <span class="month-num" id="monthNum"></span>
+                  <div class="month-text">
+                    <strong id="monthName"></strong>
+                    <span class="kanji" id="monthKanji"></span>
+                  </div>
+                </div>
+                <span class="year-mark" id="yearMark"></span>
+              </header>
+              <div class="days" id="weekGrid"></div>
+              <footer class="proverb">
+                <span class="proverb-jp" id="proverbJp"></span>
+                <span class="proverb-tr" id="proverbTr"></span>
+              </footer>
+            </article>
+
+            <article class="page page-right">
+              <header class="page-head">
+                <div class="week-mark">
+                  <strong id="weekLabel"></strong>
+                  <span class="kanji" id="weekKanji"></span>
+                </div>
+                <span class="range-mark" id="weekRange"></span>
+              </header>
+              <section class="goals">
+                <h2 class="section-title"><span data-i18n="weeklyGoals">Weekly goals</span><span class="kanji">目標</span></h2>
+                <ul class="goal-list" id="goalsList"></ul>
+                <form class="goal-add" id="goalForm">
+                  <input id="goalInput" maxlength="140" autocomplete="off" data-i18n-placeholder="goalPlaceholder" data-i18n-aria="weeklyGoals" />
+                </form>
+              </section>
+              <section class="notes">
+                <h2 class="section-title"><span data-i18n="weekNotes">Notes</span><span class="kanji">メモ</span></h2>
+                <textarea id="weekNotes" data-i18n-placeholder="notesFreePlaceholder" data-i18n-aria="weekNotes"></textarea>
+              </section>
+            </article>
+
+            <nav class="month-tabs" id="monthTabs" data-i18n-aria="months" aria-label="Months"></nav>
+          </div>
         </section>
 
         <section class="view placeholder-view" id="placeholderView" hidden>
@@ -160,7 +202,7 @@
 
         <div class="field">
           <button type="button" class="toggle" id="itemUrgent" aria-pressed="false">
-            <span class="flag">!</span><span data-i18n="urgentToggle">Urgent</span>
+            <span class="flag" aria-hidden="true">急</span><span data-i18n="urgentToggle">Urgent</span>
           </button>
         </div>
 
@@ -208,6 +250,13 @@
             <div class="seg" data-setting="weekStart">
               <button type="button" data-value="1" data-i18n="monday">MONDAY</button>
               <button type="button" data-value="0" data-i18n="sunday">SUNDAY</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="holidays">Holidays</span>
+            <div class="seg" data-setting="holidays">
+              <button type="button" data-value="br" data-i18n="holidaysBrazil">BRAZIL</button>
+              <button type="button" data-value="off" data-i18n="holidaysOff">OFF</button>
             </div>
           </div>
         </section>

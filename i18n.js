@@ -51,6 +51,12 @@
       restoreFailed: "Couldn't restore that file — is it a Lowstate backup?", confirmRestore: "Replace all current data with this backup?",
       updateAvailable: "Update {version}", download: "Download", close: "Close", markDone: "Mark as done", markOpen: "Mark as not done",
       migratedNotice: "Your tasks from the notebook were brought into the planner.",
+      weeklyGoals: "Weekly goals", goalPlaceholder: "+ Add a goal for this week", removeGoal: "Remove goal",
+      weekNotes: "Notes", notesFreePlaceholder: "Ideas, reflections, anything for this week…",
+      holidays: "Holidays", holidaysBrazil: "BRAZIL", holidaysOff: "OFF", months: "Months",
+      "moon-new": "New moon", "moon-waxing-crescent": "Waxing crescent", "moon-first-quarter": "First quarter",
+      "moon-waxing-gibbous": "Waxing gibbous", "moon-full": "Full moon", "moon-waning-gibbous": "Waning gibbous",
+      "moon-last-quarter": "Last quarter", "moon-waning-crescent": "Waning crescent",
     },
     pt: {
       todo: "A FAZER", today: "HOJE", done: "FEITAS", all: "TODAS", late: "ATRASADAS", urgent: "URGENTE",
@@ -102,6 +108,12 @@
       restoreFailed: "Não foi possível restaurar — é um backup do Lowstate?", confirmRestore: "Substituir todos os dados atuais por este backup?",
       updateAvailable: "Atualização {version}", download: "Baixar", close: "Fechar", markDone: "Marcar como feita", markOpen: "Marcar como não feita",
       migratedNotice: "Suas tarefas do caderno foram trazidas para o planner.",
+      weeklyGoals: "Metas da semana", goalPlaceholder: "+ Adicionar uma meta para esta semana", removeGoal: "Remover meta",
+      weekNotes: "Notas", notesFreePlaceholder: "Ideias, reflexões, o que quiser desta semana…",
+      holidays: "Feriados", holidaysBrazil: "BRASIL", holidaysOff: "DESLIGADO", months: "Meses",
+      "moon-new": "Lua nova", "moon-waxing-crescent": "Lua crescente", "moon-first-quarter": "Quarto crescente",
+      "moon-waxing-gibbous": "Crescente gibosa", "moon-full": "Lua cheia", "moon-waning-gibbous": "Minguante gibosa",
+      "moon-last-quarter": "Quarto minguante", "moon-waning-crescent": "Lua minguante",
     },
   };
 
