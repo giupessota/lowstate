@@ -751,6 +751,7 @@ svg.i {
   display: flex;
   align-items: flex-start;
   gap: 6px;
+  height: var(--h);
   min-height: 20px;
   padding: 3px 6px;
   overflow: hidden;
@@ -780,6 +781,11 @@ svg.i {
 .block.short { align-items: center; }
 .block.short .item-body { flex-direction: row; align-items: baseline; gap: 6px; }
 .block.short .block-title { display: block; white-space: nowrap; text-overflow: ellipsis; }
+/* Hovered or focused blocks grow over the timeline to show the whole title. */
+.block:hover, .block:focus-within { height: auto; min-height: var(--h); z-index: 4; }
+.block:hover .block-title, .block:focus-within .block-title { display: block; white-space: normal; -webkit-line-clamp: unset; line-clamp: none; }
+.block.short:hover, .block.short:focus-within { align-items: flex-start; }
+.block.short:hover .item-body, .block.short:focus-within .item-body { flex-direction: column; gap: 0; }
 
 .now-line {
   position: absolute;

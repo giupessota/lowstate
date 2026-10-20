@@ -598,7 +598,7 @@
         class: classes.join(" "),
         "data-id": item.id,
         draggable: "true",
-        style: `top: ${top}px; height: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${category ? ` --cat: ${category.color};` : ""}`,
+        style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${category ? ` --cat: ${category.color};` : ""}`,
       },
         checkButton(item.done, { "data-action": "toggle" }),
         h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
