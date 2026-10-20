@@ -62,6 +62,31 @@
   --page-shadow: 0 1px 1px rgba(0, 0, 0, .4), 0 14px 30px rgba(0, 0, 0, .45);
 }
 
+/* Cover colors (Settings → Cover color); green is the default above. The
+   swatch buttons show the light version of each cloth. */
+:root[data-cover="navy"] { --cover: #2b3d63; --cover-2: #22304f; }
+:root[data-cover="wine"] { --cover: #6a2a35; --cover-2: #55212b; }
+:root[data-cover="black"] { --cover: #2e2d2b; --cover-2: #222120; }
+:root[data-cover="pink"] { --cover: #a35a6b; --cover-2: #8a4a5a; }
+:root[data-cover="mustard"] { --cover: #93661f; --cover-2: #7b5419; }
+:root[data-cover="lavender"] { --cover: #5d4f8a; --cover-2: #4c4073; }
+:root[data-cover="teal"] { --cover: #2f6b73; --cover-2: #25575e; }
+:root[data-theme="dark"][data-cover="navy"] { --cover: #1a2338; --cover-2: #151c2e; }
+:root[data-theme="dark"][data-cover="wine"] { --cover: #3a1a20; --cover-2: #2e151a; }
+:root[data-theme="dark"][data-cover="black"] { --cover: #1a1a19; --cover-2: #131312; }
+:root[data-theme="dark"][data-cover="pink"] { --cover: #4a2a32; --cover-2: #3b2128; }
+:root[data-theme="dark"][data-cover="mustard"] { --cover: #3d2c12; --cover-2: #30230e; }
+:root[data-theme="dark"][data-cover="lavender"] { --cover: #2a2440; --cover-2: #211c33; }
+:root[data-theme="dark"][data-cover="teal"] { --cover: #183338; --cover-2: #13292d; }
+[data-setting="cover"] [data-value="green"] { --swatch: #2c4a3c; --swatch-2: #23392f; }
+[data-setting="cover"] [data-value="navy"] { --swatch: #2b3d63; --swatch-2: #22304f; }
+[data-setting="cover"] [data-value="wine"] { --swatch: #6a2a35; --swatch-2: #55212b; }
+[data-setting="cover"] [data-value="black"] { --swatch: #2e2d2b; --swatch-2: #222120; }
+[data-setting="cover"] [data-value="pink"] { --swatch: #a35a6b; --swatch-2: #8a4a5a; }
+[data-setting="cover"] [data-value="mustard"] { --swatch: #93661f; --swatch-2: #7b5419; }
+[data-setting="cover"] [data-value="lavender"] { --swatch: #5d4f8a; --swatch-2: #4c4073; }
+[data-setting="cover"] [data-value="teal"] { --swatch: #2f6b73; --swatch-2: #25575e; }
+
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body {
@@ -1064,6 +1089,16 @@ dialog.sheet[open] { animation: sheet-in .18s ease; }
 }
 .set-group .set-row:last-child { border-bottom: 0; }
 .set-row > span { font-weight: 500; }
+.swatches { flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 5px 7px; }
+.seg.swatches button {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: 50%;
+  background: linear-gradient(160deg, var(--swatch), var(--swatch-2));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
+}
+.seg.swatches button.active { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
 .set-row.stacked { flex-direction: column; align-items: stretch; gap: 8px; }
 .set-row.stacked .seg button { flex: 1; padding-inline: 6px; }
 .btn-row { display: flex; gap: 6px; }

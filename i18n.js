@@ -54,6 +54,8 @@
       weeklyGoals: "Weekly goals", goalPlaceholder: "+ Add a goal for this week", removeGoal: "Remove goal",
       weekNotes: "Notes", notesFreePlaceholder: "Ideas, reflections, anything for this week…",
       holidays: "Holidays", holidaysBrazil: "BRAZIL", holidaysOff: "OFF", months: "Months",
+      coverColor: "Cover color", coverGreen: "Green", coverNavy: "Navy", coverWine: "Wine", coverBlack: "Black",
+      coverPink: "Pink", coverMustard: "Mustard", coverLavender: "Lavender", coverTeal: "Teal",
       quotes: "Page quote", quotesProverbs: "PROVERBS", quotesMotivational: "MOTIVATIONAL", quotesIronic: "IRONIC", quotesOff: "NONE",
       "moon-new": "New moon", "moon-waxing-crescent": "Waxing crescent", "moon-first-quarter": "First quarter",
       "moon-waxing-gibbous": "Waxing gibbous", "moon-full": "Full moon", "moon-waning-gibbous": "Waning gibbous",
@@ -116,6 +118,8 @@
       weeklyGoals: "Metas da semana", goalPlaceholder: "+ Adicionar uma meta para esta semana", removeGoal: "Remover meta",
       weekNotes: "Notas", notesFreePlaceholder: "Ideias, reflexões, o que quiser desta semana…",
       holidays: "Feriados", holidaysBrazil: "BRASIL", holidaysOff: "DESLIGADO", months: "Meses",
+      coverColor: "Cor da capa", coverGreen: "Verde", coverNavy: "Azul-marinho", coverWine: "Vinho", coverBlack: "Preto",
+      coverPink: "Rosa", coverMustard: "Mostarda", coverLavender: "Lavanda", coverTeal: "Azul-petróleo",
       quotes: "Frase da página", quotesProverbs: "PROVÉRBIOS", quotesMotivational: "MOTIVACIONAL", quotesIronic: "IRÔNICA", quotesOff: "NENHUMA",
       "moon-new": "Lua nova", "moon-waxing-crescent": "Lua crescente", "moon-first-quarter": "Quarto crescente",
       "moon-waxing-gibbous": "Crescente gibosa", "moon-full": "Lua cheia", "moon-waning-gibbous": "Minguante gibosa",
@@ -140,6 +144,9 @@
     });
     container?.querySelectorAll("[data-i18n-aria]").forEach((element) => {
       element.setAttribute("aria-label", t(element.dataset.i18nAria));
+    });
+    container?.querySelectorAll("[data-i18n-title]").forEach((element) => {
+      element.setAttribute("title", t(element.dataset.i18nTitle));
     });
     container?.querySelectorAll("[data-i18n-placeholder]").forEach((element) => {
       element.setAttribute("placeholder", t(element.dataset.i18nPlaceholder));

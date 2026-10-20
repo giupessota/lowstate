@@ -16,6 +16,7 @@
     dayNotes: "type-todo.planner.daynotes.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
+    cover: "type-todo.cover.v1",
     alwaysOnTop: "type-todo.always-on-top.v1",
     shortcuts: "type-todo.shortcuts.v1",
     legacyTodos: "quest-log.todos.v1",
@@ -1022,6 +1023,8 @@
 
   // ---------- settings ----------
   const currentTheme = () => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
+  const COVERS = ["green", "navy", "wine", "black", "pink", "mustard", "lavender", "teal"];
+  const currentCover = () => (COVERS.includes(document.documentElement.dataset.cover) ? document.documentElement.dataset.cover : "green");
   const alwaysOnTop = () => Store.getRaw(KEYS.alwaysOnTop) === "on";
 
   function entryToItem(entry) {
@@ -1035,6 +1038,7 @@
   function renderSettings() {
     const values = {
       theme: currentTheme(),
+      cover: currentCover(),
       language: I18n.language,
       weekStart: String(state.settings.weekStart),
       holidays: state.settings.holidays,
@@ -1059,6 +1063,10 @@
     if (setting === "theme") {
       Store.setRaw(KEYS.theme, value);
       document.documentElement.dataset.theme = value === "dark" ? "dark" : "light";
+    } else if (setting === "cover") {
+      const cover = COVERS.includes(value) ? value : "green";
+      Store.setRaw(KEYS.cover, cover);
+      document.documentElement.dataset.cover = cover;
     } else if (setting === "language") {
       I18n.setLanguage(value);
       Store.persist();

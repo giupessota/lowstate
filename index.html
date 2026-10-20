@@ -11,6 +11,7 @@
     <script>
       try {
         document.documentElement.dataset.theme = localStorage.getItem("type-todo.theme.v1") === "dark" ? "dark" : "light";
+        document.documentElement.dataset.cover = localStorage.getItem("type-todo.cover.v1") || "green";
       } catch { document.documentElement.dataset.theme = "light"; }
     </script>
     <title>Lowstate</title>
@@ -300,6 +301,19 @@
             <div class="seg" data-setting="theme">
               <button type="button" data-value="light" data-i18n="light">LIGHT</button>
               <button type="button" data-value="dark" data-i18n="dark">DARK</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="coverColor">Cover color</span>
+            <div class="seg swatches" data-setting="cover">
+              <button type="button" data-value="green" data-i18n-aria="coverGreen" data-i18n-title="coverGreen"></button>
+              <button type="button" data-value="navy" data-i18n-aria="coverNavy" data-i18n-title="coverNavy"></button>
+              <button type="button" data-value="wine" data-i18n-aria="coverWine" data-i18n-title="coverWine"></button>
+              <button type="button" data-value="black" data-i18n-aria="coverBlack" data-i18n-title="coverBlack"></button>
+              <button type="button" data-value="pink" data-i18n-aria="coverPink" data-i18n-title="coverPink"></button>
+              <button type="button" data-value="mustard" data-i18n-aria="coverMustard" data-i18n-title="coverMustard"></button>
+              <button type="button" data-value="lavender" data-i18n-aria="coverLavender" data-i18n-title="coverLavender"></button>
+              <button type="button" data-value="teal" data-i18n-aria="coverTeal" data-i18n-title="coverTeal"></button>
             </div>
           </div>
           <div class="set-row">
