@@ -449,6 +449,7 @@
     good: { eyes: "dots", mouth: "M8 14c1.5 2.4 6.5 2.4 8 0" },
     okay: { eyes: "dots", mouth: "M8.5 15h7" },
     tiring: { eyes: ["M7.5 10.5h3", "M13.5 10.5h3"], mouth: "M8.5 15.5q1.75-1.5 3.5 0t3.5 0" },
+    stressed: { eyes: "dots", brows: ["M6.8 7.6l3.4 1.4", "M17.2 7.6l-3.4 1.4"], mouth: "M7.8 15.6l1.4-1.2 1.4 1.2 1.4-1.2 1.4 1.2 1.4-1.2 1.4 1.2" },
     rough: { eyes: "dots", mouth: "M8 16.5c1.5-2.4 6.5-2.4 8 0" },
   };
 
@@ -465,6 +466,7 @@
     } else {
       face.eyes.forEach((d) => svg.append(svgEl("path", { class: "line", d })));
     }
+    face.brows?.forEach((d) => svg.append(svgEl("path", { class: "line", d })));
     svg.append(svgEl("path", { class: mood === "great" ? "line fill" : "line", d: face.mouth }));
     return svg;
   }

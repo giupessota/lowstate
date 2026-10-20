@@ -458,7 +458,7 @@
   }
 
   // ---------- Mood of the day ----------
-  const MOODS = ["great", "good", "okay", "tiring", "rough"];
+  const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
   // Returns a new { iso: mood } map. Picking the day's current mood again
   // (or anything that isn't a mood) clears it.

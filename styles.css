@@ -680,6 +680,7 @@ svg.i {
 .mood-good { --mood: var(--asagi); }
 .mood-okay { --mood: var(--yamabuki); }
 .mood-tiring { --mood: var(--fuji); }
+.mood-stressed { --mood: color-mix(in srgb, var(--vermilion) 55%, var(--yamabuki)); }
 .mood-rough { --mood: var(--vermilion); }
 .mood-mini { width: 13px; height: 13px; }
 .cell-head .mood-mini { margin-left: auto; align-self: center; }

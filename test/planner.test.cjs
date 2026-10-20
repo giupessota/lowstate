@@ -177,6 +177,7 @@ test("picking a mood sets it, picking it again clears it", () => {
   moods = P.setMood(moods, "2026-10-20", "great");
   assert.deepEqual(moods, { "2026-10-21": "rough" });
   assert.deepEqual(P.setMood(moods, "2026-10-21", "nope"), {});
+  assert.deepEqual(P.setMood({}, "2026-10-22", "stressed"), { "2026-10-22": "stressed" });
 });
 
 test("page quotes cycle through the chosen style", () => {
