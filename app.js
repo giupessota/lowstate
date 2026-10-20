@@ -13,6 +13,7 @@
     settings: "type-todo.planner.settings.v1",
     goals: "type-todo.planner.goals.v1",
     notes: "type-todo.planner.notes.v1",
+    dayNotes: "type-todo.planner.daynotes.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     alwaysOnTop: "type-todo.always-on-top.v1",
@@ -30,7 +31,8 @@
   const TAB_COLORS = ["--indigo", "--vermilion", "--matcha", "--yamabuki", "--fuji", "--asagi"];
   const START_OPTIONS = Array.from({ length: 96 }, (_, index) => Planner.minutesToTime(index * 15));
   const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
-  const PLACEHOLDER_TEXT = { day: "comingDay", month: "comingMonth", habits: "comingHabits" };
+  const PLACEHOLDER_TEXT = { habits: "comingHabits" };
+  const VIEWS = ["day", "week", "month", "habits"];
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -49,8 +51,32 @@
     goalForm: $("goalForm"),
     goalInput: $("goalInput"),
     weekNotes: $("weekNotes"),
-    monthTabs: $("monthTabs"),
     weekView: $("weekView"),
+    dayView: $("dayView"),
+    dayWashi: $("dayWashi"),
+    dayBig: $("dayBig"),
+    dayWeekday: $("dayWeekday"),
+    dayKanji: $("dayKanji"),
+    dayMoon: $("dayMoon"),
+    dayOfYear: $("dayOfYear"),
+    dayHoliday: $("dayHoliday"),
+    timeline: $("timeline"),
+    dayProverbJp: $("dayProverbJp"),
+    dayProverbTr: $("dayProverbTr"),
+    dayProgress: $("dayProgress"),
+    dayCaptureForm: $("dayCaptureForm"),
+    dayCaptureInput: $("dayCaptureInput"),
+    dayTasks: $("dayTasks"),
+    dayEmpty: $("dayEmpty"),
+    dayNotes: $("dayNotes"),
+    monthView: $("monthView"),
+    monthWashi: $("monthWashi"),
+    mvMonthNum: $("mvMonthNum"),
+    mvMonthName: $("mvMonthName"),
+    mvMonthKanji: $("mvMonthKanji"),
+    mvYear: $("mvYear"),
+    monthWeekdays: $("monthWeekdays"),
+    monthGrid: $("monthGrid"),
     placeholderView: $("placeholderView"),
     placeholderIcon: $("placeholderIcon"),
     placeholderText: $("placeholderText"),
@@ -215,7 +241,8 @@
   const initial = loadData();
   const savedSettings = Store.loadObject(KEYS.settings);
   const state = {
-    view: "week",
+    // The app always opens on today's page.
+    view: "day",
     anchor: Core.startOfDay(new Date()),
     items: initial.items,
     categories: initial.categories,
@@ -225,6 +252,7 @@
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
+    dayNotes: Store.loadObject(KEYS.dayNotes),
     editingId: null,
     draft: null,
     dragId: null,
@@ -235,6 +263,7 @@
   const persistSettings = () => Store.save(KEYS.settings, state.settings);
   const persistGoals = () => Store.save(KEYS.goals, state.goals);
   const persistNotes = () => Store.save(KEYS.notes, state.notes);
+  const persistDayNotes = () => Store.save(KEYS.dayNotes, state.dayNotes);
 
   if (initial.changed) {
     persistItems();
@@ -305,15 +334,18 @@
   }
 
   // Shared by the sidebar capture field and the per-day "+ Add" inputs.
-  function capture(text, fallbackDate = null) {
+  // fallbackStart is used when capturing on a timeline slot; a time typed in
+  // the text still wins.
+  function capture(text, fallbackDate = null, fallbackStart = null) {
     const parsed = Planner.parseCapture(text);
     if (!parsed.title) return null;
-    const date = parsed.date || fallbackDate || (parsed.start ? todayISO() : null);
+    const start = parsed.start || fallbackStart;
+    const date = parsed.date || fallbackDate || (start ? todayISO() : null);
     return addItem({
       title: parsed.title,
       date,
-      start: date ? parsed.start : null,
-      duration: date && parsed.start ? 60 : null,
+      start: date ? start : null,
+      duration: date && start ? 60 : null,
       priority: parsed.priority,
       category: resolveCategory(parsed.category),
     });
@@ -330,9 +362,25 @@
     }, icon(ICON_CHECK));
   }
 
-  // "line" = written on a day row; "inbox"/"overdue" = loose slip on the cover.
+  // "line" = written on a day row; "inbox"/"overdue" = loose slip on the cover;
+  // "mini" = one-line entry in a month cell.
   function itemEl(item, variant = "line") {
     const category = categoryById(item.category);
+    if (variant === "mini") {
+      const classes = ["item", "mini"];
+      if (item.done) classes.push("is-done");
+      if (item.priority === "urgent") classes.push("is-urgent");
+      return h("li", {
+        class: classes.join(" "),
+        "data-id": item.id,
+        draggable: "true",
+        style: category ? `--cat: ${category.color}` : null,
+      },
+        h("i", { "aria-hidden": "true" }),
+        h("span", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
+          item.start ? h("span", { class: "mini-time", text: item.start }) : null,
+          item.title));
+    }
     const classes = ["item", variant === "line" ? "line" : "slip"];
     if (variant === "overdue") classes.push("overdue");
     if (item.done) classes.push("is-done");
@@ -400,45 +448,59 @@
 
   const currentWeekKey = () => Planner.isoWeekKey(weekDays()[3]);
 
-  function renderTopbar() {
-    const isWeek = state.view === "week";
-    els.navControls.hidden = !isWeek;
-    els.rangeSub.textContent = "";
-    if (!isWeek) {
-      els.weekProgress.hidden = true;
-      els.rangeTitle.textContent = t({ day: "viewDay", month: "viewMonth", habits: "viewHabits" }[state.view]);
-      return;
-    }
-    const days = weekDays();
+  function dayClasses(day, base) {
+    const iso = Core.toISODate(day);
     const today = todayISO();
-    els.rangeTitle.textContent = formatRange(days[0], days[6]);
-    els.todayBtn.disabled = days.some((day) => Core.toISODate(day) === today);
+    const classes = [base];
+    if (iso === today) classes.push("is-today");
+    else if (iso < today) classes.push("is-past");
+    if (day.getDay() === 6) classes.push("is-sat");
+    if (day.getDay() === 0) classes.push("is-sun");
+    if (holidayFor(iso)) classes.push("is-holiday");
+    return classes.join(" ");
+  }
 
-    const stats = Planner.weekStats(state.items, days);
-    els.weekProgress.hidden = stats.total === 0;
-    els.progressFill.style.width = `${stats.total ? Math.round((stats.done / stats.total) * 100) : 0}%`;
-    els.progressText.textContent = t("weekProgress", stats);
+  const holidayFor = (iso) => (state.settings.holidays === "br" ? Planner.holidayName(iso, I18n.language) : null);
+  const anchorISO = () => Core.toISODate(state.anchor);
+
+  function renderTopbar() {
+    const view = state.view;
+    els.navControls.hidden = view === "habits";
+    els.rangeSub.textContent = "";
+    els.weekProgress.hidden = true;
+    const now = new Date();
+
+    if (view === "habits") {
+      els.rangeTitle.textContent = t("viewHabits");
+    } else if (view === "day") {
+      els.rangeTitle.textContent = capitalize(formatDate(state.anchor, { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
+      els.todayBtn.disabled = anchorISO() === todayISO();
+    } else if (view === "month") {
+      els.rangeTitle.textContent = capitalize(formatDate(state.anchor, { month: "long", year: "numeric" }));
+      els.todayBtn.disabled = state.anchor.getMonth() === now.getMonth() && state.anchor.getFullYear() === now.getFullYear();
+    } else {
+      const days = weekDays();
+      const today = todayISO();
+      els.rangeTitle.textContent = formatRange(days[0], days[6]);
+      els.todayBtn.disabled = days.some((day) => Core.toISODate(day) === today);
+      const stats = Planner.weekStats(state.items, days);
+      els.weekProgress.hidden = stats.total === 0;
+      els.progressFill.style.width = `${stats.total ? Math.round((stats.done / stats.total) * 100) : 0}%`;
+      els.progressText.textContent = t("weekProgress", stats);
+    }
   }
 
   function renderDays(days) {
-    const today = todayISO();
-    const holidaysOn = state.settings.holidays === "br";
     els.weekGrid.replaceChildren(...days.map((day) => {
       const iso = Core.toISODate(day);
-      const holiday = holidaysOn ? Planner.holidayName(iso, I18n.language) : null;
-      const classes = ["day-row"];
-      if (iso === today) classes.push("is-today");
-      else if (iso < today) classes.push("is-past");
-      if (day.getDay() === 6) classes.push("is-sat");
-      if (day.getDay() === 0) classes.push("is-sun");
-      if (holiday) classes.push("is-holiday");
+      const holiday = holidayFor(iso);
 
       return h("section", {
-        class: classes.join(" "),
+        class: dayClasses(day, "day-row"),
         "data-date": iso,
         "aria-label": holiday ? `${longDate(iso)} — ${holiday}` : longDate(iso),
       },
-        h("div", { class: "day-stamp" },
+        h("div", { class: "day-stamp", "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
           h("span", { class: "date-num", text: String(day.getDate()).padStart(2, "0") }),
           h("span", { class: "dow" },
             formatDate(day, { weekday: "short" }),
@@ -485,6 +547,192 @@
     els.weekRange.textContent = `${formatDate(days[0], { day: "2-digit", month: "2-digit" })} — ${formatDate(days[6], { day: "2-digit", month: "2-digit" })}`;
     renderGoals();
     renderNotes();
+    renderMonthTabs(reference);
+  }
+
+  function setWashi(element, seed) {
+    element.dataset.pattern = TAPE_PATTERNS[seed % TAPE_PATTERNS.length];
+    element.style.setProperty("--tape", `var(${TAPE_COLORS[seed % TAPE_COLORS.length]})`);
+  }
+
+  // ---------- day page (Hobonichi Techo style) ----------
+  const TIMELINE_START = 6;
+  let timelineScrolledFor = null;
+
+  function timelineHourHeight() {
+    return parseFloat(getComputedStyle(els.timeline).getPropertyValue("--hour")) || 42;
+  }
+
+  function timelineRange(events) {
+    const earliest = events.length ? Math.floor(Math.min(...events.map((event) => event.start)) / 60) : TIMELINE_START;
+    return { first: Math.min(TIMELINE_START, earliest), last: 24 };
+  }
+
+  function renderTimeline(iso) {
+    const items = Planner.itemsForDay(state.items, iso);
+    const events = Planner.layoutTimeline(items);
+    const { first, last } = timelineRange(events);
+    const hour = timelineHourHeight();
+    const inner = h("div", { class: "timeline-inner", "data-first-hour": first, style: `height: ${(last - first) * hour}px` });
+
+    for (let current = first; current < last; current++) {
+      const time = Planner.minutesToTime(current * 60);
+      inner.append(h("div", { class: "hour-row", style: `top: ${(current - first) * hour}px` },
+        h("span", { class: "hour-label", text: String(current).padStart(2, "0") }),
+        h("button", { type: "button", class: "hour-slot", "data-slot": time, "aria-label": t("addAtTime", { time }) })));
+    }
+
+    events.forEach((event) => {
+      const { item } = event;
+      const category = categoryById(item.category);
+      const top = ((event.start - first * 60) / 60) * hour;
+      const height = Math.max(((event.end - event.start) / 60) * hour - 2, 20);
+      const classes = ["item", "block"];
+      if (item.done) classes.push("is-done");
+      if (item.priority === "urgent") classes.push("is-urgent");
+      if (height < 34) classes.push("short");
+      inner.append(h("div", {
+        class: classes.join(" "),
+        "data-id": item.id,
+        draggable: "true",
+        style: `top: ${top}px; height: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes};${category ? ` --cat: ${category.color};` : ""}`,
+      },
+        checkButton(item.done, { "data-action": "toggle" }),
+        h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
+          h("span", { class: "block-time", text: timeRange(item) }),
+          h("span", { class: "block-title", text: item.title }))));
+    });
+
+    if (iso === todayISO()) inner.append(h("div", { class: "now-line", id: "nowLine" }));
+    els.timeline.replaceChildren(inner);
+    positionNowLine();
+
+    // Scroll once per shown day: to now on today, otherwise to the first
+    // timed item or 8 o'clock.
+    if (timelineScrolledFor !== iso) {
+      timelineScrolledFor = iso;
+      const focusMinutes = iso === todayISO()
+        ? new Date().getHours() * 60 + new Date().getMinutes() - 60
+        : (events[0]?.start ?? 8 * 60) - 30;
+      els.timeline.scrollTop = Math.max(0, ((focusMinutes - first * 60) / 60) * hour);
+    }
+  }
+
+  function positionNowLine() {
+    const line = document.getElementById("nowLine");
+    const inner = els.timeline.querySelector(".timeline-inner");
+    if (!line || !inner) return;
+    const now = new Date();
+    const first = Number(inner.dataset.firstHour);
+    line.style.top = `${((now.getHours() * 60 + now.getMinutes() - first * 60) / 60) * timelineHourHeight()}px`;
+  }
+
+  function minutesAtTimelineY(clientY) {
+    const inner = els.timeline.querySelector(".timeline-inner");
+    const rect = inner.getBoundingClientRect();
+    const first = Number(inner.dataset.firstHour);
+    const raw = first * 60 + ((clientY - rect.top) / timelineHourHeight()) * 60;
+    return Math.max(0, Math.min(23 * 60 + 45, Math.round(raw / 15) * 15));
+  }
+
+  function renderDayView() {
+    const day = state.anchor;
+    const iso = anchorISO();
+    const holiday = holidayFor(iso);
+    els.dayView.className = `view ${dayClasses(day, "day-view")}`;
+
+    els.dayBig.textContent = String(day.getDate()).padStart(2, "0");
+    els.dayWeekday.textContent = capitalize(formatDate(day, { weekday: "long" }));
+    els.dayKanji.textContent = `${Planner.WEEKDAY_KANJI[day.getDay()]}曜日 · ${capitalize(formatDate(day, { month: "long", year: "numeric" }))}`;
+    const moon = moonEl(day);
+    els.dayMoon.replaceChildren(moon, moon.getAttribute("aria-label"));
+    els.dayOfYear.textContent = t("dayOfYear", { n: Planner.dayOfYear(day), total: Planner.daysInYear(day.getFullYear()) });
+    els.dayHoliday.hidden = !holiday;
+    els.dayHoliday.textContent = holiday || "";
+    setWashi(els.dayWashi, Planner.dayOfYear(day));
+
+    const proverb = Planner.proverbForWeek(Planner.dayOfYear(day));
+    els.dayProverbJp.textContent = proverb.jp;
+    els.dayProverbTr.textContent = `— ${proverb[I18n.language] || proverb.en}`;
+
+    renderTimeline(iso);
+
+    const items = Planner.itemsForDay(state.items, iso);
+    els.dayTasks.dataset.date = iso;
+    els.dayTasks.replaceChildren(...items.map((item) => itemEl(item, "line")));
+    els.dayEmpty.hidden = items.length > 0;
+    const done = items.filter((item) => item.done).length;
+    els.dayProgress.textContent = items.length ? t("weekProgress", { done, total: items.length }) : "";
+
+    renderDayNotes();
+    renderMonthTabs(day);
+  }
+
+  let dayNotesKey = null;
+  let dayNotesTimer = null;
+
+  function renderDayNotes() {
+    const key = anchorISO();
+    if (key === dayNotesKey && document.activeElement === els.dayNotes) return;
+    dayNotesKey = key;
+    els.dayNotes.value = state.dayNotes[key] || "";
+  }
+
+  function saveDayNotes() {
+    clearTimeout(dayNotesTimer);
+    if (!dayNotesKey) return;
+    const text = els.dayNotes.value;
+    const { [dayNotesKey]: _previous, ...rest } = state.dayNotes;
+    state.dayNotes = text.trim() ? { ...rest, [dayNotesKey]: text } : rest;
+    persistDayNotes();
+  }
+
+  // Inline field on an empty timeline slot.
+  function openSlot(time) {
+    els.timeline.querySelector(".slot-add")?.remove();
+    const inner = els.timeline.querySelector(".timeline-inner");
+    const first = Number(inner.dataset.firstHour);
+    const top = ((Planner.timeToMinutes(time) - first * 60) / 60) * timelineHourHeight();
+    const input = h("input", { maxlength: "200", autocomplete: "off", placeholder: `${time} — ${t("addAtTime", { time })}`, "aria-label": t("addAtTime", { time }) });
+    const form = h("form", { class: "slot-add", style: `top: ${top + 4}px`, "data-slot": time }, input);
+    inner.append(form);
+    input.focus();
+    input.addEventListener("blur", () => setTimeout(() => form.remove(), 120));
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") form.remove();
+    });
+  }
+
+  // ---------- month page ----------
+  function renderMonthView() {
+    const year = state.anchor.getFullYear();
+    const month = state.anchor.getMonth();
+    const reference = new Date(year, month, 1);
+    els.mvMonthNum.textContent = String(month + 1).padStart(2, "0");
+    els.mvMonthName.textContent = formatDate(reference, { month: "long" });
+    els.mvMonthKanji.textContent = Planner.MONTH_KANJI[month];
+    els.mvYear.textContent = String(year);
+    setWashi(els.monthWashi, month + 3);
+
+    const weeks = Planner.monthGrid(year, month, state.settings.weekStart);
+    els.monthWeekdays.replaceChildren(...weeks[0].map((day) => h("span", {
+      class: day.getDay() === 6 ? "wd-sat" : day.getDay() === 0 ? "wd-sun" : null,
+    }, formatDate(day, { weekday: "short" }), h("span", { class: "kanji", text: Planner.WEEKDAY_KANJI[day.getDay()] }))));
+
+    const limit = weeks.length > 5 ? 3 : 4;
+    els.monthGrid.style.gridTemplateRows = `repeat(${weeks.length}, minmax(0, 1fr))`;
+    els.monthGrid.replaceChildren(...weeks.flat().map((day) => {
+      const iso = Core.toISODate(day);
+      const holiday = holidayFor(iso);
+      const items = Planner.itemsForDay(state.items, iso);
+      const classes = dayClasses(day, "month-cell") + (day.getMonth() === month ? "" : " is-other");
+      return h("div", { class: classes, "data-date": iso, "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
+        h("div", { class: "cell-head" },
+          h("span", { class: "cell-num", text: day.getDate() }),
+          holiday ? h("span", { class: "cell-holiday", text: holiday }) : null),
+        h("ul", { class: "month-items", "data-date": iso }, items.slice(0, limit).map((item) => itemEl(item, "mini"))),
+        items.length > limit ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length - limit }) }) : null);
+    }));
     renderMonthTabs(reference);
   }
 
@@ -538,7 +786,9 @@
   function renderMonthTabs(reference) {
     const year = reference.getFullYear();
     const active = reference.getMonth();
-    els.monthTabs.replaceChildren(...Array.from({ length: 12 }, (_, month) => {
+    const container = document.querySelector(".view:not([hidden]) .month-tabs");
+    if (!container) return;
+    container.replaceChildren(...Array.from({ length: 12 }, (_, month) => {
       const label = capitalize(formatDate(new Date(year, month, 1), { month: "long", year: "numeric" }));
       return h("button", {
         type: "button",
@@ -577,23 +827,36 @@
       if (active) button.setAttribute("aria-current", "page");
       else button.removeAttribute("aria-current");
     });
-    const isWeek = state.view === "week";
-    els.weekView.hidden = !isWeek;
-    els.placeholderView.hidden = isWeek;
+    els.dayView.hidden = state.view !== "day";
+    els.weekView.hidden = state.view !== "week";
+    els.monthView.hidden = state.view !== "month";
+    els.placeholderView.hidden = state.view !== "habits";
     renderTopbar();
-    if (isWeek) renderSpread();
+    if (state.view === "day") renderDayView();
+    else if (state.view === "week") renderSpread();
+    else if (state.view === "month") renderMonthView();
     else renderPlaceholder();
     renderSidebar();
   }
 
   function setView(view) {
-    if (!["week", "day", "month", "habits"].includes(view)) return;
+    if (!VIEWS.includes(view)) return;
     state.view = view;
     render();
   }
 
-  function shiftWeek(direction) {
-    state.anchor = Planner.addDays(state.anchor, direction * 7);
+  function openDay(iso) {
+    const date = Core.parseISODate(iso);
+    if (!date) return;
+    state.anchor = date;
+    setView("day");
+  }
+
+  // Previous/next by the unit of the current view.
+  function shift(direction) {
+    if (state.view === "day") state.anchor = Planner.addDays(state.anchor, direction);
+    else if (state.view === "week") state.anchor = Planner.addDays(state.anchor, direction * 7);
+    else if (state.view === "month") state.anchor = new Date(state.anchor.getFullYear(), state.anchor.getMonth() + direction, 1);
     render();
   }
 
@@ -896,8 +1159,8 @@
   document.querySelectorAll(".nav-btn").forEach((button) => {
     button.addEventListener("click", () => setView(button.dataset.view));
   });
-  els.prevBtn.addEventListener("click", () => shiftWeek(-1));
-  els.nextBtn.addEventListener("click", () => shiftWeek(1));
+  els.prevBtn.addEventListener("click", () => shift(-1));
+  els.nextBtn.addEventListener("click", () => shift(1));
   els.todayBtn.addEventListener("click", goToday);
   els.moveAllToday.addEventListener("click", () => {
     moveToToday(Planner.overdueItems(state.items, todayISO()).map((item) => item.id));
@@ -923,15 +1186,52 @@
   });
   els.weekNotes.addEventListener("blur", saveNotes);
 
-  // Month index tabs jump to the first week that mostly belongs to that month.
-  els.monthTabs.addEventListener("click", (event) => {
-    const tab = event.target.closest("[data-month]");
+  els.dayNotes.addEventListener("input", () => {
+    clearTimeout(dayNotesTimer);
+    dayNotesTimer = setTimeout(saveDayNotes, 500);
+  });
+  els.dayNotes.addEventListener("blur", saveDayNotes);
+
+  els.dayCaptureForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (capture(els.dayCaptureInput.value, anchorISO())) els.dayCaptureInput.value = "";
+    els.dayCaptureInput.focus();
+  });
+
+  // Clicking an empty slot on the timeline writes something at that hour.
+  els.timeline.addEventListener("click", (event) => {
+    const slot = event.target.closest(".hour-slot");
+    if (slot) openSlot(slot.dataset.slot);
+  });
+  els.timeline.addEventListener("submit", (event) => {
+    const form = event.target.closest(".slot-add");
+    if (!form) return;
+    event.preventDefault();
+    const text = form.querySelector("input").value;
+    form.remove();
+    capture(text, anchorISO(), form.dataset.slot);
+  });
+
+  // Month index tabs: in the week view jump to the first week that mostly
+  // belongs to that month; in the day view open its first day.
+  document.addEventListener("click", (event) => {
+    const tab = event.target.closest(".month-tabs [data-month]");
     if (!tab) return;
     const month = Number(tab.dataset.month);
-    let anchor = new Date(weekDays()[3].getFullYear(), month, 1);
-    if (Planner.weekDays(anchor, state.settings.weekStart)[3].getMonth() !== month) anchor = Planner.addDays(anchor, 7);
+    const year = state.anchor.getFullYear();
+    let anchor = new Date(year, month, 1);
+    if (state.view === "week" && Planner.weekDays(anchor, state.settings.weekStart)[3].getMonth() !== month) {
+      anchor = Planner.addDays(anchor, 7);
+    }
     state.anchor = anchor;
     render();
+  });
+
+  // Dates in the week and month views open that day's page.
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-action], .month-tabs")) return;
+    const opener = event.target.closest("[data-open-day]");
+    if (opener) openDay(opener.dataset.openDay);
   });
 
   els.inboxForm.addEventListener("submit", (event) => {
@@ -970,22 +1270,36 @@
       if (event.key === "Escape") event.target.blur();
       return;
     }
-    const views = { 1: "week", 2: "day", 3: "month", 4: "habits" };
+    const views = { 1: "day", 2: "week", 3: "month", 4: "habits" };
     if (views[event.key]) setView(views[event.key]);
     else if (event.key === "n" || event.key === "N") {
       event.preventDefault();
-      els.inboxInput.focus();
+      (state.view === "day" ? els.dayCaptureInput : els.inboxInput).focus();
     } else if (event.key === "t" || event.key === "T") goToday();
-    else if (state.view === "week" && event.key === "ArrowLeft") shiftWeek(-1);
-    else if (state.view === "week" && event.key === "ArrowRight") shiftWeek(1);
+    else if (state.view !== "habits" && event.key === "ArrowLeft") shift(-1);
+    else if (state.view !== "habits" && event.key === "ArrowRight") shift(1);
   });
 
   // ---------- drag & drop ----------
   function dropZoneFrom(target) {
-    const row = target.closest?.(".day-row");
-    if (row) return { container: row, list: row.querySelector(".day-items"), date: row.dataset.date };
+    if (target.closest?.("#timeline")) return { type: "time", container: els.timeline, date: anchorISO() };
+    const row = target.closest?.(".day-row, .month-cell");
+    if (row) return { container: row, list: row.querySelector(".day-items, .month-items"), date: row.dataset.date };
+    if (target.closest?.("#dayView .page-right")) return { container: els.dayTasks, list: els.dayTasks, date: anchorISO() };
     if (target.closest?.("#inboxSection")) return { container: els.inboxSection, list: els.inboxList, date: null };
     return null;
+  }
+
+  function showDropTime(minutes) {
+    const inner = els.timeline.querySelector(".timeline-inner");
+    let marker = inner.querySelector(".drop-time");
+    if (!marker) {
+      marker = h("div", { class: "drop-time" }, h("span"));
+      inner.append(marker);
+    }
+    const first = Number(inner.dataset.firstHour);
+    marker.style.top = `${((minutes - first * 60) / 60) * timelineHourHeight()}px`;
+    marker.firstChild.textContent = Planner.minutesToTime(minutes);
   }
 
   function cardBefore(list, y) {
@@ -999,6 +1313,7 @@
     document.querySelectorAll(".drop-target, .drop-before, .drop-end").forEach((node) => {
       node.classList.remove("drop-target", "drop-before", "drop-end");
     });
+    document.querySelectorAll(".drop-time").forEach((node) => node.remove());
   }
 
   document.addEventListener("dragstart", (event) => {
@@ -1017,6 +1332,13 @@
     if (!zone) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
+    if (zone.type === "time") {
+      document.querySelectorAll(".drop-target, .drop-before, .drop-end").forEach((node) => {
+        node.classList.remove("drop-target", "drop-before", "drop-end");
+      });
+      showDropTime(minutesAtTimelineY(event.clientY));
+      return;
+    }
     clearDropMarks();
     zone.container.classList.add("drop-target");
     const before = cardBefore(zone.list, event.clientY);
@@ -1029,6 +1351,13 @@
     const zone = dropZoneFrom(event.target);
     if (!zone) return;
     event.preventDefault();
+    if (zone.type === "time") {
+      const start = Planner.minutesToTime(minutesAtTimelineY(event.clientY));
+      state.items = Planner.scheduleAt(state.items, state.dragId, { date: zone.date, start });
+      state.dragId = null;
+      commit();
+      return;
+    }
     const before = cardBefore(zone.list, event.clientY);
     state.items = Planner.moveItem(state.items, state.dragId, { date: zone.date, beforeId: before?.dataset.id || null });
     state.dragId = null;
@@ -1047,9 +1376,12 @@
     desktop.setAlwaysOnTop?.(alwaysOnTop());
     const shortcuts = Store.loadObject(KEYS.shortcuts);
     if (Object.keys(shortcuts).length) desktop.setShortcuts?.(shortcuts);
+    // The global capture shortcut opens today's page ready to write.
     desktop.onQuickCapture?.(() => {
       document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
-      els.inboxInput.focus();
+      state.anchor = Core.startOfDay(new Date());
+      setView("day");
+      els.dayCaptureInput.focus();
     });
     desktop.onUpdateAvailable?.((info) => {
       els.updatePill.textContent = t("updateAvailable", { version: info.version });
@@ -1062,6 +1394,7 @@
   // while someone is typing (the next tick will pick it up).
   let lastDay = todayISO();
   setInterval(() => {
+    positionNowLine();
     const today = todayISO();
     if (today === lastDay || isTyping(document.activeElement) || document.querySelector("dialog[open]")) return;
     lastDay = today;

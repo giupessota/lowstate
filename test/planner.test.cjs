@@ -174,6 +174,53 @@ test("weekly proverb cycles through the list", () => {
   assert.ok(P.proverbForWeek(43).jp);
 });
 
+test("day of year and leap years", () => {
+  assert.equal(P.dayOfYear(new Date(2026, 0, 1)), 1);
+  assert.equal(P.dayOfYear(NOW), 293);
+  assert.equal(P.dayOfYear(new Date(2026, 11, 31)), 365);
+  assert.equal(P.daysInYear(2026), 365);
+  assert.equal(P.daysInYear(2028), 366);
+});
+
+test("monthGrid covers the whole month in full weeks", () => {
+  const october = P.monthGrid(2026, 9, 1);
+  assert.equal(october.length, 5);
+  assert.equal(toISODate(october[0][0]), "2026-09-28");
+  assert.equal(toISODate(october[4][6]), "2026-11-01");
+  const sundayStart = P.monthGrid(2026, 9, 0);
+  assert.equal(toISODate(sundayStart[0][0]), "2026-09-27");
+  assert.ok(P.monthGrid(2026, 7, 1).length === 6); // August 2026 spans six Monday-start weeks
+});
+
+test("scheduleAt sets date and time, keeping or defaulting the duration", () => {
+  const items = [
+    P.normalizeItem({ id: "a", title: "a", date: null }),
+    P.normalizeItem({ id: "b", title: "b", date: "2026-10-20", start: "08:00", duration: 30 }),
+  ];
+  const [a] = P.scheduleAt(items, "a", { date: "2026-10-21", start: "14:15" });
+  assert.deepEqual([a.date, a.start, a.duration], ["2026-10-21", "14:15", 60]);
+  const b = P.scheduleAt(items, "b", { date: "2026-10-20", start: "09:00" })[1];
+  assert.deepEqual([b.start, b.duration], ["09:00", 30]);
+  assert.equal(P.scheduleAt(items, "a", { date: "2026-10-21", start: "25:00" }), items);
+});
+
+test("layoutTimeline puts overlapping items side by side", () => {
+  const at = (id, start, duration) => P.normalizeItem({ id, title: id, date: "2026-10-20", start, duration });
+  const layout = P.layoutTimeline([
+    at("standup", "09:00", 30),
+    at("review", "09:15", 60),
+    at("lunch", "12:00", 60),
+    at("call", "09:45", 30),
+    P.normalizeItem({ id: "untimed", title: "x", date: "2026-10-20" }),
+  ]);
+  const byId = Object.fromEntries(layout.map((event) => [event.item.id, event]));
+  assert.equal(layout.length, 4);
+  assert.deepEqual([byId.standup.lane, byId.review.lane, byId.call.lane], [0, 1, 0]);
+  assert.equal(byId.standup.lanes, 2);
+  assert.equal(byId.lunch.lanes, 1);
+  assert.deepEqual([byId.review.start, byId.review.end], [555, 615]);
+});
+
 test("default categories are localized but keep stable ids", () => {
   assert.deepEqual(P.defaultCategories("pt").map((category) => category.id), ["work", "personal", "health", "study"]);
   assert.equal(P.defaultCategories("pt")[2].name, "Saúde");

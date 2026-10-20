@@ -57,6 +57,10 @@
       "moon-new": "New moon", "moon-waxing-crescent": "Waxing crescent", "moon-first-quarter": "First quarter",
       "moon-waxing-gibbous": "Waxing gibbous", "moon-full": "Full moon", "moon-waning-gibbous": "Waning gibbous",
       "moon-last-quarter": "Last quarter", "moon-waning-crescent": "Waning crescent",
+      todayTasks: "For this day", dayCapturePlaceholder: "What do you need to do? #tag 14:30 !urgent",
+      dayNotes: "Notes", dayNotesPlaceholder: "Thoughts, details, anything about this day…",
+      dayOfYear: "Day {n} of {total}", addAtTime: "Add at {time}", moreItems: "+{n} more", openDay: "Open {date}",
+      timeline: "Timeline", dayEmptyList: "Nothing here yet — start writing what this day needs.",
     },
     pt: {
       todo: "A FAZER", today: "HOJE", done: "FEITAS", all: "TODAS", late: "ATRASADAS", urgent: "URGENTE",
@@ -114,6 +118,10 @@
       "moon-new": "Lua nova", "moon-waxing-crescent": "Lua crescente", "moon-first-quarter": "Quarto crescente",
       "moon-waxing-gibbous": "Crescente gibosa", "moon-full": "Lua cheia", "moon-waning-gibbous": "Minguante gibosa",
       "moon-last-quarter": "Quarto minguante", "moon-waning-crescent": "Lua minguante",
+      todayTasks: "Para este dia", dayCapturePlaceholder: "O que você precisa fazer? #tag 14h !urgente",
+      dayNotes: "Notas", dayNotesPlaceholder: "Pensamentos, detalhes, o que quiser deste dia…",
+      dayOfYear: "Dia {n} de {total}", addAtTime: "Adicionar às {time}", moreItems: "+{n}", openDay: "Abrir {date}",
+      timeline: "Horários", dayEmptyList: "Nada aqui ainda — comece a escrever o que este dia precisa.",
     },
   };
 

@@ -381,9 +381,81 @@
     { jp: "塞翁が馬", en: "Old Saiō's horse — luck and misfortune are hard to tell apart.", pt: "O cavalo do velho Saiō — sorte e azar são difíceis de distinguir." },
   ];
 
+  // Cycles through the proverbs; used with the week number on week pages
+  // and with the day of the year on day pages.
   function proverbForWeek(weekNumber) {
     const index = ((Math.round(weekNumber) - 1) % PROVERBS.length + PROVERBS.length) % PROVERBS.length;
     return PROVERBS[index];
+  }
+
+  function dayOfYear(date) {
+    return Math.round((startOfDay(date) - new Date(date.getFullYear(), 0, 1)) / 86400000) + 1;
+  }
+
+  function daysInYear(year) {
+    return new Date(year, 1, 29).getMonth() === 1 ? 366 : 365;
+  }
+
+  // Weeks (arrays of 7 dates) needed to show a whole month as a block calendar.
+  function monthGrid(year, month, weekStartsOn = 1) {
+    const last = new Date(year, month + 1, 0);
+    const weeks = [];
+    for (let cursor = startOfWeek(new Date(year, month, 1), weekStartsOn); cursor <= last; cursor = addDays(cursor, 7)) {
+      weeks.push(Array.from({ length: 7 }, (_, index) => addDays(cursor, index)));
+    }
+    return weeks;
+  }
+
+  // Puts an item on a day at a given time (e.g. dropped on the timeline),
+  // keeping its duration or defaulting to one hour.
+  function scheduleAt(items, id, { date, start }) {
+    if (!parseISODate(date) || !isTime(start)) return items;
+    const others = items.filter((item) => item.id !== id);
+    return items.map((item) => (item.id !== id ? item : {
+      ...item,
+      date,
+      start,
+      duration: item.duration || 60,
+      order: item.date === date ? item.order : nextOrder(others, date),
+    }));
+  }
+
+  // Lays timed items out in side-by-side lanes where they overlap, like a
+  // calendar day column. Returns [{ item, start, end, lane, lanes }] in minutes.
+  function layoutTimeline(items, defaultDuration = 60) {
+    const events = items
+      .filter((item) => isTime(item.start))
+      .map((item) => {
+        const start = timeToMinutes(item.start);
+        return { item, start, end: Math.min(1440, start + (item.duration || defaultDuration)) };
+      })
+      .sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
+
+    const result = [];
+    let cluster = [];
+    let clusterEnd = -1;
+    const flush = () => {
+      const laneEnds = [];
+      cluster.forEach((event) => {
+        let lane = laneEnds.findIndex((end) => end <= event.start);
+        if (lane < 0) {
+          lane = laneEnds.length;
+          laneEnds.push(event.end);
+        } else {
+          laneEnds[lane] = event.end;
+        }
+        event.lane = lane;
+      });
+      cluster.forEach((event) => result.push({ ...event, lanes: laneEnds.length }));
+      cluster = [];
+    };
+    events.forEach((event) => {
+      if (cluster.length && event.start >= clusterEnd) flush();
+      cluster.push(event);
+      clusterEnd = Math.max(clusterEnd, event.end);
+    });
+    if (cluster.length) flush();
+    return result;
   }
 
   return {
@@ -399,6 +471,11 @@
     brazilHolidays,
     holidayName,
     proverbForWeek,
+    dayOfYear,
+    daysInYear,
+    monthGrid,
+    scheduleAt,
+    layoutTimeline,
     newId,
     addDays,
     startOfWeek,

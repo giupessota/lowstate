@@ -27,13 +27,13 @@
         </div>
 
         <nav class="nav" aria-label="Views" data-i18n-aria="views">
-          <button type="button" class="nav-btn" data-view="week">
-            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2.5"/><path d="M9 5v15M15 5v15"/></svg>
-            <span data-i18n="viewWeek">Week</span><kbd>1</kbd>
-          </button>
           <button type="button" class="nav-btn" data-view="day">
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
-            <span data-i18n="viewDay">Day</span><kbd>2</kbd>
+            <span data-i18n="viewDay">Day</span><kbd>1</kbd>
+          </button>
+          <button type="button" class="nav-btn" data-view="week">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2.5"/><path d="M9 5v15M15 5v15"/></svg>
+            <span data-i18n="viewWeek">Week</span><kbd>2</kbd>
           </button>
           <button type="button" class="nav-btn" data-view="month">
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
@@ -96,7 +96,77 @@
           </div>
         </header>
 
-        <section class="view week-view" id="weekView">
+        <section class="view day-view" id="dayView" hidden>
+          <div class="spread">
+            <article class="page page-left">
+              <header class="page-head day-head">
+                <span class="washi" id="dayWashi" aria-hidden="true"></span>
+                <div class="day-date">
+                  <span class="day-big" id="dayBig"></span>
+                  <div class="day-meta">
+                    <strong id="dayWeekday"></strong>
+                    <span class="kanji" id="dayKanji"></span>
+                  </div>
+                </div>
+                <div class="day-side">
+                  <span class="day-moon" id="dayMoon"></span>
+                  <span class="year-mark" id="dayOfYear"></span>
+                </div>
+              </header>
+              <p class="holiday day-holiday" id="dayHoliday" hidden></p>
+              <div class="timeline" id="timeline" data-i18n-aria="timeline" role="region" aria-label="Timeline"></div>
+              <footer class="proverb">
+                <span class="proverb-jp" id="dayProverbJp"></span>
+                <span class="proverb-tr" id="dayProverbTr"></span>
+              </footer>
+            </article>
+
+            <article class="page page-right">
+              <header class="page-head">
+                <div class="week-mark">
+                  <strong data-i18n="todayTasks">For this day</strong>
+                  <span class="kanji">やること</span>
+                </div>
+                <span class="range-mark" id="dayProgress"></span>
+              </header>
+              <form class="day-capture" id="dayCaptureForm">
+                <span class="day-capture-mark" aria-hidden="true">✎</span>
+                <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" />
+              </form>
+              <ul class="day-items day-tasks" id="dayTasks"></ul>
+              <p class="day-empty" id="dayEmpty" data-i18n="dayEmptyList"></p>
+              <section class="notes">
+                <h2 class="section-title"><span data-i18n="dayNotes">Notes</span><span class="kanji">メモ</span></h2>
+                <textarea id="dayNotes" data-i18n-placeholder="dayNotesPlaceholder" data-i18n-aria="dayNotes"></textarea>
+              </section>
+            </article>
+
+            <nav class="month-tabs" data-i18n-aria="months" aria-label="Months"></nav>
+          </div>
+        </section>
+
+        <section class="view month-view" id="monthView" hidden>
+          <div class="spread month-spread">
+            <article class="page month-page">
+              <header class="page-head">
+                <span class="washi" id="monthWashi" aria-hidden="true"></span>
+                <div class="month-mark">
+                  <span class="month-num" id="mvMonthNum"></span>
+                  <div class="month-text">
+                    <strong id="mvMonthName"></strong>
+                    <span class="kanji" id="mvMonthKanji"></span>
+                  </div>
+                </div>
+                <span class="year-mark" id="mvYear"></span>
+              </header>
+              <div class="month-weekdays" id="monthWeekdays"></div>
+              <div class="month-grid" id="monthGrid"></div>
+            </article>
+            <nav class="month-tabs" data-i18n-aria="months" aria-label="Months"></nav>
+          </div>
+        </section>
+
+        <section class="view week-view" id="weekView" hidden>
           <div class="spread">
             <article class="page page-left">
               <header class="page-head">
