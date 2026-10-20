@@ -1,12 +1,12 @@
 {
   "name": "Lowstate",
   "short_name": "Lowstate",
-  "description": "Lower your mental entropy.",
+  "description": "Lower your mental entropy. A calm planner for your week.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#1f1e1c",
-  "theme_color": "#1f1e1c",
+  "background_color": "#f4f0e8",
+  "theme_color": "#284236",
   "orientation": "any",
   "icons": [
     {

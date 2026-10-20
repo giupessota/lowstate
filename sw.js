@@ -1,4 +1,4 @@
-const CACHE = "lowstate-v4";
+const CACHE = "lowstate-v5";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,6 +6,7 @@ const ASSETS = [
   "./storage.js",
   "./i18n.js",
   "./core.js",
+  "./planner.js",
   "./app.js",
   "./manifest.webmanifest",
   "./assets/icon.svg",

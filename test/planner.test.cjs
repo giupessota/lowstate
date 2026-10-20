@@ -1,0 +1,135 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { toISODate } = require("../core.js");
+const P = require("../planner.js");
+
+// Tuesday, 20 Oct 2026, 14:30 local time
+const NOW = new Date(2026, 9, 20, 14, 30);
+
+test("weeks start on the configured weekday", () => {
+  assert.equal(toISODate(P.startOfWeek(NOW, 1)), "2026-10-19");
+  assert.equal(toISODate(P.startOfWeek(NOW, 0)), "2026-10-18");
+  // A Sunday belongs to the week that started the previous Monday.
+  assert.equal(toISODate(P.startOfWeek(new Date(2026, 9, 25), 1)), "2026-10-19");
+  const days = P.weekDays(NOW, 1).map(toISODate);
+  assert.deepEqual(days, ["2026-10-19", "2026-10-20", "2026-10-21", "2026-10-22", "2026-10-23", "2026-10-24", "2026-10-25"]);
+});
+
+test("ISO week numbers", () => {
+  assert.equal(P.isoWeekNumber(NOW), 43);
+  assert.equal(P.isoWeekNumber(new Date(2026, 0, 1)), 1);
+  assert.equal(P.isoWeekNumber(new Date(2027, 0, 1)), 53);
+});
+
+test("time helpers validate and convert", () => {
+  assert.equal(P.isTime("09:30"), true);
+  assert.equal(P.isTime("24:00"), false);
+  assert.equal(P.timeToMinutes("09:30"), 570);
+  assert.equal(P.minutesToTime(570), "09:30");
+  assert.equal(P.minutesToTime(2000), "23:59");
+});
+
+test("normalizeItem drops time data that cannot apply", () => {
+  const item = P.normalizeItem({ title: "  Call  ", date: null, start: "09:00", duration: 30 }, 1);
+  assert.equal(item.title, "Call");
+  assert.equal(item.start, null);
+  assert.equal(item.duration, null);
+  assert.equal(P.normalizeItem({ title: "x", date: "2026-02-30" }).date, null);
+  const timed = P.normalizeItem({ title: "x", date: "2026-10-20", start: "09:00", duration: 45 });
+  assert.equal(timed.start, "09:00");
+  assert.equal(timed.duration, 45);
+});
+
+test("days list untimed tasks first, then timed items by start", () => {
+  const items = [
+    P.normalizeItem({ id: "b", title: "b", date: "2026-10-20", start: "14:00" }),
+    P.normalizeItem({ id: "a", title: "a", date: "2026-10-20", order: 10 }),
+    P.normalizeItem({ id: "c", title: "c", date: "2026-10-20", start: "09:00" }),
+    P.normalizeItem({ id: "d", title: "d", date: "2026-10-20", order: 0 }),
+    P.normalizeItem({ id: "e", title: "e", date: "2026-10-21" }),
+  ];
+  assert.deepEqual(P.itemsForDay(items, "2026-10-20").map((item) => item.id), ["d", "a", "c", "b"]);
+});
+
+test("createItem appends to the end of its bucket", () => {
+  const items = [P.normalizeItem({ id: "a", title: "a", date: "2026-10-20", order: 30 })];
+  assert.equal(P.createItem(items, { title: "b", date: "2026-10-20" }).order, 40);
+  assert.equal(P.createItem(items, { title: "c" }).order, 0);
+});
+
+test("moveItem reschedules and reorders the target day", () => {
+  const items = [
+    P.normalizeItem({ id: "a", title: "a", date: "2026-10-20", order: 0 }),
+    P.normalizeItem({ id: "b", title: "b", date: "2026-10-20", order: 10 }),
+    P.normalizeItem({ id: "x", title: "x", date: null, order: 0 }),
+  ];
+  const moved = P.moveItem(items, "x", { date: "2026-10-20", beforeId: "b" });
+  assert.deepEqual(P.itemsForDay(moved, "2026-10-20").map((item) => item.id), ["a", "x", "b"]);
+  assert.equal(P.inboxItems(moved).length, 0);
+  // Original array is not mutated.
+  assert.equal(items[2].date, null);
+});
+
+test("moving back to the inbox clears time and completion", () => {
+  const items = [P.normalizeItem({ id: "a", title: "a", date: "2026-10-20", start: "10:00", duration: 30, done: true, doneAt: 5 })];
+  const [item] = P.moveItem(items, "a", { date: null });
+  assert.deepEqual([item.date, item.start, item.duration, item.done], [null, null, null, false]);
+});
+
+test("completing an unscheduled item puts it on today", () => {
+  const item = P.normalizeItem({ title: "a" });
+  const done = P.toggleDone(item, "2026-10-20", 99);
+  assert.equal(done.done, true);
+  assert.equal(done.date, "2026-10-20");
+  assert.equal(P.toggleDone(done, "2026-10-20").done, false);
+});
+
+test("overdue lists past, unfinished items oldest first", () => {
+  const items = [
+    P.normalizeItem({ id: "old", title: "a", date: "2026-10-01" }),
+    P.normalizeItem({ id: "older", title: "b", date: "2026-09-30" }),
+    P.normalizeItem({ id: "done", title: "c", date: "2026-10-01", done: true }),
+    P.normalizeItem({ id: "today", title: "d", date: "2026-10-20" }),
+  ];
+  assert.deepEqual(P.overdueItems(items, "2026-10-20").map((item) => item.id), ["older", "old"]);
+});
+
+test("parseCapture understands time, date, urgency and category", () => {
+  assert.deepEqual(P.parseCapture("Dentist @tomorrow 14:30 #Health !urgent", NOW), {
+    title: "Dentist",
+    date: "2026-10-21",
+    start: "14:30",
+    priority: "urgent",
+    category: "HEALTH",
+  });
+  assert.equal(P.parseCapture("Gym 7h", NOW).start, "07:00");
+  assert.equal(P.parseCapture("Standup 9h30", NOW).start, "09:30");
+  assert.equal(P.parseCapture("Buy 3 apples", NOW).start, null);
+  assert.equal(P.parseCapture("Room 27h", NOW).start, null);
+});
+
+test("migrateLegacy converts 1.x tasks and categories", () => {
+  const { items, categories } = P.migrateLegacy({
+    todos: [
+      { id: "1", title: "Report", dueDate: "2026-10-20", priority: "boss", category: "WORK", order: -200, createdAt: 200 },
+      { id: "2", title: "Gym", dueDate: "2026-10-20", priority: "normal", category: null, order: -100, createdAt: 100 },
+      { id: "3", title: "   ", dueDate: null },
+      { id: "4", title: "Someday", dueDate: null, done: true, createdAt: 50 },
+    ],
+    categories: ["WORK", "HOME"],
+    categoryColors: { WORK: "#c9dfd5" },
+  });
+  assert.deepEqual(categories, [
+    { id: "work", name: "Work", color: "#c9dfd5" },
+    { id: "home", name: "Home", color: P.PALETTE[1] },
+  ]);
+  assert.equal(items.length, 3);
+  const report = items.find((item) => item.id === "1");
+  assert.deepEqual([report.priority, report.category, report.date, report.order], ["urgent", "work", "2026-10-20", 0]);
+  assert.equal(items.find((item) => item.id === "2").order, 10);
+});
+
+test("default categories are localized but keep stable ids", () => {
+  assert.deepEqual(P.defaultCategories("pt").map((category) => category.id), ["work", "personal", "health", "study"]);
+  assert.equal(P.defaultCategories("pt")[2].name, "Saúde");
+});
