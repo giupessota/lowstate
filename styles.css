@@ -764,13 +764,22 @@ svg.i {
 .block .check svg.i { width: 13px; height: 13px; }
 .block .item-body { display: flex; flex-direction: column; min-width: 0; }
 .block-time { color: var(--ink-2); font: 500 10px var(--mono); white-space: nowrap; }
-.block-title { overflow: hidden; font-size: 12.5px; font-weight: 600; line-height: 1.25; text-overflow: ellipsis; }
+.block-title {
+  display: -webkit-box;
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines, 1);
+  line-clamp: var(--lines, 1);
+}
 .block.is-urgent { border-left-color: var(--vermilion); }
 .block.is-done { opacity: .55; }
 .block.is-done .block-title { text-decoration: line-through; }
 .block.short { align-items: center; }
 .block.short .item-body { flex-direction: row; align-items: baseline; gap: 6px; }
-.block.short .block-title { white-space: nowrap; }
+.block.short .block-title { display: block; white-space: nowrap; text-overflow: ellipsis; }
 
 .now-line {
   position: absolute;

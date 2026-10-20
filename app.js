@@ -591,11 +591,14 @@
       if (item.done) classes.push("is-done");
       if (item.priority === "urgent") classes.push("is-urgent");
       if (height < 34) classes.push("short");
+      // Title lines that fit under the time label (6px padding, 13px time,
+      // ~16px per title line); the rest ends in an ellipsis.
+      const lines = Math.max(1, Math.floor((height - 19) / 16));
       inner.append(h("div", {
         class: classes.join(" "),
         "data-id": item.id,
         draggable: "true",
-        style: `top: ${top}px; height: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes};${category ? ` --cat: ${category.color};` : ""}`,
+        style: `top: ${top}px; height: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${category ? ` --cat: ${category.color};` : ""}`,
       },
         checkButton(item.done, { "data-action": "toggle" }),
         h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
