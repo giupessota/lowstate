@@ -98,6 +98,7 @@
     inboxList: $("inboxList"),
     inboxEmpty: $("inboxEmpty"),
     settingsBtn: $("settingsBtn"),
+    brandYear: $("brandYear"),
     updatePill: $("updatePill"),
     itemDialog: $("itemDialog"),
     itemForm: $("itemForm"),
@@ -863,6 +864,7 @@
   }
 
   function render() {
+    els.brandYear.textContent = String(new Date().getFullYear());
     document.querySelectorAll(".nav-btn").forEach((button) => {
       const active = button.dataset.view === state.view;
       button.classList.toggle("active", active);
