@@ -168,6 +168,17 @@ test("Easter and the Brazilian holidays derived from it", () => {
   assert.equal(P.brazilHolidays(2023).has("2023-11-20"), false);
 });
 
+test("picking a mood sets it, picking it again clears it", () => {
+  let moods = P.setMood({}, "2026-10-20", "good");
+  assert.deepEqual(moods, { "2026-10-20": "good" });
+  moods = P.setMood(moods, "2026-10-21", "rough");
+  moods = P.setMood(moods, "2026-10-20", "great");
+  assert.deepEqual(moods, { "2026-10-20": "great", "2026-10-21": "rough" });
+  moods = P.setMood(moods, "2026-10-20", "great");
+  assert.deepEqual(moods, { "2026-10-21": "rough" });
+  assert.deepEqual(P.setMood(moods, "2026-10-21", "nope"), {});
+});
+
 test("page quotes cycle through the chosen style", () => {
   for (const style of ["proverbs", "motivational", "ironic"]) {
     const list = P.QUOTES[style];

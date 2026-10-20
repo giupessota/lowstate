@@ -14,6 +14,7 @@
     goals: "type-todo.planner.goals.v1",
     notes: "type-todo.planner.notes.v1",
     dayNotes: "type-todo.planner.daynotes.v1",
+    moods: "type-todo.planner.moods.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
@@ -66,6 +67,7 @@
     dayTasks: $("dayTasks"),
     dayEmpty: $("dayEmpty"),
     dayNotes: $("dayNotes"),
+    moodPicker: $("moodPicker"),
     monthView: $("monthView"),
     monthWashi: $("monthWashi"),
     mvMonthNum: $("mvMonthNum"),
@@ -250,6 +252,7 @@
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
     dayNotes: Store.loadObject(KEYS.dayNotes),
+    moods: Store.loadObject(KEYS.moods),
     editingId: null,
     draft: null,
     dragId: null,
@@ -261,6 +264,7 @@
   const persistGoals = () => Store.save(KEYS.goals, state.goals);
   const persistNotes = () => Store.save(KEYS.notes, state.notes);
   const persistDayNotes = () => Store.save(KEYS.dayNotes, state.dayNotes);
+  const persistMoods = () => Store.save(KEYS.moods, state.moods);
 
   if (initial.changed) {
     persistItems();
@@ -439,6 +443,42 @@
     return svg;
   }
 
+  // Little ink faces for the mood of the day, drawn on a 24×24 grid.
+  const MOOD_FACES = {
+    great: { eyes: ["M7.5 10.5q1.5-2 3 0", "M13.5 10.5q1.5-2 3 0"], mouth: "M7 13.5c1.2 4.2 8.8 4.2 10 0Z" },
+    good: { eyes: "dots", mouth: "M8 14c1.5 2.4 6.5 2.4 8 0" },
+    okay: { eyes: "dots", mouth: "M8.5 15h7" },
+    tiring: { eyes: ["M7.5 10.5h3", "M13.5 10.5h3"], mouth: "M8.5 15.5q1.75-1.5 3.5 0t3.5 0" },
+    rough: { eyes: "dots", mouth: "M8 16.5c1.5-2.4 6.5-2.4 8 0" },
+  };
+
+  function moodEl(mood, className = "mood-face") {
+    const face = MOOD_FACES[mood];
+    if (!face) return null;
+    const label = t(`mood-${mood}`);
+    const svg = svgEl("svg", { class: `${className} mood-${mood}`, viewBox: "0 0 24 24", role: "img", "aria-label": label });
+    const title = svgEl("title", {});
+    title.textContent = label;
+    svg.append(title, svgEl("circle", { class: "face", cx: 12, cy: 12, r: 10 }));
+    if (face.eyes === "dots") {
+      svg.append(svgEl("circle", { class: "dot", cx: 9, cy: 10, r: 1.2 }), svgEl("circle", { class: "dot", cx: 15, cy: 10, r: 1.2 }));
+    } else {
+      face.eyes.forEach((d) => svg.append(svgEl("path", { class: "line", d })));
+    }
+    svg.append(svgEl("path", { class: mood === "great" ? "line fill" : "line", d: face.mouth }));
+    return svg;
+  }
+
+  function renderMoodPicker(iso) {
+    const current = state.moods[iso];
+    els.moodPicker.replaceChildren(...Planner.MOODS.map((mood) => h("button", {
+      type: "button",
+      class: "mood-btn",
+      "data-mood": mood,
+      "aria-pressed": String(current === mood),
+    }, moodEl(mood), h("span", { text: t(`mood-${mood}`) }))));
+  }
+
   function weekDays() {
     return Planner.weekDays(state.anchor, state.settings.weekStart);
   }
@@ -507,7 +547,7 @@
         h("div", { class: "day-stamp", "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
           h("span", { class: "date-num", text: String(day.getDate()).padStart(2, "0") }),
           h("span", { class: "dow", text: formatDate(day, { weekday: "short" }) }),
-          moonEl(day)),
+          h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini"))),
         h("div", { class: "day-body" },
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
           h("ul", { class: "day-items", "data-date": iso },
@@ -663,6 +703,7 @@
     const done = items.filter((item) => item.done).length;
     els.dayProgress.textContent = items.length ? t("weekProgress", { done, total: items.length }) : "";
 
+    renderMoodPicker(iso);
     renderDayNotes();
     renderMonthTabs(day);
   }
@@ -727,7 +768,8 @@
       return h("div", { class: classes, "data-date": iso, "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
         h("div", { class: "cell-head" },
           h("span", { class: "cell-num", text: day.getDate() }),
-          holiday ? h("span", { class: "cell-holiday", text: holiday }) : null),
+          holiday ? h("span", { class: "cell-holiday", text: holiday }) : null,
+          moodEl(state.moods[iso], "mood-mini")),
         h("ul", { class: "month-items", "data-date": iso }, items.slice(0, limit).map((item) => itemEl(item, "mini"))),
         items.length > limit ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length - limit }) }) : null);
     }));
@@ -1201,6 +1243,14 @@
     dayNotesTimer = setTimeout(saveDayNotes, 500);
   });
   els.dayNotes.addEventListener("blur", saveDayNotes);
+
+  els.moodPicker.addEventListener("click", (event) => {
+    const button = event.target.closest(".mood-btn");
+    if (!button) return;
+    state.moods = Planner.setMood(state.moods, anchorISO(), button.dataset.mood);
+    persistMoods();
+    renderMoodPicker(anchorISO());
+  });
 
   els.dayCaptureForm.addEventListener("submit", (event) => {
     event.preventDefault();

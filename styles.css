@@ -555,7 +555,9 @@ svg.i {
 }
 .date-num { font: 400 21px/1 var(--mono); letter-spacing: -.03em; padding: 0 2px; }
 .dow { display: flex; align-items: baseline; gap: 5px; color: var(--ink-2); font: 500 9.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.stamp-icons { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
 .moon { width: 12px; height: 12px; margin-top: 4px; }
+.stamp-icons .moon { margin-top: 0; }
 .moon .shadow { fill: color-mix(in srgb, var(--ink) 55%, transparent); }
 .moon .lit { fill: var(--paper); }
 .moon .rim { fill: none; stroke: color-mix(in srgb, var(--ink) 55%, transparent); stroke-width: 1; }
@@ -667,6 +669,40 @@ svg.i {
 }
 .goal-add input:focus { border-bottom-color: var(--ink-2); }
 .goal-add input::placeholder { color: var(--muted); }
+
+/* Mood of the day: little ink faces */
+.mood-face, .mood-mini { flex: none; --mood: var(--muted); }
+.mood-face .face, .mood-mini .face { fill: color-mix(in srgb, var(--mood) 26%, var(--paper)); stroke: var(--mood); stroke-width: 1.4; }
+.mood-face .dot, .mood-mini .dot { fill: var(--ink); }
+.mood-face .line, .mood-mini .line { fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.mood-face .line.fill, .mood-mini .line.fill { fill: var(--ink); }
+.mood-great { --mood: var(--matcha); }
+.mood-good { --mood: var(--asagi); }
+.mood-okay { --mood: var(--yamabuki); }
+.mood-tiring { --mood: var(--fuji); }
+.mood-rough { --mood: var(--vermilion); }
+.mood-mini { width: 13px; height: 13px; }
+.cell-head .mood-mini { margin-left: auto; align-self: center; }
+.mood-picker { display: flex; flex-wrap: wrap; gap: 4px; }
+.mood-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 58px;
+  padding: 6px 4px 4px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font: 500 10px var(--mono);
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+.mood-btn .mood-face { width: 26px; height: 26px; opacity: .55; filter: grayscale(.6); transition: opacity .15s, filter .15s, transform .15s; }
+.mood-btn:hover .mood-face { opacity: 1; filter: none; transform: translateY(-1px); }
+.mood-btn[aria-pressed="true"] { border-color: var(--rule); background: color-mix(in srgb, var(--paper) 70%, var(--paper-2)); color: var(--ink); }
+.mood-btn[aria-pressed="true"] .mood-face { opacity: 1; filter: none; transform: rotate(-6deg); }
 
 .notes { display: flex; flex: 1 1 auto; flex-direction: column; min-height: 120px; }
 .notes textarea {

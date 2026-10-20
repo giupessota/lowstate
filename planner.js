@@ -457,6 +457,16 @@
     return list[index];
   }
 
+  // ---------- Mood of the day ----------
+  const MOODS = ["great", "good", "okay", "tiring", "rough"];
+
+  // Returns a new { iso: mood } map. Picking the day's current mood again
+  // (or anything that isn't a mood) clears it.
+  function setMood(moods, iso, mood) {
+    const { [iso]: previous, ...rest } = moods || {};
+    return MOODS.includes(mood) && mood !== previous ? { ...rest, [iso]: mood } : rest;
+  }
+
   function dayOfYear(date) {
     return Math.round((startOfDay(date) - new Date(date.getFullYear(), 0, 1)) / 86400000) + 1;
   }
@@ -531,6 +541,8 @@
     PALETTE,
     QUOTES,
     QUOTE_STYLES,
+    MOODS,
+    setMood,
     isoWeekKey,
     moonPhase,
     moonPhaseName,
