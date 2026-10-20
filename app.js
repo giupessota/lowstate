@@ -40,12 +40,9 @@
     washi: $("washi"),
     monthNum: $("monthNum"),
     monthName: $("monthName"),
-    monthKanji: $("monthKanji"),
     yearMark: $("yearMark"),
-    proverbJp: $("proverbJp"),
-    proverbTr: $("proverbTr"),
+    proverb: $("proverb"),
     weekLabel: $("weekLabel"),
-    weekKanji: $("weekKanji"),
     weekRange: $("weekRange"),
     goalsList: $("goalsList"),
     goalForm: $("goalForm"),
@@ -56,13 +53,12 @@
     dayWashi: $("dayWashi"),
     dayBig: $("dayBig"),
     dayWeekday: $("dayWeekday"),
-    dayKanji: $("dayKanji"),
+    dayMonth: $("dayMonth"),
     dayMoon: $("dayMoon"),
     dayOfYear: $("dayOfYear"),
     dayHoliday: $("dayHoliday"),
     timeline: $("timeline"),
-    dayProverbJp: $("dayProverbJp"),
-    dayProverbTr: $("dayProverbTr"),
+    dayProverb: $("dayProverb"),
     dayProgress: $("dayProgress"),
     dayCaptureForm: $("dayCaptureForm"),
     dayCaptureInput: $("dayCaptureInput"),
@@ -73,7 +69,6 @@
     monthWashi: $("monthWashi"),
     mvMonthNum: $("mvMonthNum"),
     mvMonthName: $("mvMonthName"),
-    mvMonthKanji: $("mvMonthKanji"),
     mvYear: $("mvYear"),
     monthWeekdays: $("monthWeekdays"),
     monthGrid: $("monthGrid"),
@@ -387,9 +382,9 @@
     if (item.priority === "urgent") classes.push("is-urgent");
 
     const stamp = category ? h("span", { class: "stamp", text: category.name }) : null;
-    // 急 ("urgent") as a little hanko seal.
+    // Urgent items get a little "!" seal.
     const seal = item.priority === "urgent"
-      ? h("span", { class: "seal", title: t("urgentToggle"), "aria-label": t("urgentToggle"), role: "img" }, "急")
+      ? h("span", { class: "seal", title: t("urgentToggle"), "aria-label": t("urgentToggle"), role: "img" }, "!")
       : null;
     const notesMark = item.notes.trim() ? h("span", { class: "notes-mark", title: item.notes, text: "≡" }) : null;
 
@@ -502,9 +497,7 @@
       },
         h("div", { class: "day-stamp", "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
           h("span", { class: "date-num", text: String(day.getDate()).padStart(2, "0") }),
-          h("span", { class: "dow" },
-            formatDate(day, { weekday: "short" }),
-            h("span", { class: "kanji", text: Planner.WEEKDAY_KANJI[day.getDay()] })),
+          h("span", { class: "dow", text: formatDate(day, { weekday: "short" }) }),
           moonEl(day)),
         h("div", { class: "day-body" },
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
@@ -531,7 +524,6 @@
     els.monthName.textContent = sameMonth
       ? formatDate(reference, { month: "long" })
       : `${formatDate(days[0], { month: "short" })} – ${formatDate(days[6], { month: "short" })}`;
-    els.monthKanji.textContent = Planner.MONTH_KANJI[reference.getMonth()];
     els.yearMark.textContent = String(reference.getFullYear());
     els.washi.dataset.pattern = TAPE_PATTERNS[weekNumber % TAPE_PATTERNS.length];
     els.washi.style.setProperty("--tape", `var(${TAPE_COLORS[weekNumber % TAPE_COLORS.length]})`);
@@ -539,11 +531,9 @@
     renderDays(days);
 
     const proverb = Planner.proverbForWeek(weekNumber);
-    els.proverbJp.textContent = proverb.jp;
-    els.proverbTr.textContent = `— ${proverb[I18n.language] || proverb.en}`;
+    els.proverb.textContent = proverb[I18n.language] || proverb.en;
 
     els.weekLabel.textContent = t("weekNumber", { n: weekNumber });
-    els.weekKanji.textContent = `第${weekNumber}週`;
     els.weekRange.textContent = `${formatDate(days[0], { day: "2-digit", month: "2-digit" })} — ${formatDate(days[6], { day: "2-digit", month: "2-digit" })}`;
     renderGoals();
     renderNotes();
@@ -646,7 +636,7 @@
 
     els.dayBig.textContent = String(day.getDate()).padStart(2, "0");
     els.dayWeekday.textContent = capitalize(formatDate(day, { weekday: "long" }));
-    els.dayKanji.textContent = `${Planner.WEEKDAY_KANJI[day.getDay()]}曜日 · ${capitalize(formatDate(day, { month: "long", year: "numeric" }))}`;
+    els.dayMonth.textContent = capitalize(formatDate(day, { month: "long", year: "numeric" }));
     const moon = moonEl(day);
     els.dayMoon.replaceChildren(moon, moon.getAttribute("aria-label"));
     els.dayOfYear.textContent = t("dayOfYear", { n: Planner.dayOfYear(day), total: Planner.daysInYear(day.getFullYear()) });
@@ -655,8 +645,7 @@
     setWashi(els.dayWashi, Planner.dayOfYear(day));
 
     const proverb = Planner.proverbForWeek(Planner.dayOfYear(day));
-    els.dayProverbJp.textContent = proverb.jp;
-    els.dayProverbTr.textContent = `— ${proverb[I18n.language] || proverb.en}`;
+    els.dayProverb.textContent = proverb[I18n.language] || proverb.en;
 
     renderTimeline(iso);
 
@@ -713,14 +702,13 @@
     const reference = new Date(year, month, 1);
     els.mvMonthNum.textContent = String(month + 1).padStart(2, "0");
     els.mvMonthName.textContent = formatDate(reference, { month: "long" });
-    els.mvMonthKanji.textContent = Planner.MONTH_KANJI[month];
     els.mvYear.textContent = String(year);
     setWashi(els.monthWashi, month + 3);
 
     const weeks = Planner.monthGrid(year, month, state.settings.weekStart);
     els.monthWeekdays.replaceChildren(...weeks[0].map((day) => h("span", {
       class: day.getDay() === 6 ? "wd-sat" : day.getDay() === 0 ? "wd-sun" : null,
-    }, formatDate(day, { weekday: "short" }), h("span", { class: "kanji", text: Planner.WEEKDAY_KANJI[day.getDay()] }))));
+    }, formatDate(day, { weekday: "short" }))));
 
     const limit = weeks.length > 5 ? 3 : 4;
     els.monthGrid.style.gridTemplateRows = `repeat(${weeks.length}, minmax(0, 1fr))`;

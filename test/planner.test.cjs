@@ -171,7 +171,7 @@ test("Easter and the Brazilian holidays derived from it", () => {
 test("weekly proverb cycles through the list", () => {
   assert.equal(P.proverbForWeek(1), P.PROVERBS[0]);
   assert.equal(P.proverbForWeek(P.PROVERBS.length + 1), P.PROVERBS[0]);
-  assert.ok(P.proverbForWeek(43).jp);
+  assert.ok(P.proverbForWeek(43).pt);
 });
 
 test("day of year and leap years", () => {

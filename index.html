@@ -105,7 +105,7 @@
                   <span class="day-big" id="dayBig"></span>
                   <div class="day-meta">
                     <strong id="dayWeekday"></strong>
-                    <span class="kanji" id="dayKanji"></span>
+                    <span class="day-month" id="dayMonth"></span>
                   </div>
                 </div>
                 <div class="day-side">
@@ -116,8 +116,7 @@
               <p class="holiday day-holiday" id="dayHoliday" hidden></p>
               <div class="timeline" id="timeline" data-i18n-aria="timeline" role="region" aria-label="Timeline"></div>
               <footer class="proverb">
-                <span class="proverb-jp" id="dayProverbJp"></span>
-                <span class="proverb-tr" id="dayProverbTr"></span>
+                <span class="proverb-tr" id="dayProverb"></span>
               </footer>
             </article>
 
@@ -125,7 +124,6 @@
               <header class="page-head">
                 <div class="week-mark">
                   <strong data-i18n="todayTasks">For this day</strong>
-                  <span class="kanji">やること</span>
                 </div>
                 <span class="range-mark" id="dayProgress"></span>
               </header>
@@ -136,7 +134,7 @@
               <ul class="day-items day-tasks" id="dayTasks"></ul>
               <p class="day-empty" id="dayEmpty" data-i18n="dayEmptyList"></p>
               <section class="notes">
-                <h2 class="section-title"><span data-i18n="dayNotes">Notes</span><span class="kanji">メモ</span></h2>
+                <h2 class="section-title"><span data-i18n="dayNotes">Notes</span></h2>
                 <textarea id="dayNotes" data-i18n-placeholder="dayNotesPlaceholder" data-i18n-aria="dayNotes"></textarea>
               </section>
             </article>
@@ -154,7 +152,6 @@
                   <span class="month-num" id="mvMonthNum"></span>
                   <div class="month-text">
                     <strong id="mvMonthName"></strong>
-                    <span class="kanji" id="mvMonthKanji"></span>
                   </div>
                 </div>
                 <span class="year-mark" id="mvYear"></span>
@@ -175,15 +172,13 @@
                   <span class="month-num" id="monthNum"></span>
                   <div class="month-text">
                     <strong id="monthName"></strong>
-                    <span class="kanji" id="monthKanji"></span>
                   </div>
                 </div>
                 <span class="year-mark" id="yearMark"></span>
               </header>
               <div class="days" id="weekGrid"></div>
               <footer class="proverb">
-                <span class="proverb-jp" id="proverbJp"></span>
-                <span class="proverb-tr" id="proverbTr"></span>
+                <span class="proverb-tr" id="proverb"></span>
               </footer>
             </article>
 
@@ -191,19 +186,18 @@
               <header class="page-head">
                 <div class="week-mark">
                   <strong id="weekLabel"></strong>
-                  <span class="kanji" id="weekKanji"></span>
                 </div>
                 <span class="range-mark" id="weekRange"></span>
               </header>
               <section class="goals">
-                <h2 class="section-title"><span data-i18n="weeklyGoals">Weekly goals</span><span class="kanji">目標</span></h2>
+                <h2 class="section-title"><span data-i18n="weeklyGoals">Weekly goals</span></h2>
                 <ul class="goal-list" id="goalsList"></ul>
                 <form class="goal-add" id="goalForm">
                   <input id="goalInput" maxlength="140" autocomplete="off" data-i18n-placeholder="goalPlaceholder" data-i18n-aria="weeklyGoals" />
                 </form>
               </section>
               <section class="notes">
-                <h2 class="section-title"><span data-i18n="weekNotes">Notes</span><span class="kanji">メモ</span></h2>
+                <h2 class="section-title"><span data-i18n="weekNotes">Notes</span></h2>
                 <textarea id="weekNotes" data-i18n-placeholder="notesFreePlaceholder" data-i18n-aria="weekNotes"></textarea>
               </section>
             </article>
@@ -272,7 +266,7 @@
 
         <div class="field">
           <button type="button" class="toggle" id="itemUrgent" aria-pressed="false">
-            <span class="flag" aria-hidden="true">急</span><span data-i18n="urgentToggle">Urgent</span>
+            <span class="flag" aria-hidden="true">!</span><span data-i18n="urgentToggle">Urgent</span>
           </button>
         </div>
 

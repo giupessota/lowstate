@@ -33,7 +33,6 @@
   --page-shadow: 0 1px 1px rgba(60, 50, 30, .06), 0 14px 30px rgba(60, 50, 30, .12);
   --sans: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: "DM Mono", ui-monospace, Consolas, monospace;
-  --jp: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
 }
 
 :root[data-theme="dark"] {
@@ -77,7 +76,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 [hidden] { display: none !important; }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.kanji { font-family: var(--jp); font-weight: 400; }
 
 /* Thin, quiet scrollbars so they don't cut through the paper */
 .timeline, .days, .day-tasks, .side-list, .notes textarea, .month-grid {
@@ -304,7 +302,7 @@ svg.i {
   border-radius: 4px;
   background: var(--vermilion);
   color: #fff;
-  font: 600 10.5px var(--jp);
+  font: 700 11px var(--mono);
   transform: rotate(-5deg);
 }
 .notes-mark { color: var(--muted); font-size: 12px; }
@@ -500,7 +498,6 @@ svg.i {
 .month-num { font: 400 40px/0.9 var(--mono); letter-spacing: -.04em; }
 .month-text { display: flex; flex-direction: column; gap: 1px; padding-bottom: 2px; }
 .month-text strong { font-size: 17px; font-weight: 600; letter-spacing: -.01em; text-transform: capitalize; line-height: 1.1; }
-.month-text .kanji { color: var(--muted); font-size: 12px; letter-spacing: .1em; }
 .year-mark { color: var(--muted); font: 500 11px var(--mono); letter-spacing: .12em; padding-bottom: 3px; }
 
 /* Day rows */
@@ -533,7 +530,6 @@ svg.i {
 }
 .date-num { font: 400 21px/1 var(--mono); letter-spacing: -.03em; padding: 0 2px; }
 .dow { display: flex; align-items: baseline; gap: 5px; color: var(--ink-2); font: 500 9.5px var(--mono); letter-spacing: .1em; text-transform: uppercase; }
-.dow .kanji { font-size: 11.5px; letter-spacing: 0; }
 .moon { width: 12px; height: 12px; margin-top: 4px; }
 .moon .shadow { fill: color-mix(in srgb, var(--ink) 55%, transparent); }
 .moon .lit { fill: var(--paper); }
@@ -597,13 +593,11 @@ svg.i {
   padding-top: 9px;
   border-top: 1px solid var(--rule);
 }
-.proverb-jp { font: 400 14px var(--jp); letter-spacing: .08em; }
 .proverb-tr { color: var(--ink-2); font-size: 12px; font-style: italic; }
 
 /* Right page: goals + free notes */
 .week-mark { display: flex; align-items: baseline; gap: 10px; }
 .week-mark strong { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
-.week-mark .kanji { color: var(--muted); font-size: 13px; letter-spacing: .08em; }
 .range-mark { color: var(--muted); font: 500 11px var(--mono); letter-spacing: .1em; text-transform: uppercase; padding-bottom: 2px; }
 
 .section-title {
@@ -616,7 +610,6 @@ svg.i {
   letter-spacing: .12em;
   text-transform: uppercase;
 }
-.section-title .kanji { color: var(--muted); font-size: 12px; letter-spacing: .06em; text-transform: none; }
 
 .goal-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
 .goal { display: flex; align-items: flex-start; gap: 8px; padding: 3px 4px; border-radius: 6px; }
@@ -700,7 +693,7 @@ svg.i {
 .day-big { padding: 0 2px; font: 400 54px/.85 var(--mono); letter-spacing: -.05em; }
 .day-meta { display: flex; flex-direction: column; gap: 3px; padding-bottom: 2px; }
 .day-meta strong { font-size: 17px; font-weight: 600; line-height: 1.15; }
-.day-meta .kanji { color: var(--muted); font-size: 12px; letter-spacing: .1em; }
+.day-month { color: var(--muted); font-size: 12px; letter-spacing: .02em; }
 .day-side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .day-moon { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
 .day-moon .moon { width: 15px; height: 15px; margin: 0; }
@@ -865,7 +858,6 @@ svg.i {
   letter-spacing: .1em;
   text-transform: uppercase;
 }
-.month-weekdays .kanji { margin-left: 5px; font-size: 11px; letter-spacing: 0; }
 .month-weekdays .wd-sat { color: var(--indigo); }
 .month-weekdays .wd-sun { color: var(--vermilion); }
 .month-grid {
@@ -1049,7 +1041,7 @@ dialog.sheet[open] { animation: sheet-in .18s ease; }
   place-items: center;
   border-radius: 4px;
   background: color-mix(in srgb, var(--ink) 8%, transparent);
-  font: 600 11px var(--jp);
+  font: 700 12px var(--mono);
 }
 .toggle[aria-pressed="true"] { border-color: var(--vermilion); color: var(--vermilion); }
 .toggle[aria-pressed="true"] .flag { background: var(--vermilion); color: #fff; transform: rotate(-5deg); }

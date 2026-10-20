@@ -6,11 +6,9 @@
 })(typeof globalThis !== "undefined" ? globalThis : this, (core) => {
   const { startOfDay, toISODate, parseISODate } = core;
 
-  // Traditional ink colors: 藍 indigo, 朱 vermilion, 抹茶 matcha, 山吹 yamabuki,
-  // 藤 wisteria, 浅葱 asagi, 桜 sakura, 鼠 nezumi.
+  // Ink colors: indigo, vermilion, matcha, yamabuki, wisteria, asagi, sakura,
+  // grey.
   const PALETTE = ["#34508a", "#d64a32", "#7c8c4a", "#e2a43a", "#8b78bd", "#3e9aa8", "#e59aa6", "#8d8a85"];
-  const WEEKDAY_KANJI = ["日", "月", "火", "水", "木", "金", "土"];
-  const MONTH_KANJI = ["一月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "十一月", "十二月"];
   const DEFAULT_CATEGORY_NAMES = {
     en: ["Work", "Personal", "Health", "Study"],
     pt: ["Trabalho", "Pessoal", "Saúde", "Estudos"],
@@ -357,28 +355,28 @@
     return key ? HOLIDAY_NAMES[key][language] || HOLIDAY_NAMES[key].en : null;
   }
 
-  // ---------- Weekly proverb (ことわざ) ----------
+  // ---------- Weekly proverb ----------
   const PROVERBS = [
-    { jp: "七転び八起き", en: "Fall seven times, get up eight.", pt: "Caia sete vezes, levante-se oito." },
-    { jp: "千里の道も一歩から", en: "A journey of a thousand miles begins with a single step.", pt: "Uma jornada de mil léguas começa com um passo." },
-    { jp: "塵も積もれば山となる", en: "Even dust, piled up, becomes a mountain.", pt: "Até a poeira, acumulada, vira montanha." },
-    { jp: "急がば回れ", en: "When in a hurry, take the long way round.", pt: "Se está com pressa, vá pelo caminho mais longo." },
-    { jp: "継続は力なり", en: "Persistence is power.", pt: "Persistência é força." },
-    { jp: "一期一会", en: "One time, one meeting — treasure each moment.", pt: "Um encontro, uma única vez — valorize cada momento." },
-    { jp: "石の上にも三年", en: "Sit on a cold stone for three years and it grows warm.", pt: "Sente-se três anos numa pedra fria e ela se aquece." },
-    { jp: "雨降って地固まる", en: "After the rain, the ground grows firm.", pt: "Depois da chuva, a terra fica firme." },
-    { jp: "笑う門には福来る", en: "Good fortune comes to the house that laughs.", pt: "A sorte chega à casa onde se ri." },
-    { jp: "案ずるより産むが易し", en: "Doing it is easier than worrying about it.", pt: "Fazer é mais fácil do que se preocupar." },
-    { jp: "猿も木から落ちる", en: "Even monkeys fall from trees.", pt: "Até os macacos caem das árvores." },
-    { jp: "明日は明日の風が吹く", en: "Tomorrow's winds will blow tomorrow.", pt: "Amanhã sopram os ventos de amanhã." },
-    { jp: "十人十色", en: "Ten people, ten colors.", pt: "Dez pessoas, dez cores." },
-    { jp: "腹八分目", en: "Stop when you are eight-tenths full.", pt: "Pare quando estiver oito décimos satisfeito." },
-    { jp: "能ある鷹は爪を隠す", en: "The skilled hawk hides its talons.", pt: "O falcão habilidoso esconde as garras." },
-    { jp: "一石二鳥", en: "One stone, two birds.", pt: "Uma pedra, dois pássaros." },
-    { jp: "備えあれば憂いなし", en: "Be prepared and you will have nothing to fear.", pt: "Quem se prepara não tem o que temer." },
-    { jp: "早起きは三文の徳", en: "Rising early is worth three coins.", pt: "Acordar cedo vale três moedas." },
-    { jp: "初心忘るべからず", en: "Never forget your beginner's mind.", pt: "Nunca esqueça o espírito de iniciante." },
-    { jp: "塞翁が馬", en: "Old Saiō's horse — luck and misfortune are hard to tell apart.", pt: "O cavalo do velho Saiō — sorte e azar são difíceis de distinguir." },
+    { en: "Fall seven times, get up eight.", pt: "Caia sete vezes, levante-se oito." },
+    { en: "A journey of a thousand miles begins with a single step.", pt: "Uma jornada de mil léguas começa com um passo." },
+    { en: "Even dust, piled up, becomes a mountain.", pt: "Até a poeira, acumulada, vira montanha." },
+    { en: "When in a hurry, take the long way round.", pt: "Se está com pressa, vá pelo caminho mais longo." },
+    { en: "Persistence is power.", pt: "Persistência é força." },
+    { en: "One time, one meeting — treasure each moment.", pt: "Um encontro, uma única vez — valorize cada momento." },
+    { en: "Sit on a cold stone for three years and it grows warm.", pt: "Sente-se três anos numa pedra fria e ela se aquece." },
+    { en: "After the rain, the ground grows firm.", pt: "Depois da chuva, a terra fica firme." },
+    { en: "Good fortune comes to the house that laughs.", pt: "A sorte chega à casa onde se ri." },
+    { en: "Doing it is easier than worrying about it.", pt: "Fazer é mais fácil do que se preocupar." },
+    { en: "Even monkeys fall from trees.", pt: "Até os macacos caem das árvores." },
+    { en: "Tomorrow's winds will blow tomorrow.", pt: "Amanhã sopram os ventos de amanhã." },
+    { en: "Ten people, ten colors.", pt: "Dez pessoas, dez cores." },
+    { en: "Stop when you are eight-tenths full.", pt: "Pare quando estiver oito décimos satisfeito." },
+    { en: "The skilled hawk hides its talons.", pt: "O falcão habilidoso esconde as garras." },
+    { en: "One stone, two birds.", pt: "Uma pedra, dois pássaros." },
+    { en: "Be prepared and you will have nothing to fear.", pt: "Quem se prepara não tem o que temer." },
+    { en: "Rising early is worth three coins.", pt: "Acordar cedo vale três moedas." },
+    { en: "Never forget your beginner's mind.", pt: "Nunca esqueça o espírito de iniciante." },
+    { en: "Old Saiō's horse — luck and misfortune are hard to tell apart.", pt: "O cavalo do velho Saiō — sorte e azar são difíceis de distinguir." },
   ];
 
   // Cycles through the proverbs; used with the week number on week pages
@@ -460,8 +458,6 @@
 
   return {
     PALETTE,
-    WEEKDAY_KANJI,
-    MONTH_KANJI,
     PROVERBS,
     isoWeekKey,
     moonPhase,
