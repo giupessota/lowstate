@@ -355,7 +355,7 @@
     return key ? HOLIDAY_NAMES[key][language] || HOLIDAY_NAMES[key].en : null;
   }
 
-  // ---------- Weekly proverb ----------
+  // ---------- Page quotes ----------
   const PROVERBS = [
     { en: "Fall seven times, get up eight.", pt: "Caia sete vezes, levante-se oito." },
     { en: "A journey of a thousand miles begins with a single step.", pt: "Uma jornada de mil léguas começa com um passo." },
@@ -379,11 +379,82 @@
     { en: "Old Saiō's horse — luck and misfortune are hard to tell apart.", pt: "O cavalo do velho Saiō — sorte e azar são difíceis de distinguir." },
   ];
 
-  // Cycles through the proverbs; used with the week number on week pages
-  // and with the day of the year on day pages.
-  function proverbForWeek(weekNumber) {
-    const index = ((Math.round(weekNumber) - 1) % PROVERBS.length + PROVERBS.length) % PROVERBS.length;
-    return PROVERBS[index];
+  const MOTIVATIONAL = [
+    { en: "One step at a time is still moving.", pt: "Um passo de cada vez ainda é andar." },
+    { en: "Done is better than perfect.", pt: "Feito é melhor que perfeito." },
+    { en: "You don't have to do it all today — just the next step.", pt: "Você não precisa fazer tudo hoje — só o próximo passo." },
+    { en: "Small progress is still progress.", pt: "Pequenos progressos ainda são progressos." },
+    { en: "Start small, but start.", pt: "Comece pequeno, mas comece." },
+    { en: "Consistency beats rushing.", pt: "A constância vence a pressa." },
+    { en: "Today is a blank page.", pt: "Hoje é uma página em branco." },
+    { en: "Discipline is remembering what you want.", pt: "Disciplina é lembrar o que você quer." },
+    { en: "Rest is part of the plan too.", pt: "Descansar também faz parte do plano." },
+    { en: "Hard gets easier with practice.", pt: "O difícil fica fácil com prática." },
+    { en: "Your pace is the right pace.", pt: "Seu ritmo é o ritmo certo." },
+    { en: "Finish one thing before starting three.", pt: "Termine uma coisa antes de começar três." },
+    { en: "Courage is doing it anyway.", pt: "Coragem é fazer mesmo com medo." },
+    { en: "Every crossed-off task is a win.", pt: "Cada tarefa riscada é uma vitória." },
+    { en: "Focus on what you can control.", pt: "Foco no que dá para controlar." },
+    { en: "Better than yesterday is enough.", pt: "Melhor que ontem já é suficiente." },
+    { en: "Motivation shows up after you start.", pt: "A motivação aparece depois que você começa." },
+    { en: "You've made it through harder days.", pt: "Você já passou por dias mais difíceis." },
+    { en: "Great things are made of ordinary days.", pt: "Grandes coisas são feitas de dias comuns." },
+    { en: "Breathe. Prioritize. Do.", pt: "Respire. Priorize. Faça." },
+    { en: "Don't wait for the perfect moment — make it.", pt: "Não espere o momento perfeito — crie o momento." },
+    { en: "Your future self will thank you for today.", pt: "Seu eu de amanhã agradece o que você fizer hoje." },
+    { en: "Mistakes are part of trying.", pt: "Errar faz parte de tentar." },
+    { en: "Simplify. Then simplify again.", pt: "Simplifique. Depois, simplifique de novo." },
+    { en: "Persistence turns the impossible into routine.", pt: "A persistência transforma o impossível em rotina." },
+    { en: "A good day starts with a short list.", pt: "Um bom dia começa com uma lista curta." },
+    { en: "Celebrate what you've already done.", pt: "Celebre o que você já fez." },
+    { en: "Slow still gets there.", pt: "Devagar também se chega." },
+    { en: "Be kind to yourself along the way.", pt: "Seja gentil com você no meio do caminho." },
+    { en: "Today counts.", pt: "Hoje conta." },
+  ];
+
+  const IRONIC = [
+    { en: "Today is a great day to procrastinate with conviction.", pt: "Hoje é um ótimo dia para adiar algo com muita convicção." },
+    { en: "Believe in yourself. Someone has to.", pt: "Acredite em você. Alguém tem que acreditar." },
+    { en: "If nothing works out, at least you made a list.", pt: "Se nada der certo, pelo menos você fez uma lista." },
+    { en: "You can do anything. Including nothing.", pt: "Você é capaz de tudo. Inclusive de não fazer nada." },
+    { en: "Dream big. Nap bigger.", pt: "Sonhe grande. Cochile maior ainda." },
+    { en: "Success is right there, after one more coffee.", pt: "O sucesso está logo ali, depois de mais um café." },
+    { en: "Every great journey begins with \"five more minutes\".", pt: "Toda grande jornada começa com \"só mais cinco minutinhos\"." },
+    { en: "Be the person your calendar thinks you are.", pt: "Seja a pessoa que sua agenda acha que você é." },
+    { en: "Deep breath. The emails aren't going anywhere. Sadly.", pt: "Respire fundo. Os e-mails não vão a lugar nenhum. Infelizmente." },
+    { en: "Today you'll shine. Or at least show up.", pt: "Hoje você vai brilhar. Ou pelo menos aparecer." },
+    { en: "Nothing is impossible. Just very tedious.", pt: "Nada é impossível. Só muito chato." },
+    { en: "When life gives you lemons, add them to tomorrow's list.", pt: "Se a vida te der limões, coloque na lista de amanhã." },
+    { en: "Remember: that meeting could have been an email.", pt: "Lembre-se: essa reunião poderia ter sido um e-mail." },
+    { en: "Focus, strength and snacks.", pt: "Foco, força e lanchinho." },
+    { en: "The first step is the hardest. So is the second.", pt: "O primeiro passo é o mais difícil. O segundo também." },
+    { en: "It's not late, it's a personal time zone.", pt: "Não é atraso, é fuso horário próprio." },
+    { en: "Being organized means knowing exactly where the mess is.", pt: "Organização é saber exatamente onde está a bagunça." },
+    { en: "Do today what you can reschedule tomorrow.", pt: "Faça hoje o que você pode reagendar amanhã." },
+    { en: "Productivity is a vibe. Today's vibe is different.", pt: "Produtividade é uma vibe. Hoje a vibe é outra." },
+    { en: "Think positive: Monday only lasts one day.", pt: "Pense positivo: a segunda-feira só dura um dia." },
+    { en: "Courage! The list won't cross itself off.", pt: "Coragem! A lista não vai se riscar sozinha." },
+    { en: "The universe is on your side. It's just a bit busy.", pt: "O universo conspira a seu favor. Só está meio ocupado." },
+    { en: "Great achievements require small naps.", pt: "Grandes conquistas exigem pequenos cochilos." },
+    { en: "Today you'll be unstoppable. Until lunch.", pt: "Hoje ninguém te segura. Até o almoço." },
+    { en: "Plan it all on Sunday, improvise it all on Monday.", pt: "Quem planeja tudo no domingo improvisa tudo na segunda." },
+    { en: "You're stronger than the office Wi-Fi.", pt: "Você é mais forte que o Wi-Fi do escritório." },
+    { en: "Feeling lazy? Do it lazily, then.", pt: "Deu preguiça? Faça com preguiça mesmo." },
+    { en: "Your potential is infinite. Your social battery isn't.", pt: "Seu potencial é infinito. Sua bateria social, não." },
+    { en: "It'll all work out. Maybe not today, but it will.", pt: "Vai dar tudo certo. Talvez não hoje, mas vai." },
+    { en: "Mark it done and pretend it was easy.", pt: "Marque como feito e finja que foi fácil." },
+  ];
+
+  const QUOTES = { proverbs: PROVERBS, motivational: MOTIVATIONAL, ironic: IRONIC };
+  const QUOTE_STYLES = ["proverbs", "motivational", "ironic", "off"];
+
+  // Cycles through one style's quotes; used with the week number on week
+  // pages and with the day of the year on day pages. "off" gives null.
+  function quoteFor(style, n) {
+    const list = QUOTES[style];
+    if (!list) return null;
+    const index = ((Math.round(n) - 1) % list.length + list.length) % list.length;
+    return list[index];
   }
 
   function dayOfYear(date) {
@@ -458,7 +529,8 @@
 
   return {
     PALETTE,
-    PROVERBS,
+    QUOTES,
+    QUOTE_STYLES,
     isoWeekKey,
     moonPhase,
     moonPhaseName,
@@ -466,7 +538,7 @@
     easterSunday,
     brazilHolidays,
     holidayName,
-    proverbForWeek,
+    quoteFor,
     dayOfYear,
     daysInYear,
     monthGrid,

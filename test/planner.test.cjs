@@ -168,10 +168,14 @@ test("Easter and the Brazilian holidays derived from it", () => {
   assert.equal(P.brazilHolidays(2023).has("2023-11-20"), false);
 });
 
-test("weekly proverb cycles through the list", () => {
-  assert.equal(P.proverbForWeek(1), P.PROVERBS[0]);
-  assert.equal(P.proverbForWeek(P.PROVERBS.length + 1), P.PROVERBS[0]);
-  assert.ok(P.proverbForWeek(43).pt);
+test("page quotes cycle through the chosen style", () => {
+  for (const style of ["proverbs", "motivational", "ironic"]) {
+    const list = P.QUOTES[style];
+    assert.equal(P.quoteFor(style, 1), list[0]);
+    assert.equal(P.quoteFor(style, list.length + 1), list[0]);
+    assert.ok(list.every((quote) => quote.en && quote.pt));
+  }
+  assert.equal(P.quoteFor("off", 3), null);
 });
 
 test("day of year and leap years", () => {

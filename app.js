@@ -244,6 +244,7 @@
     settings: {
       weekStart: savedSettings.weekStart === 0 ? 0 : 1,
       holidays: savedSettings.holidays === "off" ? "off" : "br",
+      quotes: Planner.QUOTE_STYLES.includes(savedSettings.quotes) ? savedSettings.quotes : "proverbs",
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
@@ -456,6 +457,13 @@
   }
 
   const holidayFor = (iso) => (state.settings.holidays === "br" ? Planner.holidayName(iso, I18n.language) : null);
+
+  // Fills a page footer with the chosen style's quote, or hides it.
+  function showQuote(el, n) {
+    const quote = Planner.quoteFor(state.settings.quotes, n);
+    el.parentElement.hidden = !quote;
+    el.textContent = quote ? quote[I18n.language] || quote.en : "";
+  }
   const anchorISO = () => Core.toISODate(state.anchor);
 
   function renderTopbar() {
@@ -530,8 +538,7 @@
 
     renderDays(days);
 
-    const proverb = Planner.proverbForWeek(weekNumber);
-    els.proverb.textContent = proverb[I18n.language] || proverb.en;
+    showQuote(els.proverb, weekNumber);
 
     els.weekLabel.textContent = t("weekNumber", { n: weekNumber });
     els.weekRange.textContent = `${formatDate(days[0], { day: "2-digit", month: "2-digit" })} — ${formatDate(days[6], { day: "2-digit", month: "2-digit" })}`;
@@ -644,8 +651,7 @@
     els.dayHoliday.textContent = holiday || "";
     setWashi(els.dayWashi, Planner.dayOfYear(day));
 
-    const proverb = Planner.proverbForWeek(Planner.dayOfYear(day));
-    els.dayProverb.textContent = proverb[I18n.language] || proverb.en;
+    showQuote(els.dayProverb, Planner.dayOfYear(day));
 
     renderTimeline(iso);
 
@@ -1032,6 +1038,7 @@
       language: I18n.language,
       weekStart: String(state.settings.weekStart),
       holidays: state.settings.holidays,
+      quotes: state.settings.quotes,
       alwaysOnTop: alwaysOnTop() ? "on" : "off",
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
@@ -1062,6 +1069,10 @@
       render();
     } else if (setting === "holidays") {
       state.settings.holidays = value === "off" ? "off" : "br";
+      persistSettings();
+      render();
+    } else if (setting === "quotes") {
+      state.settings.quotes = Planner.QUOTE_STYLES.includes(value) ? value : "proverbs";
       persistSettings();
       render();
     } else if (setting === "alwaysOnTop") {
