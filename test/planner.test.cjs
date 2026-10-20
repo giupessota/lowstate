@@ -168,6 +168,21 @@ test("Easter and the Brazilian holidays derived from it", () => {
   assert.equal(P.brazilHolidays(2023).has("2023-11-20"), false);
 });
 
+test("water: target glasses, per-day counts and liters", () => {
+  assert.equal(P.waterTarget(2000, 250), 8);
+  assert.equal(P.waterTarget(2000, 300), 7);
+  assert.equal(P.waterTarget(1500, 500), 3);
+  let water = P.setWater({}, "2026-10-20", 3);
+  assert.deepEqual(water, { "2026-10-20": 3 });
+  water = P.setWater(water, "2026-10-20", 0);
+  assert.deepEqual(water, {});
+  assert.deepEqual(P.setWater({}, "2026-10-20", 99), { "2026-10-20": 30 });
+  assert.deepEqual(P.setWater({}, "2026-10-20", -2), {});
+  assert.equal(P.formatLiters(1250, "pt"), "1,25 L");
+  assert.equal(P.formatLiters(2000, "en"), "2 L");
+  assert.equal(P.formatLiters(1500, "en"), "1.5 L");
+});
+
 test("picking a mood sets it, picking it again clears it", () => {
   let moods = P.setMood({}, "2026-10-20", "good");
   assert.deepEqual(moods, { "2026-10-20": "good" });

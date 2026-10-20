@@ -460,6 +460,29 @@
   // ---------- Mood of the day ----------
   const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
+  // ---------- Water ----------
+  const GLASS_SIZES = [200, 250, 300, 500];
+  const WATER_GOALS = [1500, 2000, 2500, 3000];
+  const MAX_GLASSES = 30;
+
+  // How many glasses reach the daily goal (both in ml).
+  function waterTarget(goalMl, glassMl) {
+    return Math.max(1, Math.ceil(goalMl / glassMl));
+  }
+
+  // Returns a new { iso: glasses } map; zero removes the day.
+  function setWater(water, iso, glasses) {
+    const { [iso]: _previous, ...rest } = water || {};
+    const count = Math.max(0, Math.min(MAX_GLASSES, Math.round(Number(glasses) || 0)));
+    return count ? { ...rest, [iso]: count } : rest;
+  }
+
+  // 1250 → "1,25 L" (pt) / "1.25 L" (en).
+  function formatLiters(ml, language = "en") {
+    const liters = Math.round(ml / 10) / 100;
+    return `${liters.toLocaleString(language === "pt" ? "pt-BR" : "en-GB", { maximumFractionDigits: 2 })} L`;
+  }
+
   // Returns a new { iso: mood } map. Picking the day's current mood again
   // (or anything that isn't a mood) clears it.
   function setMood(moods, iso, mood) {
@@ -543,6 +566,11 @@
     QUOTE_STYLES,
     MOODS,
     setMood,
+    GLASS_SIZES,
+    WATER_GOALS,
+    waterTarget,
+    setWater,
+    formatLiters,
     isoWeekKey,
     moonPhase,
     moonPhaseName,

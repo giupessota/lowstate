@@ -15,6 +15,7 @@
     notes: "type-todo.planner.notes.v1",
     dayNotes: "type-todo.planner.daynotes.v1",
     moods: "type-todo.planner.moods.v1",
+    water: "type-todo.planner.water.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
@@ -68,6 +69,8 @@
     dayEmpty: $("dayEmpty"),
     dayNotes: $("dayNotes"),
     moodPicker: $("moodPicker"),
+    waterRow: $("waterRow"),
+    waterSum: $("waterSum"),
     monthView: $("monthView"),
     monthWashi: $("monthWashi"),
     mvMonthNum: $("mvMonthNum"),
@@ -249,11 +252,15 @@
       weekStart: savedSettings.weekStart === 0 ? 0 : 1,
       holidays: savedSettings.holidays === "off" ? "off" : "br",
       quotes: Planner.QUOTE_STYLES.includes(savedSettings.quotes) ? savedSettings.quotes : "proverbs",
+      waterUnit: savedSettings.waterUnit === "liters" ? "liters" : "glasses",
+      glassMl: Planner.GLASS_SIZES.includes(savedSettings.glassMl) ? savedSettings.glassMl : 250,
+      waterGoal: Planner.WATER_GOALS.includes(savedSettings.waterGoal) ? savedSettings.waterGoal : 2000,
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
     dayNotes: Store.loadObject(KEYS.dayNotes),
     moods: Store.loadObject(KEYS.moods),
+    water: Store.loadObject(KEYS.water),
     editingId: null,
     draft: null,
     dragId: null,
@@ -266,6 +273,7 @@
   const persistNotes = () => Store.save(KEYS.notes, state.notes);
   const persistDayNotes = () => Store.save(KEYS.dayNotes, state.dayNotes);
   const persistMoods = () => Store.save(KEYS.moods, state.moods);
+  const persistWater = () => Store.save(KEYS.water, state.water);
 
   if (initial.changed) {
     persistItems();
@@ -480,6 +488,37 @@
       "data-mood": mood,
       "aria-pressed": String(current === mood),
     }, moodEl(mood), h("span", { text: t(`mood-${mood}`) }))));
+  }
+
+  // A glass outline with the water level inside, on an 18×22 grid.
+  function glassEl() {
+    const svg = svgEl("svg", { class: "glass-icon", viewBox: "0 0 18 22", "aria-hidden": "true" });
+    svg.append(
+      svgEl("path", { class: "glass-water", d: "M3.6 8.5h10.8l-1.1 11H4.7Z" }),
+      svgEl("path", { class: "glass-rim", d: "M2.2 2.5h13.6l-1.7 17.6a1.6 1.6 0 0 1-1.6 1.4H5.5a1.6 1.6 0 0 1-1.6-1.4Z" }));
+    return svg;
+  }
+
+  function renderWater(iso) {
+    const { waterUnit, glassMl, waterGoal } = state.settings;
+    const target = Planner.waterTarget(waterGoal, glassMl);
+    const count = state.water[iso] || 0;
+    const slots = Math.max(target, count);
+    const glasses = Array.from({ length: slots }, (_, index) => h("button", {
+      type: "button",
+      class: `glass${index < count ? " is-full" : ""}${index >= target ? " is-extra" : ""}`,
+      "data-glass": index + 1,
+      "aria-pressed": String(index < count),
+      "aria-label": t("glassN", { n: index + 1 }),
+      title: t("glassN", { n: index + 1 }),
+    }, glassEl()));
+    els.waterRow.replaceChildren(...glasses,
+      h("button", { type: "button", class: "water-step", "data-water": "-1", "aria-label": t("removeGlass"), title: t("removeGlass"), disabled: count === 0 ? "" : null, text: "−" }),
+      h("button", { type: "button", class: "water-step", "data-water": "1", "aria-label": t("addGlass"), title: t("addGlass"), text: "+" }));
+    els.waterSum.textContent = waterUnit === "liters"
+      ? t("waterLiters", { n: Planner.formatLiters(count * glassMl, I18n.language).replace(" L", ""), total: Planner.formatLiters(waterGoal, I18n.language) })
+      : t("waterGlasses", { n: count, total: target });
+    els.waterSum.classList.toggle("is-done", count >= target);
   }
 
   function weekDays() {
@@ -706,6 +745,7 @@
     const done = items.filter((item) => item.done).length;
     els.dayProgress.textContent = items.length ? t("weekProgress", { done, total: items.length }) : "";
 
+    renderWater(iso);
     renderMoodPicker(iso);
     renderDayNotes();
     renderMonthTabs(day);
@@ -1089,6 +1129,9 @@
       weekStart: String(state.settings.weekStart),
       holidays: state.settings.holidays,
       quotes: state.settings.quotes,
+      waterUnit: state.settings.waterUnit,
+      glassMl: String(state.settings.glassMl),
+      waterGoal: String(state.settings.waterGoal),
       alwaysOnTop: alwaysOnTop() ? "on" : "off",
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
@@ -1097,6 +1140,9 @@
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", String(active));
       });
+    });
+    els.settingsDialog.querySelectorAll('[data-setting="waterGoal"] button').forEach((button) => {
+      button.textContent = Planner.formatLiters(Number(button.dataset.value), I18n.language);
     });
     els.windowGroup.hidden = !desktop;
     const count = Store.pruneTrash().length;
@@ -1127,6 +1173,12 @@
       render();
     } else if (setting === "quotes") {
       state.settings.quotes = Planner.QUOTE_STYLES.includes(value) ? value : "proverbs";
+      persistSettings();
+      render();
+    } else if (setting === "waterUnit" || setting === "glassMl" || setting === "waterGoal") {
+      if (setting === "waterUnit") state.settings.waterUnit = value === "liters" ? "liters" : "glasses";
+      if (setting === "glassMl" && Planner.GLASS_SIZES.includes(Number(value))) state.settings.glassMl = Number(value);
+      if (setting === "waterGoal" && Planner.WATER_GOALS.includes(Number(value))) state.settings.waterGoal = Number(value);
       persistSettings();
       render();
     } else if (setting === "alwaysOnTop") {
@@ -1247,6 +1299,21 @@
     dayNotesTimer = setTimeout(saveDayNotes, 500);
   });
   els.dayNotes.addEventListener("blur", saveDayNotes);
+
+  els.waterRow.addEventListener("click", (event) => {
+    const iso = anchorISO();
+    const count = state.water[iso] || 0;
+    const glass = event.target.closest("[data-glass]");
+    const step = event.target.closest("[data-water]");
+    let next = count;
+    // Tapping the last full glass empties it; any other glass fills up to it.
+    if (glass) next = Number(glass.dataset.glass) === count ? count - 1 : Number(glass.dataset.glass);
+    else if (step) next = count + Number(step.dataset.water);
+    else return;
+    state.water = Planner.setWater(state.water, iso, next);
+    persistWater();
+    renderWater(iso);
+  });
 
   els.moodPicker.addEventListener("click", (event) => {
     const button = event.target.closest(".mood-btn");

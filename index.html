@@ -136,6 +136,10 @@
               </form>
               <ul class="day-items day-tasks" id="dayTasks"></ul>
               <p class="day-empty" id="dayEmpty" data-i18n="dayEmptyList"></p>
+              <section class="water">
+                <h2 class="section-title"><span data-i18n="water">Water</span><span class="water-sum" id="waterSum"></span></h2>
+                <div class="water-row" id="waterRow" role="group" data-i18n-aria="water"></div>
+              </section>
               <section class="mood">
                 <h2 class="section-title"><span data-i18n="dayMood">Mood of the day</span></h2>
                 <div class="mood-picker" id="moodPicker" role="group" data-i18n-aria="dayMood"></div>
@@ -350,6 +354,35 @@
               <button type="button" data-value="motivational" data-i18n="quotesMotivational">MOTIVATIONAL</button>
               <button type="button" data-value="ironic" data-i18n="quotesIronic">IRONIC</button>
               <button type="button" data-value="off" data-i18n="quotesOff">NONE</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="set-group">
+          <h3 data-i18n="water">Water</h3>
+          <div class="set-row">
+            <span data-i18n="waterUnit">Count water in</span>
+            <div class="seg" data-setting="waterUnit">
+              <button type="button" data-value="glasses" data-i18n="waterUnitGlasses">GLASSES</button>
+              <button type="button" data-value="liters" data-i18n="waterUnitLiters">LITERS</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="glassSize">Glass size</span>
+            <div class="seg" data-setting="glassMl">
+              <button type="button" data-value="200">200 ML</button>
+              <button type="button" data-value="250">250 ML</button>
+              <button type="button" data-value="300">300 ML</button>
+              <button type="button" data-value="500">500 ML</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="waterGoal">Daily goal</span>
+            <div class="seg" data-setting="waterGoal">
+              <button type="button" data-value="1500"></button>
+              <button type="button" data-value="2000"></button>
+              <button type="button" data-value="2500"></button>
+              <button type="button" data-value="3000"></button>
             </div>
           </div>
         </section>
