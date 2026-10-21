@@ -16,6 +16,10 @@ let isQuitting = false;
 const dataDirOverride = process.env.LOWSTATE_DATA_DIR || null;
 if (dataDirOverride) app.setPath("userData", path.join(dataDirOverride, "profile"));
 
+// Windows attributes notifications to this ID; it must match the installer's
+// appId so reminders show as "Lowstate" with its icon.
+if (process.platform === "win32") app.setAppUserModelId("com.lowstate.app");
+
 function createWindow() {
   window = new BrowserWindow({
     width: 1240,
