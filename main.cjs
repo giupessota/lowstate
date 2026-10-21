@@ -3,37 +3,29 @@ const fs = require("fs");
 const https = require("https");
 const path = require("path");
 const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
-const { hideWindowOnClose } = require("./desktop-lifecycle.cjs");
+const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
 let tray;
 let isQuitting = false;
 
-const FULL_HEIGHT = 654;
-const COMPACT_HEIGHT = 110;
-
-function setCompactWindow(on) {
-  if (!window) return;
-  const [width] = window.getContentSize();
-  window.setContentSize(width, on ? COMPACT_HEIGHT : FULL_HEIGHT, true);
-}
+// Lets a development/preview run use its own data folder (e.g. a copy of the
+// real data) instead of the one shared with the installed app.
+const dataDirOverride = process.env.LOWSTATE_DATA_DIR || null;
+if (dataDirOverride) app.setPath("userData", path.join(dataDirOverride, "profile"));
 
 function createWindow() {
   window = new BrowserWindow({
-    width: 580,
-    height: FULL_HEIGHT,
+    width: 1240,
+    height: 820,
     useContentSize: true,
-    minWidth: 460,
-    minHeight: 96,
-    maxWidth: 720,
-    alwaysOnTop: true,
+    minWidth: 860,
+    minHeight: 560,
     resizable: true,
-    maximizable: false,
-    fullscreenable: false,
     title: "Lowstate",
     icon: iconPath,
-    backgroundColor: "#d8d4cf",
+    backgroundColor: "#f4f0e8",
     webPreferences: {
       contextIsolation: true,
       sandbox: true,
@@ -41,7 +33,6 @@ function createWindow() {
     }
   });
 
-  window.setAlwaysOnTop(true, "floating");
   window.loadFile(path.join(__dirname, "index.html"));
   window.on("close", (event) => {
     hideWindowOnClose(event, window, isQuitting);
@@ -58,7 +49,7 @@ let shortcuts = { ...DEFAULT_SHORTCUTS };
 function desktopStoragePaths() {
   // Keep the durable copy outside Chromium's userData/profile directory. If
   // that profile is reset, this sibling directory is left intact.
-  const directory = path.join(app.getPath("appData"), "Lowstate Data");
+  const directory = dataDirOverride || path.join(app.getPath("appData"), "Lowstate Data");
   return {
     current: path.join(directory, "lowstate-data.json"),
     backup: path.join(directory, "lowstate-data.backup.json"),
@@ -135,47 +126,37 @@ async function migrateLegacyProfile() {
   }
 }
 
-function focusWindow(compact) {
+function focusWindow() {
   if (!window) return;
   // A minimized window still reports isVisible() === true on macOS, so
   // isMinimized() has to be checked separately before restoring/showing.
   if (window.isMinimized()) window.restore();
   window.show();
   window.focus();
-  // Resize AFTER show/restore, not before: on Windows, a setContentSize()
-  // applied while the window is still hidden/minimized can get silently
-  // discarded once the OS repaints it, leaving the window at its old
-  // (full) size with the compact UI rendered inside it.
-  setCompactWindow(compact);
 }
 
 const SHORTCUT_HANDLERS = {
-  // Show / hide the full gadget
+  // Show / hide the planner
   toggle: () => {
     if (!window) return;
     if (window.isVisible() && !window.isMinimized()) { window.hide(); return; }
-    window.webContents.send("set-compact-ui", false);
-    focusWindow(false);
+    focusWindow();
   },
-  // Quick capture (task): pop up the compact input bar from anywhere
+  // Quick capture: bring the planner up with the "To schedule" field focused.
+  // The old "brain dump" shortcut now lands in the same place.
   capture: () => {
     if (!window) return;
-    focusWindow(true);
+    focusWindow();
     window.webContents.send("quick-capture", "tasks");
   },
-  // Brain dump: same, but the note lands in the Brain Inbox
   brain: () => {
     if (!window) return;
-    focusWindow(true);
+    focusWindow();
     window.webContents.send("quick-capture", "brain");
   },
 };
 
-function showFullWindow() {
-  if (!window) return;
-  window.webContents.send("set-compact-ui", false);
-  focusWindow(false);
-}
+const showFullWindow = () => focusWindow();
 
 function createTray() {
   if (process.platform === "darwin" || tray) return;
@@ -208,16 +189,6 @@ function registerShortcuts(map) {
 // (macOS refuses outright; Windows would still trigger SmartScreen on the
 // downloaded installer), so this only checks GitHub for a newer tag and
 // lets the renderer show a "download the new version" nudge.
-function isNewerVersion(candidate, current) {
-  const a = candidate.split(".").map(Number);
-  const b = current.split(".").map(Number);
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const na = a[i] || 0, nb = b[i] || 0;
-    if (na !== nb) return na > nb;
-  }
-  return false;
-}
-
 function checkForUpdate() {
   const options = {
     hostname: "api.github.com",
@@ -257,7 +228,6 @@ app.whenReady().then(async () => {
   setTimeout(checkForUpdate, 2000);
 });
 
-ipcMain.on("set-compact", (_event, on) => setCompactWindow(on));
 ipcMain.on("hide-window", () => { if (window) window.hide(); });
 ipcMain.on("set-always-on-top", (_event, on) => { if (window) window.setAlwaysOnTop(!!on, "floating"); });
 ipcMain.on("open-external", (_event, url) => {

@@ -61,3 +61,6 @@ jobs:
         with:
           files: ${{ matrix.pattern }}
           generate_release_notes: true
+          # v2.1.0-beta.1 and similar ship as pre-releases, so the in-app
+          # update check (which reads releases/latest) never offers them.
+          prerelease: ${{ contains(github.ref_name, '-') }}

@@ -3,333 +3,455 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1f1e1c" />
-    <meta name="description" content="Lowstate — lower your mental entropy." />
+    <meta name="theme-color" content="#284236" />
+    <meta name="description" content="Lowstate — lower your mental entropy. A calm planner for your week." />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="styles.css" />
+    <script>
+      try {
+        document.documentElement.dataset.theme = localStorage.getItem("type-todo.theme.v1") === "dark" ? "dark" : "light";
+        document.documentElement.dataset.cover = localStorage.getItem("type-todo.cover.v1") || "green";
+      } catch { document.documentElement.dataset.theme = "light"; }
+    </script>
     <title>Lowstate</title>
   </head>
   <body>
-    <main class="machine">
-      <div class="spiral" aria-hidden="true">
-        <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-      </div>
-      <button id="compactExpand" class="compact-expand" type="button" aria-label="Expand" title="Expand (Esc)" hidden>⊕</button>
-      <header class="machine-top">
-        <button id="titleButton" class="brand-mark" type="button" title="Rename notebook">
-          <span id="notebookTitle">MY DAILY NOTEBOOK</span>
-          <span class="title-edit" aria-hidden="true">✎</span>
-        </button>
-        <form id="titleForm" class="title-form" hidden>
-          <input id="titleInput" maxlength="24" aria-label="Notebook name" />
-          <button type="submit" aria-label="Save notebook name">✓</button>
-        </form>
-        <button id="compactToggle" class="night-toggle" type="button" aria-label="Compact mode (quick capture)" title="Compact mode">⊟</button>
-        <button id="settingsToggle" class="night-toggle" type="button" aria-label="Settings" title="Settings">⚙<span id="updateDot" class="update-dot" hidden></span></button>
-      </header>
-
-      <section class="paper">
-        <div class="paper-slot" aria-hidden="true">
-          <span>TO-DO LIST</span>
-        </div>
-        <div class="paper-toolbar">
-          <button id="settingsBack" class="mini-button" type="button" aria-label="Back" title="Back" data-i18n-aria="back" hidden>←</button>
-          <div class="toolbar-center">
-            <div class="mode-switch" aria-label="Notebook mode">
-              <button type="button" class="active" data-mode="tasks" data-i18n="tasks">TASKS</button>
-              <button type="button" data-mode="brain" data-i18n="brainInbox">BRAIN INBOX</button>
-            </div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="brand">
+          <img class="brand-mark" src="assets/icon.svg" alt="" width="32" height="32" />
+          <div class="brand-text">
+            <strong>Lowstate</strong>
+            <span>lower your mental entropy</span>
           </div>
-          <button id="clearDone" class="mini-button" type="button" title="Clear completed tasks">×</button>
+          <span class="brand-year" id="brandYear" aria-hidden="true"></span>
         </div>
 
-        <form id="todoForm" class="type-line">
-          <label class="sr-only" for="todoInput">New task</label>
-          <span aria-hidden="true">&gt;</span>
-          <input
-            id="todoInput"
-            type="text"
-            maxlength="160"
-            autocomplete="off"
-            placeholder="type a task..."
-            data-i18n-placeholder="taskPlaceholder"
-            autofocus
-          />
-          <button id="captureOptionsToggle" class="capture-options-toggle" type="button" aria-label="Task options" aria-expanded="false" title="Category, priority and due date">＋</button>
-          <button type="submit" aria-label="Add task">↵</button>
-          <div id="captureOptions" class="capture-options" hidden>
-            <div class="cat-picker">
-              <button id="catPickerBtn" class="cat-picker-btn" type="button" aria-haspopup="true" aria-expanded="false" title="Tag this task with a category">
-                <span class="cat-dot" id="catPickerDot" aria-hidden="true"></span>
-                <span id="catPickerLabel">TAG</span>
-                <svg aria-hidden="true" viewBox="0 0 10 6"><path d="m1 1 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-              </button>
-              <div id="categoryMenu" class="category-menu" role="menu" aria-label="Choose category" hidden></div>
-            </div>
-            <div class="priority-picker" aria-label="Priority">
-              <button type="button" class="priority active" data-priority="normal" data-i18n="normal">NORMAL</button>
-              <button type="button" class="priority" data-priority="boss" data-i18n="urgent">URGENT</button>
-            </div>
-            <button id="newDueButton" class="new-due-button" type="button" aria-label="Set due date for new task">◷ DATE</button>
-          </div>
-        </form>
-
-        <div class="progress-row">
-          <div class="progress-track" aria-hidden="true"><div id="progressBar"></div></div>
-          <strong id="progressText" aria-live="polite">0 / 0 DONE</strong>
-        </div>
-
-        <nav class="filters" aria-label="Task filters" data-i18n-aria="taskFilters">
-          <div id="taskFilters" class="filter-row">
-            <div class="status-row">
-              <button class="filter active" data-filter="active"><span data-i18n="todo">TO DO</span> <span id="activeCount">0</span></button>
-              <button class="filter" data-filter="today" data-i18n="today">TODAY</button>
-              <button class="filter" data-filter="done" data-i18n="done">DONE</button>
-              <button id="activeCategoryChip" class="active-category-chip" type="button" hidden aria-label="Clear category filter">
-                <span class="cat-dot" aria-hidden="true"></span><span class="chip-name"></span><span class="chip-x" aria-hidden="true">×</span>
-              </button>
-              <button id="filterMenuToggle" class="filter-menu-toggle" type="button" aria-expanded="false" aria-controls="filterMenu"><span data-i18n="filter">FILTER</span> <span id="filterActiveDot" class="filter-active-dot" hidden></span></button>
-              <div id="filterMenu" class="filter-menu" hidden>
-                <button class="filter-option" type="button" data-filter="all" data-i18n="all">ALL</button>
-                <button class="filter-option" type="button" data-filter="overdue" data-i18n="late">LATE</button>
-                <button id="urgentToggle" class="filter-option" type="button" aria-pressed="false">! <span data-i18n="urgent">URGENT</span></button>
-                <div class="filter-menu-divider"></div>
-                <div id="filterCategoryList" class="filter-category-list"></div>
-              </div>
-            </div>
-            <form id="categoryForm" class="category-form" hidden>
-              <input id="categoryInput" maxlength="10" placeholder="NAME" aria-label="Category name" />
-              <div class="category-colors" aria-label="Category color">
-                <label style="--choice:#c9dfd5" title="Mint"><input type="radio" name="categoryColor" value="#c9dfd5" checked /><span></span></label>
-                <label style="--choice:#efc3c1" title="Rose"><input type="radio" name="categoryColor" value="#efc3c1" /><span></span></label>
-                <label style="--choice:#c9dced" title="Blue"><input type="radio" name="categoryColor" value="#c9dced" /><span></span></label>
-                <label style="--choice:#eadca5" title="Yellow"><input type="radio" name="categoryColor" value="#eadca5" /><span></span></label>
-                <label style="--choice:#d5c5df" title="Purple"><input type="radio" name="categoryColor" value="#d5c5df" /><span></span></label>
-              </div>
-              <button type="submit" aria-label="Save category">↵</button>
-            </form>
-          </div>
-          <div id="brainFilters" class="brain-filters" hidden>
-            <button class="brain-filter active" type="button" data-brain-filter="unprocessed" data-i18n="unprocessed">UNPROCESSED</button>
-            <button class="brain-filter" type="button" data-brain-filter="processed" data-i18n="processed">PROCESSED</button>
-            <button id="brainTagToggle" class="brain-action" type="button" aria-expanded="false"># <span data-i18n="tags">TAGS</span></button>
-            <button id="processBrain" class="brain-action" type="button" data-i18n="processAll">PROCESS ALL</button>
-            <button id="copyBrain" class="brain-action" type="button" data-i18n="copyAll">COPY ALL</button>
-            <button id="exportBrain" class="brain-action" type="button">EXPORT .MD</button>
-            <div id="brainTagMenu" class="brain-tag-menu" hidden></div>
-          </div>
+        <nav class="nav" aria-label="Views" data-i18n-aria="views">
+          <button type="button" class="nav-btn" data-view="day">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>
+            <span data-i18n="viewDay">Day</span><kbd>1</kbd>
+          </button>
+          <button type="button" class="nav-btn" data-view="week">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2.5"/><path d="M9 5v15M15 5v15"/></svg>
+            <span data-i18n="viewWeek">Week</span><kbd>2</kbd>
+          </button>
+          <button type="button" class="nav-btn" data-view="month">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 17.5h.01M12 17.5h.01"/></svg>
+            <span data-i18n="viewMonth">Month</span><kbd>3</kbd>
+          </button>
+          <button type="button" class="nav-btn" data-view="habits">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 0 1 12.9-5.2M19.5 12a7.5 7.5 0 0 1-12.9 5.2"/><path d="M18 3.5v4h-4M6 20.5v-4h4"/></svg>
+            <span data-i18n="viewHabits">Habits</span><kbd>4</kbd>
+          </button>
         </nav>
 
-        <ul id="todoList" class="todo-list" aria-live="polite"></ul>
-
-        <div id="emptyState" class="empty-state">
-          <span class="pixel-face" aria-hidden="true">•ᴗ•</span>
-          <p id="emptyTitle">all quiet around here.</p>
-          <small id="emptyHint"></small>
-        </div>
-
-        <aside id="onboardingTip" class="onboarding-tip" hidden>
-          <button id="dismissOnboarding" type="button" aria-label="Dismiss">×</button>
-          <strong data-i18n="welcomeTitle">CAPTURE FIRST. ORGANIZE LATER.</strong>
-          <span data-i18n="welcomeBody">Type a task, use ＋ for details, or press the global shortcut for instant capture.</span>
-        </aside>
-
-        <section id="settingsPage" class="settings-page" aria-label="Settings" hidden>
-          <div class="settings-section update-banner" id="updateBanner" hidden>
-            <div class="settings-row">
-              <span class="settings-label" id="updateBannerText">Update available</span>
-              <button type="button" class="foot-btn" id="updateBannerButton">DOWNLOAD</button>
-            </div>
+        <section class="side-section overdue" id="overdueSection" hidden>
+          <div class="side-head">
+            <h2 data-i18n="overdueTitle">Overdue</h2>
+            <span class="count" id="overdueCount"></span>
+            <button type="button" class="link-btn" id="moveAllToday" data-i18n="moveAllToday">Move all to today</button>
           </div>
+          <ul class="side-list" id="overdueList"></ul>
+        </section>
 
-          <div class="settings-section">
-            <h3 class="settings-section-title" data-i18n="appearance">Appearance</h3>
-            <div class="settings-row">
-              <span class="settings-label" data-i18n="style">Style</span>
-              <div class="mode-switch settings-switch" role="group" aria-label="Notebook style">
-                <button type="button" class="active" data-style-value="notebook" data-i18n="notebook">NOTEBOOK</button>
-                <button type="button" data-style-value="minimal" data-i18n="minimal">MINIMAL</button>
-              </div>
-            </div>
-            <div class="settings-row">
-              <span class="settings-label" data-i18n="theme">Theme</span>
-              <div class="mode-switch settings-switch" role="group" aria-label="Notebook theme">
-                <button type="button" class="active" data-theme-value="light" data-i18n="light">LIGHT</button>
-                <button type="button" data-theme-value="dark" data-i18n="dark">DARK</button>
-              </div>
-            </div>
-            <div class="settings-row">
-              <span class="settings-label" data-i18n="textSize">Text size</span>
-              <div class="mode-switch settings-switch" role="group" aria-label="Text size">
-                <button type="button" data-font-size-value="small" data-i18n="small">SMALL</button>
-                <button type="button" class="active" data-font-size-value="normal" data-i18n="normal">NORMAL</button>
-                <button type="button" data-font-size-value="large" data-i18n="large">LARGE</button>
-              </div>
-            </div>
-            <div class="settings-row">
-              <span class="settings-label" data-i18n="language">Language</span>
-              <div class="mode-switch settings-switch" role="group" aria-label="Language">
-                <button type="button" data-language-value="en">EN</button>
-                <button type="button" data-language-value="pt">PT</button>
-              </div>
-            </div>
-            <div class="settings-row settings-cover-row">
-              <span class="settings-label" data-i18n="cover">Cover</span>
-              <div id="themePalette" class="theme-palette" aria-label="Notebook colors">
-                <button type="button" data-cover="forest" aria-label="Forest cover"></button>
-                <button type="button" data-cover="rose" aria-label="Rose cover"></button>
-                <button type="button" data-cover="blue" aria-label="Blue cover"></button>
-                <button type="button" data-cover="green" aria-label="Green cover"></button>
-                <button type="button" data-cover="yellow" aria-label="Yellow cover"></button>
-                <button type="button" data-cover="purple" aria-label="Purple cover"></button>
-                <button type="button" data-cover="mono" aria-label="Black cover"></button>
-                <button type="button" id="coverPickerToggle" class="cover-custom" title="Mix your own color" aria-label="Mix a custom cover color" aria-expanded="false"></button>
-              </div>
-              <div id="coverPicker" class="cover-picker" aria-label="Mix a custom cover" hidden>
-                <div class="cover-picker-row">
-                  <span id="coverPreview" class="cover-preview" aria-hidden="true"></span>
-                  <div class="cover-sliders">
-                    <input type="range" id="coverHue" class="cp-slider cp-hue" min="0" max="360" value="210" aria-label="Cover hue" />
-                    <input type="range" id="coverDepth" class="cp-slider cp-depth" min="0" max="100" value="40" aria-label="Cover depth" />
+        <section class="side-section inbox" id="inboxSection">
+          <div class="side-head">
+            <h2 data-i18n="toSchedule">To schedule</h2>
+            <span class="count" id="inboxCount"></span>
+          </div>
+          <form class="capture" id="inboxForm">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            <input id="inboxInput" autocomplete="off" maxlength="200" data-i18n-placeholder="inboxPlaceholder" data-i18n-aria="newTask" />
+          </form>
+          <ul class="side-list" id="inboxList"></ul>
+          <p class="side-empty" id="inboxEmpty" data-i18n="inboxEmpty"></p>
+        </section>
+
+        <footer class="side-foot">
+          <button type="button" class="update-pill" id="updatePill" hidden></button>
+          <button type="button" class="foot-btn" id="settingsBtn">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+            <span data-i18n="settings">Settings</span>
+          </button>
+        </footer>
+      </aside>
+
+      <main class="stage">
+        <header class="topbar">
+          <div class="range">
+            <h1 id="rangeTitle"></h1>
+            <p class="range-sub" id="rangeSub"></p>
+          </div>
+          <div class="progress" id="weekProgress" hidden>
+            <div class="progress-bar"><span id="progressFill"></span></div>
+            <span id="progressText"></span>
+          </div>
+          <div class="nav-controls" id="navControls">
+            <button type="button" class="icon-btn" id="prevBtn" data-i18n-aria="previous" aria-label="Previous">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <button type="button" class="btn" id="todayBtn" data-i18n="goToday">Today</button>
+            <button type="button" class="icon-btn" id="nextBtn" data-i18n-aria="next" aria-label="Next">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+        </header>
+
+        <section class="view day-view" id="dayView" hidden>
+          <div class="spread">
+            <article class="page page-left">
+              <header class="page-head day-head">
+                <span class="washi" id="dayWashi" aria-hidden="true"></span>
+                <div class="day-date">
+                  <span class="day-big" id="dayBig"></span>
+                  <div class="day-meta">
+                    <strong id="dayWeekday"></strong>
+                    <span class="day-month" id="dayMonth"></span>
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
+                <div class="day-side">
+                  <span class="day-moon" id="dayMoon"></span>
+                  <span class="year-mark" id="dayOfYear"></span>
+                </div>
+              </header>
+              <p class="holiday day-holiday" id="dayHoliday" hidden></p>
+              <div class="timeline" id="timeline" data-i18n-aria="timeline" role="region" aria-label="Timeline"></div>
+              <footer class="proverb">
+                <span class="proverb-tr" id="dayProverb"></span>
+              </footer>
+            </article>
 
-          <div class="settings-section" id="settingsWindowSection" hidden>
-            <h3 class="settings-section-title" data-i18n="window">Window</h3>
-            <div class="settings-row">
-              <span class="settings-label" data-i18n="alwaysOnTop">Always on top</span>
-              <div class="mode-switch settings-switch" role="group" aria-label="Always on top">
-                <button type="button" class="active" data-aot-value="on" data-i18n="on">ON</button>
-                <button type="button" data-aot-value="off" data-i18n="off">OFF</button>
-              </div>
-            </div>
-          </div>
+            <article class="page page-right">
+              <header class="page-head">
+                <div class="week-mark">
+                  <strong data-i18n="todayTasks">For this day</strong>
+                </div>
+                <span class="range-mark" id="dayProgress"></span>
+              </header>
+              <section class="load" id="loadMeter" data-i18n-aria="load"></section>
+              <form class="day-capture" id="dayCaptureForm">
+                <span class="day-capture-mark" aria-hidden="true">✎</span>
+                <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" />
+              </form>
+              <div class="day-tasks focus-groups" id="dayTasks"></div>
+              <section class="water">
+                <h2 class="section-title"><span data-i18n="water">Water</span><span class="water-sum" id="waterSum"></span></h2>
+                <div class="water-row" id="waterRow" role="group" data-i18n-aria="water"></div>
+              </section>
+              <section class="mood">
+                <h2 class="section-title"><span data-i18n="dayMood">Mood of the day</span></h2>
+                <div class="mood-picker" id="moodPicker" role="group" data-i18n-aria="dayMood"></div>
+                <input class="mood-reason" id="moodReason" maxlength="140" autocomplete="off" data-i18n-placeholder="moodReasonPlaceholder" data-i18n-aria="moodReason" hidden />
+              </section>
+              <section class="notes">
+                <h2 class="section-title"><span data-i18n="dayNotes">Notes</span></h2>
+                <textarea id="dayNotes" data-i18n-placeholder="dayNotesPlaceholder" data-i18n-aria="dayNotes"></textarea>
+              </section>
+            </article>
 
-          <div class="settings-section">
-            <h3 class="settings-section-title" data-i18n="data">Data</h3>
-            <div class="settings-row settings-data-row">
-              <button id="exportData" class="foot-btn" type="button" title="Download a backup (.json)" data-i18n="backup">⤓ BACKUP</button>
-              <button id="importData" class="foot-btn" type="button" title="Restore from a backup (.json)" data-i18n="restore">⤒ RESTORE</button>
-            </div>
-            <div class="settings-row trash-row">
-              <span class="settings-label"><span data-i18n="trash">Trash</span> <small id="trashCount">0</small></span>
-              <div class="settings-data-row">
-                <button id="restoreTrash" class="foot-btn" type="button" data-i18n="restoreLast">RESTORE LAST</button>
-                <button id="emptyTrash" class="foot-btn danger" type="button" data-i18n="emptyTrash">EMPTY</button>
-              </div>
-            </div>
-          </div>
-
-          <div class="settings-section">
-            <h3 class="settings-section-title" data-i18n="shortcuts">Shortcuts</h3>
-            <p class="settings-hint" data-i18n="globalDesktop">Global (desktop app)</p>
-            <ul class="settings-shortcuts" id="globalShortcuts">
-              <li>
-                <span class="shortcut-key-group">
-                  <button type="button" class="shortcut-key" data-shortcut="toggle">⌘⇧Space</button>
-                  <button type="button" class="shortcut-reset" data-shortcut-reset="toggle" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
-                </span>
-                <span data-i18n="showHide">Show / hide the gadget</span>
-              </li>
-              <li>
-                <span class="shortcut-key-group">
-                  <button type="button" class="shortcut-key" data-shortcut="capture">⌘⇧N</button>
-                  <button type="button" class="shortcut-reset" data-shortcut-reset="capture" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
-                </span>
-                <span data-i18n="quickCapture">Quick-capture a task</span>
-              </li>
-              <li>
-                <span class="shortcut-key-group">
-                  <button type="button" class="shortcut-key" data-shortcut="brain">⌘⇧B</button>
-                  <button type="button" class="shortcut-reset" data-shortcut-reset="brain" title="Reset to default" aria-label="Reset to default" hidden>↺</button>
-                </span>
-                <span data-i18n="brainDump">Brain dump</span>
-              </li>
-            </ul>
-            <p class="settings-hint" data-i18n="inApp">In-app</p>
-            <ul class="settings-shortcuts">
-              <li><kbd>N</kbd><span data-i18n="focusInput">Focus the input</span></li>
-              <li><kbd>Esc</kbd><span data-i18n="closeCancel">Close / cancel</span></li>
-            </ul>
+            <nav class="month-tabs" data-i18n-aria="months" aria-label="Months"></nav>
           </div>
         </section>
-      </section>
 
-      <footer>
-        <span id="installHint"></span>
-      </footer>
-      <input id="importFile" type="file" accept="application/json,.json" hidden />
-
-      <div id="duePicker" class="due-picker" aria-label="Due date" hidden>
-        <div class="due-quick">
-          <button type="button" data-due="today" data-i18n="today">TODAY</button>
-          <button type="button" data-due="tomorrow" data-i18n="tomorrow">TOMORROW</button>
-          <button type="button" data-due="weekend" data-i18n="weekend">WEEKEND</button>
-          <button type="button" data-due="nextweek" data-i18n="nextWeek">NEXT WEEK</button>
-        </div>
-        <div class="due-cal-head">
-          <button type="button" data-cal-nav="-1" aria-label="Previous month">‹</button>
-          <span id="dueMonthLabel"></span>
-          <button type="button" data-cal-nav="1" aria-label="Next month">›</button>
-        </div>
-        <div class="due-cal-weekdays"><span>S</span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span></div>
-        <div id="dueCalGrid" class="due-cal-grid"></div>
-        <button type="button" class="due-clear" data-due="clear" data-i18n="noDate">✕ NO DATE</button>
-      </div>
-
-      <div id="toast" class="toast" role="status" aria-live="polite" hidden>
-        <span id="toastMessage"></span>
-        <button id="toastAction" type="button" hidden></button>
-      </div>
-    </main>
-
-    <template id="todoTemplate">
-      <li class="quest-item">
-        <button class="check" type="button" aria-label="Complete task"><svg class="check-mark" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 L6.7 11.7 L12.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <div class="quest-copy">
-          <div class="quest-meta">
-            <button class="cat-tag" type="button" hidden></button>
-            <button class="due-chip" type="button" hidden></button>
-            <span class="boss-tag">!</span>
+        <section class="view month-view" id="monthView" hidden>
+          <div class="spread month-spread">
+            <article class="page month-page">
+              <header class="page-head">
+                <span class="washi" id="monthWashi" aria-hidden="true"></span>
+                <div class="month-mark">
+                  <span class="month-num" id="mvMonthNum"></span>
+                  <div class="month-text">
+                    <strong id="mvMonthName"></strong>
+                  </div>
+                </div>
+                <span class="year-mark" id="mvYear"></span>
+              </header>
+              <div class="month-weekdays" id="monthWeekdays"></div>
+              <div class="month-grid" id="monthGrid"></div>
+            </article>
+            <nav class="month-tabs" data-i18n-aria="months" aria-label="Months"></nav>
           </div>
-          <p class="quest-title"></p>
-          <input class="edit-input" maxlength="160" aria-label="Edit task" />
-        </div>
-        <div class="quest-actions">
-          <button class="icon-button drag-handle" type="button" draggable="true" aria-label="Drag to reorder" title="Drag to reorder (within the same day)">⠿</button>
-          <button class="icon-button tag-btn" type="button" aria-label="Set category" title="Category">#</button>
-          <button class="icon-button edit" type="button" aria-label="Edit task" title="Edit">✎</button>
-          <button class="icon-button delete" type="button" aria-label="Delete task" title="Delete">×</button>
-        </div>
-      </li>
-    </template>
+        </section>
 
-    <template id="brainTemplate">
-      <li class="quest-item brain-item">
-        <button class="check brain-check" type="button" aria-label="Mark as processed"><svg class="check-mark" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5 L6.7 11.7 L12.5 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <div class="quest-copy">
-          <div class="quest-meta">
-            <span class="brain-tags"></span>
+        <section class="view week-view" id="weekView" hidden>
+          <div class="spread">
+            <article class="page page-left">
+              <header class="page-head">
+                <span class="washi" id="washi" aria-hidden="true"></span>
+                <div class="month-mark">
+                  <span class="month-num" id="monthNum"></span>
+                  <div class="month-text">
+                    <strong id="monthName"></strong>
+                  </div>
+                </div>
+                <span class="year-mark" id="yearMark"></span>
+              </header>
+              <div class="days" id="weekGrid"></div>
+              <footer class="proverb">
+                <span class="proverb-tr" id="proverb"></span>
+              </footer>
+            </article>
+
+            <article class="page page-right">
+              <header class="page-head">
+                <div class="week-mark">
+                  <strong id="weekLabel"></strong>
+                </div>
+                <span class="range-mark" id="weekRange"></span>
+              </header>
+              <section class="goals">
+                <h2 class="section-title"><span data-i18n="weeklyGoals">Weekly goals</span></h2>
+                <ul class="goal-list" id="goalsList"></ul>
+                <form class="goal-add" id="goalForm">
+                  <input id="goalInput" maxlength="140" autocomplete="off" data-i18n-placeholder="goalPlaceholder" data-i18n-aria="weeklyGoals" />
+                </form>
+              </section>
+              <section class="notes">
+                <h2 class="section-title"><span data-i18n="weekNotes">Notes</span></h2>
+                <textarea id="weekNotes" data-i18n-placeholder="notesFreePlaceholder" data-i18n-aria="weekNotes"></textarea>
+              </section>
+            </article>
+
+            <nav class="month-tabs" id="monthTabs" data-i18n-aria="months" aria-label="Months"></nav>
           </div>
-          <p class="quest-title"></p>
-          <input class="edit-input" maxlength="160" aria-label="Edit note" />
-        </div>
-        <div class="quest-actions">
-          <button class="icon-button convert-note" type="button" aria-label="Convert to task" title="Convert to task">↗</button>
-          <button class="icon-button copy-note" type="button" aria-label="Copy note" title="Copy">⧉</button>
-          <button class="icon-button edit-note" type="button" aria-label="Edit note" title="Edit">✎</button>
-          <button class="icon-button delete-note" type="button" aria-label="Delete note" title="Delete">×</button>
-        </div>
-      </li>
-    </template>
+        </section>
 
-    <script src="storage.js" defer></script>
-    <script src="i18n.js" defer></script>
-    <script src="core.js" defer></script>
-    <script src="app.js" defer></script>
+        <section class="view placeholder-view" id="placeholderView" hidden>
+          <div class="placeholder-card">
+            <div class="placeholder-icon" id="placeholderIcon"></div>
+            <h2 data-i18n="comingTitle">Coming in the next step</h2>
+            <p id="placeholderText"></p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="sheet" id="itemDialog" aria-labelledby="itemTitle">
+      <form class="sheet-body" id="itemForm" method="dialog">
+        <header class="sheet-head">
+          <button type="button" class="check big" id="itemDone">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>
+          </button>
+          <input class="title-input" id="itemTitle" maxlength="200" autocomplete="off" data-i18n-aria="fieldTitle" />
+        </header>
+
+        <div class="field">
+          <span class="field-label" data-i18n="fieldDate">Date</span>
+          <div class="date-control">
+            <button type="button" class="icon-btn small" data-date-step="-1" data-i18n-aria="previous" aria-label="Previous">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+            </button>
+            <span class="date-label" id="itemDateLabel"></span>
+            <button type="button" class="icon-btn small" data-date-step="1" data-i18n-aria="next" aria-label="Next">
+              <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+            </button>
+          </div>
+          <div class="chip-row" id="dateChips">
+            <button type="button" class="chip" data-date-quick="today" data-i18n="goToday">Today</button>
+            <button type="button" class="chip" data-date-quick="tomorrow" data-i18n="tomorrowOption">Tomorrow</button>
+            <button type="button" class="chip" data-date-quick="nextweek" data-i18n="nextWeekOption">Next week</button>
+            <button type="button" class="chip" data-date-quick="none" data-i18n="noDateOption">Unscheduled</button>
+          </div>
+        </div>
+
+        <div class="field-grid">
+          <label class="field">
+            <span class="field-label" data-i18n="fieldTime">Time</span>
+            <select id="itemStart"></select>
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="fieldDuration">Duration</span>
+            <select id="itemDuration"></select>
+          </label>
+        </div>
+
+        <div class="field">
+          <span class="field-label" data-i18n="fieldCategory">Category</span>
+          <div class="chip-row" id="categoryChips"></div>
+          <div class="new-category">
+            <input id="newCategoryInput" maxlength="24" autocomplete="off" data-i18n-placeholder="newCategoryName" />
+            <button type="button" class="chip" id="newCategoryAdd" data-i18n="addCategory">Add</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <div class="seg focus-seg" id="itemFocus" role="group" data-i18n-aria="focusLabel">
+            <button type="button" data-focus="must" data-i18n="focusMustShort">MUST DO</button>
+            <button type="button" data-focus="could" data-i18n="focusCouldShort">COULD DO</button>
+            <button type="button" data-focus="later" data-i18n="focusLaterShort">NOT TODAY</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <button type="button" class="toggle" id="itemUrgent" aria-pressed="false">
+            <span class="flag" aria-hidden="true">!</span><span data-i18n="urgentToggle">Urgent</span>
+          </button>
+        </div>
+
+        <label class="field">
+          <span class="field-label" data-i18n="fieldNotes">Notes</span>
+          <textarea id="itemNotes" rows="3" data-i18n-placeholder="notesPlaceholder"></textarea>
+        </label>
+
+        <footer class="sheet-foot">
+          <button type="button" class="btn ghost danger" id="itemDelete" data-i18n="deleteItem">Delete</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="itemCancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="save">Save</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet settings-sheet" id="settingsDialog" aria-labelledby="settingsTitle">
+      <div class="sheet-body">
+        <header class="sheet-head">
+          <h2 id="settingsTitle" data-i18n="settings">Settings</h2>
+          <button type="button" class="icon-btn small" id="settingsClose" data-i18n-aria="close" aria-label="Close">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </header>
+
+        <nav class="set-tabs" role="tablist" data-i18n-aria="settings">
+          <button type="button" role="tab" data-tab="look" data-i18n="appearance">Appearance</button>
+          <button type="button" role="tab" data-tab="planner" data-i18n="tabPlanner">Planner</button>
+          <button type="button" role="tab" data-tab="water" data-i18n="water">Water</button>
+          <button type="button" role="tab" data-tab="general" data-i18n="tabGeneral">General</button>
+        </nav>
+
+        <section class="set-group" data-tab="look">
+          <div class="set-row">
+            <span data-i18n="theme">Theme</span>
+            <div class="seg" data-setting="theme">
+              <button type="button" data-value="light" data-i18n="light">LIGHT</button>
+              <button type="button" data-value="dark" data-i18n="dark">DARK</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="coverColor">Cover color</span>
+            <div class="seg swatches" data-setting="cover">
+              <button type="button" data-value="green" data-i18n-aria="coverGreen" data-i18n-title="coverGreen"></button>
+              <button type="button" data-value="navy" data-i18n-aria="coverNavy" data-i18n-title="coverNavy"></button>
+              <button type="button" data-value="wine" data-i18n-aria="coverWine" data-i18n-title="coverWine"></button>
+              <button type="button" data-value="black" data-i18n-aria="coverBlack" data-i18n-title="coverBlack"></button>
+              <button type="button" data-value="pink" data-i18n-aria="coverPink" data-i18n-title="coverPink"></button>
+              <button type="button" data-value="mustard" data-i18n-aria="coverMustard" data-i18n-title="coverMustard"></button>
+              <button type="button" data-value="lavender" data-i18n-aria="coverLavender" data-i18n-title="coverLavender"></button>
+              <button type="button" data-value="teal" data-i18n-aria="coverTeal" data-i18n-title="coverTeal"></button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="language">Language</span>
+            <div class="seg" data-setting="language">
+              <button type="button" data-value="en">EN</button>
+              <button type="button" data-value="pt">PT</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="set-group" data-tab="planner">
+          <div class="set-row">
+            <span data-i18n="weekStartsOn">Week starts on</span>
+            <div class="seg" data-setting="weekStart">
+              <button type="button" data-value="1" data-i18n="monday">MONDAY</button>
+              <button type="button" data-value="0" data-i18n="sunday">SUNDAY</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="holidays">Holidays</span>
+            <div class="seg" data-setting="holidays">
+              <button type="button" data-value="br" data-i18n="holidaysBrazil">BRAZIL</button>
+              <button type="button" data-value="off" data-i18n="holidaysOff">OFF</button>
+            </div>
+          </div>
+          <div class="set-row stacked">
+            <span data-i18n="quotes">Page quote</span>
+            <div class="seg" data-setting="quotes">
+              <button type="button" data-value="proverbs" data-i18n="quotesProverbs">PROVERBS</button>
+              <button type="button" data-value="motivational" data-i18n="quotesMotivational">MOTIVATIONAL</button>
+              <button type="button" data-value="ironic" data-i18n="quotesIronic">IRONIC</button>
+              <button type="button" data-value="off" data-i18n="quotesOff">NONE</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="set-group" data-tab="water">
+          <div class="set-row">
+            <span data-i18n="waterUnit">Count water in</span>
+            <div class="seg" data-setting="waterUnit">
+              <button type="button" data-value="glasses" data-i18n="waterUnitGlasses">GLASSES</button>
+              <button type="button" data-value="liters" data-i18n="waterUnitLiters">LITERS</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="glassSize">Glass or bottle</span>
+            <div class="container-picks">
+              <div class="seg" data-setting="glassMl">
+                <button type="button" data-value="200">200 ML</button>
+                <button type="button" data-value="250">250 ML</button>
+                <button type="button" data-value="300">300 ML</button>
+              </div>
+              <div class="seg" data-setting="glassMl">
+                <button type="button" data-value="500">500 ML</button>
+                <button type="button" data-value="750">750 ML</button>
+                <button type="button" data-value="1000">1 L</button>
+                <button type="button" data-value="1200">1,2 L</button>
+              </div>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="waterGoal">Daily goal</span>
+            <div class="stepper" data-stepper="waterGoal">
+              <button type="button" data-step="-250" aria-label="−250 ml">−</button>
+              <output id="waterGoalValue"></output>
+              <button type="button" data-step="250" aria-label="+250 ml">+</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="set-group" data-tab="general" id="windowGroup" hidden>
+          <h3 data-i18n="window">Window</h3>
+          <div class="set-row">
+            <span data-i18n="alwaysOnTop">Always on top</span>
+            <div class="seg" data-setting="alwaysOnTop">
+              <button type="button" data-value="on" data-i18n="on">ON</button>
+              <button type="button" data-value="off" data-i18n="off">OFF</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="set-group" data-tab="general">
+          <h3 data-i18n="data">Data</h3>
+          <div class="set-row">
+            <span></span>
+            <div class="btn-row">
+              <button type="button" class="btn" id="exportData" data-i18n="backup">⤓ BACKUP</button>
+              <button type="button" class="btn" id="importData" data-i18n="restore">⤒ RESTORE</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span id="trashSummary"></span>
+            <div class="btn-row">
+              <button type="button" class="btn" id="trashRestore" data-i18n="restoreLast">RESTORE LAST</button>
+              <button type="button" class="btn danger" id="trashEmpty" data-i18n="emptyTrash">EMPTY</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </dialog>
+
+    <input type="file" id="importFile" accept="application/json,.json" hidden />
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden>
+      <span id="toastText"></span>
+      <button type="button" class="toast-action" id="toastAction"></button>
+    </div>
+
+    <script src="storage.js"></script>
+    <script src="i18n.js"></script>
+    <script src="core.js"></script>
+    <script src="planner.js"></script>
+    <script src="app.js"></script>
   </body>
 </html>
