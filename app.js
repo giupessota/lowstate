@@ -1215,8 +1215,10 @@
       return [
         h("div", { class: "hg-name", style: `--habit: ${habit.color}` },
           h("button", { type: "button", class: "hg-edit", "data-habit-edit": habit.id, title: t("habitEdit"), "aria-label": t("habitEdit") }, habitMark(habit)),
-          h("input", { value: habit.name, maxlength: "60", "data-habit-name": habit.id, "aria-label": t("habitRename"), title: habit.name }),
-          h("button", { type: "button", class: "hg-remove", "data-habit-remove": habit.id, title: t("habitRemove"), "aria-label": t("habitRemove"), text: "×" })),
+          h("button", { type: "button", class: "hg-label", "data-habit-edit": habit.id, title: t("habitEdit") },
+            h("span", { class: "hg-title", text: habit.name }),
+            h("span", { class: "hg-meta", text: habitScheduleText(habit) })),
+),
         ...isos.map((iso) => {
           const done = Planner.habitDone(state.habitLog, iso, habit.id);
           const future = iso > today;
@@ -1434,9 +1436,23 @@
     if (!clean || state.habits.some((habit) => habit.name.toLowerCase() === clean.toLowerCase())) return;
     const used = new Set(state.habits.map((habit) => habit.color));
     const color = Planner.PALETTE.find((candidate) => !used.has(candidate)) || Planner.PALETTE[state.habits.length % Planner.PALETTE.length];
-    state.habits = Planner.normalizeHabits([...state.habits, { id: Planner.newId(), name: clean, color, icon, days }]);
+    const id = Planner.newId();
+    state.habits = Planner.normalizeHabits([...state.habits, { id, name: clean, color, icon, days }]);
     persistHabits();
     render();
+    // Straight into the editor, so days and a time are set while it's fresh.
+    openHabitEditor(id);
+  }
+
+  // "07:00 · mon wed fri", "Every day", …
+  function habitScheduleText(habit) {
+    const sunday = new Date(2026, 0, 4);
+    const days = habit.days.length
+      ? weekdayOrder().filter((day) => habit.days.includes(day))
+        .map((day) => formatDate(Planner.addDays(sunday, day), { weekday: "short" }).replace(".", "").toLowerCase())
+        .join(" ")
+      : t("habitEveryDay");
+    return habit.start ? `${habit.start} · ${days}` : days;
   }
 
   function renderSidebar() {
@@ -2019,17 +2035,6 @@
       render();
       return;
     }
-    const remove = event.target.closest("[data-habit-remove]");
-    if (remove) {
-      const habit = state.habits.find((candidate) => candidate.id === remove.dataset.habitRemove);
-      if (habit && window.confirm(t("habitRemoveConfirm", { name: habit.name }))) {
-        state.habits = state.habits.filter((candidate) => candidate.id !== habit.id);
-        state.habitLog = Planner.forgetHabit(state.habitLog, habit.id);
-        persistHabits();
-        render();
-      }
-      return;
-    }
     const idea = event.target.closest("[data-habit-idea]");
     if (idea) {
       const preset = habitIdeas().find((candidate) => candidate.name === idea.dataset.habitIdea);
@@ -2093,19 +2098,6 @@
     addHabit(els.habitInput.value);
     els.habitInput.value = "";
     els.habitInput.focus();
-  });
-
-  // Renaming happens in place; an emptied name goes back to the old one.
-  els.habitGrid.addEventListener("change", (event) => {
-    const input = event.target.closest("[data-habit-name]");
-    if (!input) return;
-    const name = input.value.trim().slice(0, 60);
-    state.habits = state.habits.map((habit) => (habit.id === input.dataset.habitName && name ? { ...habit, name } : habit));
-    persistHabits();
-    render();
-  });
-  els.habitGrid.addEventListener("keydown", (event) => {
-    if (event.target.matches?.("[data-habit-name]") && event.key === "Enter") event.target.blur();
   });
 
   let moodReasonTimer = null;
