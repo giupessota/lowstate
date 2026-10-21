@@ -73,6 +73,9 @@
     return text ? text.charAt(0).toUpperCase() + text.slice(1).toLowerCase() : "";
   }
 
+  // How a dated item is weighed on its day: must do, could do, not today.
+  const FOCUS = ["must", "could", "later"];
+
   function normalizeItem(raw, now = Date.now()) {
     const item = raw && typeof raw === "object" ? raw : {};
     const date = parseISODate(item.date) ? item.date : null;
@@ -90,6 +93,7 @@
       done,
       doneAt: done && Number.isFinite(item.doneAt) ? item.doneAt : null,
       priority: item.priority === "urgent" ? "urgent" : "normal",
+      focus: FOCUS.includes(item.focus) ? item.focus : item.priority === "urgent" ? "must" : "could",
       category: typeof item.category === "string" && item.category ? item.category : null,
       notes: String(item.notes ?? ""),
       createdAt: Number.isFinite(item.createdAt) ? item.createdAt : now,
@@ -153,11 +157,13 @@
 
   // Moves an item into a day (or back to the unscheduled list when date is
   // null), placing it before `beforeId` and reindexing that bucket's order.
-  function moveItem(items, id, { date = null, beforeId = null } = {}) {
+  // `focus` optionally moves it into a must/could/later group as well.
+  function moveItem(items, id, { date = null, beforeId = null, focus = null } = {}) {
     const moving = items.find((item) => item.id === id);
     if (!moving) return items;
     const target = parseISODate(date) ? date : null;
     const moved = { ...moving, date: target };
+    if (FOCUS.includes(focus)) moved.focus = focus;
     if (!target) Object.assign(moved, { start: null, duration: null, done: false, doneAt: null });
 
     const bucket = bucketOf(items.filter((item) => item.id !== id), target);
@@ -467,7 +473,15 @@
   const BOTTLE_SIZES = [500, 750, 1000, 1200];
   const CONTAINER_SIZES = [...GLASS_SIZES, ...BOTTLE_SIZES];
   const isBottle = (ml) => ml >= 500;
-  const WATER_GOALS = [1500, 2000, 2500, 3000];
+  const WATER_GOAL = { min: 500, max: 5000, step: 250, fallback: 2000 };
+
+  // Snaps a daily goal (ml) to 250 ml steps between 0.5 and 5 L.
+  function clampWaterGoal(ml) {
+    const value = Number(ml);
+    if (!Number.isFinite(value)) return WATER_GOAL.fallback;
+    const snapped = Math.round(value / WATER_GOAL.step) * WATER_GOAL.step;
+    return Math.max(WATER_GOAL.min, Math.min(WATER_GOAL.max, snapped));
+  }
   const MAX_GLASSES = 30;
 
   // How many glasses reach the daily goal (both in ml).
@@ -567,6 +581,7 @@
 
   return {
     PALETTE,
+    FOCUS,
     QUOTES,
     QUOTE_STYLES,
     MOODS,
@@ -575,7 +590,8 @@
     BOTTLE_SIZES,
     CONTAINER_SIZES,
     isBottle,
-    WATER_GOALS,
+    WATER_GOAL,
+    clampWaterGoal,
     waterTarget,
     setWater,
     formatLiters,

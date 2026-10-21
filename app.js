@@ -16,6 +16,7 @@
     dayNotes: "type-todo.planner.daynotes.v1",
     moods: "type-todo.planner.moods.v1",
     water: "type-todo.planner.water.v1",
+    moodNotes: "type-todo.planner.moodnotes.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
@@ -66,9 +67,10 @@
     dayCaptureForm: $("dayCaptureForm"),
     dayCaptureInput: $("dayCaptureInput"),
     dayTasks: $("dayTasks"),
-    dayEmpty: $("dayEmpty"),
     dayNotes: $("dayNotes"),
     moodPicker: $("moodPicker"),
+    moodReason: $("moodReason"),
+    waterGoalValue: $("waterGoalValue"),
     waterRow: $("waterRow"),
     waterSum: $("waterSum"),
     monthView: $("monthView"),
@@ -115,6 +117,7 @@
     newCategoryInput: $("newCategoryInput"),
     newCategoryAdd: $("newCategoryAdd"),
     itemUrgent: $("itemUrgent"),
+    itemFocus: $("itemFocus"),
     itemNotes: $("itemNotes"),
     itemDelete: $("itemDelete"),
     itemCancel: $("itemCancel"),
@@ -254,13 +257,14 @@
       quotes: Planner.QUOTE_STYLES.includes(savedSettings.quotes) ? savedSettings.quotes : "proverbs",
       waterUnit: savedSettings.waterUnit === "liters" ? "liters" : "glasses",
       glassMl: Planner.CONTAINER_SIZES.includes(savedSettings.glassMl) ? savedSettings.glassMl : 250,
-      waterGoal: Planner.WATER_GOALS.includes(savedSettings.waterGoal) ? savedSettings.waterGoal : 2000,
+      waterGoal: Planner.clampWaterGoal(savedSettings.waterGoal ?? Planner.WATER_GOAL.fallback),
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
     dayNotes: Store.loadObject(KEYS.dayNotes),
     moods: Store.loadObject(KEYS.moods),
     water: Store.loadObject(KEYS.water),
+    moodNotes: Store.loadObject(KEYS.moodNotes),
     editingId: null,
     draft: null,
     dragId: null,
@@ -274,6 +278,7 @@
   const persistDayNotes = () => Store.save(KEYS.dayNotes, state.dayNotes);
   const persistMoods = () => Store.save(KEYS.moods, state.moods);
   const persistWater = () => Store.save(KEYS.water, state.water);
+  const persistMoodNotes = () => Store.save(KEYS.moodNotes, state.moodNotes);
 
   if (initial.changed) {
     persistItems();
@@ -395,6 +400,7 @@
     if (variant === "overdue") classes.push("overdue");
     if (item.done) classes.push("is-done");
     if (item.priority === "urgent") classes.push("is-urgent");
+    if (item.focus === "later" && item.date) classes.push("is-later");
 
     const stamp = category ? h("span", { class: "stamp", text: category.name }) : null;
     // Urgent items get a little "!" seal.
@@ -462,10 +468,10 @@
     rough: { eyes: "dots", mouth: "M8 16.5c1.5-2.4 6.5-2.4 8 0" },
   };
 
-  function moodEl(mood, className = "mood-face") {
+  function moodEl(mood, className = "mood-face", reason = "") {
     const face = MOOD_FACES[mood];
     if (!face) return null;
-    const label = t(`mood-${mood}`);
+    const label = reason ? `${t(`mood-${mood}`)} — ${reason}` : t(`mood-${mood}`);
     const svg = svgEl("svg", { class: `${className} mood-${mood}`, viewBox: "0 0 24 24", role: "img", "aria-label": label });
     const title = svgEl("title", {});
     title.textContent = label;
@@ -482,6 +488,8 @@
 
   function renderMoodPicker(iso) {
     const current = state.moods[iso];
+    els.moodReason.hidden = !current;
+    if (document.activeElement !== els.moodReason) els.moodReason.value = state.moodNotes[iso] || "";
     els.moodPicker.replaceChildren(...Planner.MOODS.map((mood) => h("button", {
       type: "button",
       class: "mood-btn",
@@ -598,7 +606,7 @@
         h("div", { class: "day-stamp", "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
           h("span", { class: "date-num", text: String(day.getDate()).padStart(2, "0") }),
           h("span", { class: "dow", text: formatDate(day, { weekday: "short" }) }),
-          h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini"))),
+          h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso]))),
         h("div", { class: "day-body" },
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
           h("ul", { class: "day-items", "data-date": iso },
@@ -695,7 +703,7 @@
           h("span", { class: "block-title", text: item.title }))));
     });
 
-    if (iso === todayISO()) inner.append(h("div", { class: "now-line", id: "nowLine" }));
+    if (iso === todayISO()) inner.append(h("div", { class: "now-line", id: "nowLine", title: t("now") }, h("span", { class: "now-time" })));
     els.timeline.replaceChildren(inner);
     positionNowLine();
 
@@ -717,6 +725,7 @@
     const now = new Date();
     const first = Number(inner.dataset.firstHour);
     line.style.top = `${((now.getHours() * 60 + now.getMinutes() - first * 60) / 60) * timelineHourHeight()}px`;
+    line.firstChild.textContent = Planner.minutesToTime(now.getHours() * 60 + now.getMinutes());
   }
 
   function minutesAtTimelineY(clientY) {
@@ -748,16 +757,33 @@
     renderTimeline(iso);
 
     const items = Planner.itemsForDay(state.items, iso);
-    els.dayTasks.dataset.date = iso;
-    els.dayTasks.replaceChildren(...items.map((item) => itemEl(item, "line")));
-    els.dayEmpty.hidden = items.length > 0;
-    const done = items.filter((item) => item.done).length;
-    els.dayProgress.textContent = items.length ? t("weekProgress", { done, total: items.length }) : "";
+    renderDayTasks(iso, items);
+    // "Not today" items don't count against the day.
+    const counted = items.filter((item) => item.focus !== "later");
+    const done = counted.filter((item) => item.done).length;
+    els.dayProgress.textContent = counted.length ? t("weekProgress", { done, total: counted.length }) : "";
 
     renderWater(iso);
     renderMoodPicker(iso);
     renderDayNotes();
     renderMonthTabs(day);
+  }
+
+  const FOCUS_LABELS = { must: "focusMust", could: "focusCould", later: "focusLater" };
+
+  function renderDayTasks(iso, items) {
+    els.dayTasks.dataset.date = iso;
+    els.dayTasks.replaceChildren(...Planner.FOCUS.map((focus) => {
+      const group = items.filter((item) => item.focus === focus);
+      const movable = focus === "later" && group.some((item) => !item.done);
+      return h("section", { class: `focus-group focus-${focus}`, "data-focus": focus },
+        h("h3", { class: "focus-head" },
+          h("span", { text: t(FOCUS_LABELS[focus]) }),
+          group.length ? h("span", { class: "focus-count", text: String(group.length) }) : null,
+          movable ? h("button", { type: "button", class: "focus-action", "data-later-tomorrow": iso, text: t("allToTomorrow") }) : null),
+        h("ul", { class: "day-items", "data-date": iso, "data-focus": focus }, group.map((item) => itemEl(item, "line"))),
+        group.length ? null : h("p", { class: "focus-hint", text: t(`${FOCUS_LABELS[focus]}Hint`) }));
+    }));
   }
 
   let dayNotesKey = null;
@@ -821,7 +847,7 @@
         h("div", { class: "cell-head" },
           h("span", { class: "cell-num", text: day.getDate() }),
           holiday ? h("span", { class: "cell-holiday", text: holiday }) : null,
-          moodEl(state.moods[iso], "mood-mini")),
+          moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso])),
         h("ul", { class: "month-items", "data-date": iso }, items.slice(0, limit).map((item) => itemEl(item, "mini"))),
         items.length > limit ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length - limit }) }) : null);
     }));
@@ -890,7 +916,7 @@
         "aria-label": label,
         "aria-current": month === active ? "true" : null,
         style: `--tab: var(${TAB_COLORS[month % TAB_COLORS.length]})`,
-      }, String(month + 1));
+      }, formatDate(new Date(year, month, 1), { month: "short" }).replace(".", "").slice(0, 3));
     }));
   }
 
@@ -1003,6 +1029,11 @@
     }, h("i"), category.name)));
 
     els.itemUrgent.setAttribute("aria-pressed", String(draft.priority === "urgent"));
+    els.itemFocus.querySelectorAll("[data-focus]").forEach((button) => {
+      const active = button.dataset.focus === draft.focus;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
   }
 
   function openEditor(id) {
@@ -1067,6 +1098,12 @@
   els.itemDone.addEventListener("click", () => {
     state.draft.done = !state.draft.done;
     if (state.draft.done && !state.draft.date) state.draft.date = todayISO();
+    renderEditor();
+  });
+  els.itemFocus.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-focus]");
+    if (!button) return;
+    state.draft.focus = button.dataset.focus;
     renderEditor();
   });
   els.itemUrgent.addEventListener("click", () => {
@@ -1140,7 +1177,6 @@
       quotes: state.settings.quotes,
       waterUnit: state.settings.waterUnit,
       glassMl: String(state.settings.glassMl),
-      waterGoal: String(state.settings.waterGoal),
       alwaysOnTop: alwaysOnTop() ? "on" : "off",
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
@@ -1150,9 +1186,9 @@
         button.setAttribute("aria-pressed", String(active));
       });
     });
-    els.settingsDialog.querySelectorAll('[data-setting="waterGoal"] button').forEach((button) => {
-      button.textContent = Planner.formatLiters(Number(button.dataset.value), I18n.language);
-    });
+    els.waterGoalValue.textContent = Planner.formatLiters(state.settings.waterGoal, I18n.language);
+    els.settingsDialog.querySelector('[data-step="-250"]').disabled = state.settings.waterGoal <= Planner.WATER_GOAL.min;
+    els.settingsDialog.querySelector('[data-step="250"]').disabled = state.settings.waterGoal >= Planner.WATER_GOAL.max;
     const unitButton = els.settingsDialog.querySelector('[data-setting="waterUnit"] [data-value="glasses"]');
     unitButton.textContent = t(Planner.isBottle(state.settings.glassMl) ? "waterUnitBottles" : "waterUnitGlasses");
     els.windowGroup.hidden = !desktop;
@@ -1186,10 +1222,9 @@
       state.settings.quotes = Planner.QUOTE_STYLES.includes(value) ? value : "proverbs";
       persistSettings();
       render();
-    } else if (setting === "waterUnit" || setting === "glassMl" || setting === "waterGoal") {
+    } else if (setting === "waterUnit" || setting === "glassMl") {
       if (setting === "waterUnit") state.settings.waterUnit = value === "liters" ? "liters" : "glasses";
       if (setting === "glassMl" && Planner.CONTAINER_SIZES.includes(Number(value))) state.settings.glassMl = Number(value);
-      if (setting === "waterGoal" && Planner.WATER_GOALS.includes(Number(value))) state.settings.waterGoal = Number(value);
       persistSettings();
       render();
     } else if (setting === "alwaysOnTop") {
@@ -1219,6 +1254,14 @@
     const tab = event.target.closest(".set-tabs [data-tab]");
     if (tab) {
       showSettingsTab(tab.dataset.tab);
+      return;
+    }
+    const step = event.target.closest(".stepper [data-step]");
+    if (step) {
+      state.settings.waterGoal = Planner.clampWaterGoal(state.settings.waterGoal + Number(step.dataset.step));
+      persistSettings();
+      render();
+      renderSettings();
       return;
     }
     if (event.target === els.settingsDialog) {
@@ -1342,11 +1385,48 @@
     renderWater(iso);
   });
 
+  let moodReasonTimer = null;
+  function saveMoodReason() {
+    clearTimeout(moodReasonTimer);
+    const iso = anchorISO();
+    const text = els.moodReason.value.trim();
+    const { [iso]: _previous, ...rest } = state.moodNotes;
+    state.moodNotes = text ? { ...rest, [iso]: text } : rest;
+    persistMoodNotes();
+  }
+  els.moodReason.addEventListener("input", () => {
+    clearTimeout(moodReasonTimer);
+    moodReasonTimer = setTimeout(saveMoodReason, 500);
+  });
+  els.moodReason.addEventListener("blur", saveMoodReason);
+  els.moodReason.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") els.moodReason.blur();
+  });
+
+  els.dayTasks.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-later-tomorrow]");
+    if (!button) return;
+    const iso = button.dataset.laterTomorrow;
+    const tomorrow = Core.toISODate(Planner.addDays(Core.parseISODate(iso), 1));
+    // Moved items start fresh on their new day as "could do".
+    const ids = Planner.itemsForDay(state.items, iso).filter((item) => item.focus === "later" && !item.done).map((item) => item.id);
+    ids.forEach((id) => {
+      state.items = Planner.moveItem(state.items, id, { date: tomorrow, focus: "could" });
+    });
+    commit();
+  });
+
   els.moodPicker.addEventListener("click", (event) => {
     const button = event.target.closest(".mood-btn");
     if (!button) return;
     state.moods = Planner.setMood(state.moods, anchorISO(), button.dataset.mood);
     persistMoods();
+    // Clearing the mood clears its reason too.
+    if (!state.moods[anchorISO()] && state.moodNotes[anchorISO()]) {
+      const { [anchorISO()]: _previous, ...rest } = state.moodNotes;
+      state.moodNotes = rest;
+      persistMoodNotes();
+    }
     renderMoodPicker(anchorISO());
   });
 
@@ -1443,7 +1523,10 @@
     if (target.closest?.("#timeline")) return { type: "time", container: els.timeline, date: anchorISO() };
     const row = target.closest?.(".day-row, .month-cell");
     if (row) return { container: row, list: row.querySelector(".day-items, .month-items"), date: row.dataset.date };
-    if (target.closest?.("#dayView .page-right")) return { container: els.dayTasks, list: els.dayTasks, date: anchorISO() };
+    if (target.closest?.("#dayView .page-right")) {
+      const group = target.closest(".focus-group") || els.dayTasks.querySelector('.focus-group[data-focus="could"]');
+      return { container: group, list: group.querySelector(".day-items"), date: anchorISO(), focus: group.dataset.focus };
+    }
     if (target.closest?.("#inboxSection")) return { container: els.inboxSection, list: els.inboxList, date: null };
     return null;
   }
@@ -1517,7 +1600,7 @@
       return;
     }
     const before = cardBefore(zone.list, event.clientY);
-    state.items = Planner.moveItem(state.items, state.dragId, { date: zone.date, beforeId: before?.dataset.id || null });
+    state.items = Planner.moveItem(state.items, state.dragId, { date: zone.date, beforeId: before?.dataset.id || null, focus: zone.focus || null });
     state.dragId = null;
     commit();
   });

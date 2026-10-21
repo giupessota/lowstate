@@ -134,8 +134,7 @@
                 <span class="day-capture-mark" aria-hidden="true">✎</span>
                 <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" />
               </form>
-              <ul class="day-items day-tasks" id="dayTasks"></ul>
-              <p class="day-empty" id="dayEmpty" data-i18n="dayEmptyList"></p>
+              <div class="day-tasks focus-groups" id="dayTasks"></div>
               <section class="water">
                 <h2 class="section-title"><span data-i18n="water">Water</span><span class="water-sum" id="waterSum"></span></h2>
                 <div class="water-row" id="waterRow" role="group" data-i18n-aria="water"></div>
@@ -143,6 +142,7 @@
               <section class="mood">
                 <h2 class="section-title"><span data-i18n="dayMood">Mood of the day</span></h2>
                 <div class="mood-picker" id="moodPicker" role="group" data-i18n-aria="dayMood"></div>
+                <input class="mood-reason" id="moodReason" maxlength="140" autocomplete="off" data-i18n-placeholder="moodReasonPlaceholder" data-i18n-aria="moodReason" hidden />
               </section>
               <section class="notes">
                 <h2 class="section-title"><span data-i18n="dayNotes">Notes</span></h2>
@@ -276,6 +276,14 @@
         </div>
 
         <div class="field">
+          <div class="seg focus-seg" id="itemFocus" role="group" data-i18n-aria="focusLabel">
+            <button type="button" data-focus="must" data-i18n="focusMustShort">MUST DO</button>
+            <button type="button" data-focus="could" data-i18n="focusCouldShort">COULD DO</button>
+            <button type="button" data-focus="later" data-i18n="focusLaterShort">NOT TODAY</button>
+          </div>
+        </div>
+
+        <div class="field">
           <button type="button" class="toggle" id="itemUrgent" aria-pressed="false">
             <span class="flag" aria-hidden="true">!</span><span data-i18n="urgentToggle">Urgent</span>
           </button>
@@ -393,11 +401,10 @@
           </div>
           <div class="set-row">
             <span data-i18n="waterGoal">Daily goal</span>
-            <div class="seg" data-setting="waterGoal">
-              <button type="button" data-value="1500"></button>
-              <button type="button" data-value="2000"></button>
-              <button type="button" data-value="2500"></button>
-              <button type="button" data-value="3000"></button>
+            <div class="stepper" data-stepper="waterGoal">
+              <button type="button" data-step="-250" aria-label="−250 ml">−</button>
+              <output id="waterGoalValue"></output>
+              <button type="button" data-step="250" aria-label="+250 ml">+</button>
             </div>
           </div>
         </section>

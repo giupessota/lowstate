@@ -168,6 +168,24 @@ test("Easter and the Brazilian holidays derived from it", () => {
   assert.equal(P.brazilHolidays(2023).has("2023-11-20"), false);
 });
 
+test("focus groups: urgent items start as must, moves can change group", () => {
+  assert.equal(P.normalizeItem({ title: "a" }).focus, "could");
+  assert.equal(P.normalizeItem({ title: "b", priority: "urgent" }).focus, "must");
+  assert.equal(P.normalizeItem({ title: "c", focus: "later" }).focus, "later");
+  assert.equal(P.normalizeItem({ title: "d", focus: "nope" }).focus, "could");
+  const items = [P.normalizeItem({ id: "x", title: "x", date: "2026-10-21" })];
+  assert.equal(P.moveItem(items, "x", { date: "2026-10-21", focus: "must" })[0].focus, "must");
+  assert.equal(P.moveItem(items, "x", { date: "2026-10-22" })[0].focus, "could");
+});
+
+test("water goal snaps to 250 ml steps between 0.5 and 5 L", () => {
+  assert.equal(P.clampWaterGoal(2000), 2000);
+  assert.equal(P.clampWaterGoal(1830), 1750);
+  assert.equal(P.clampWaterGoal(100), 500);
+  assert.equal(P.clampWaterGoal(9000), 5000);
+  assert.equal(P.clampWaterGoal("x"), 2000);
+});
+
 test("water: target glasses, per-day counts and liters", () => {
   assert.equal(P.waterTarget(2000, 250), 8);
   assert.equal(P.waterTarget(2000, 300), 7);
