@@ -189,7 +189,7 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
 
 test("habits: toggling, streaks that survive an unchecked today, monthly progress", () => {
   assert.deepEqual(P.normalizeHabits([{ id: "a", name: " Ler " }, { id: "a", name: "dup" }, { id: "b", name: "" }, null]), [
-    { id: "a", name: "Ler", color: P.PALETTE[0] },
+    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [] },
   ]);
   let log = {};
   ["2026-10-18", "2026-10-19", "2026-10-20"].forEach((iso) => { log = P.toggleHabit(log, iso, "read"); });
@@ -200,10 +200,27 @@ test("habits: toggling, streaks that survive an unchecked today, monthly progres
   assert.equal(P.habitStreak(log, "walk", "2026-10-22"), 0);
   log = P.toggleHabit(log, "2026-10-21", "read");
   assert.deepEqual(log["2026-10-21"], undefined);
-  assert.deepEqual(P.habitMonth(log, "read", 2026, 9, "2026-10-21"), { done: 3, elapsed: 21, total: 31 });
-  assert.deepEqual(P.habitMonth(log, "read", 2026, 8, "2026-10-21"), { done: 0, elapsed: 30, total: 30 });
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 9, "2026-10-21"), { done: 3, extra: 0, elapsed: 21, total: 31 });
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 8, "2026-10-21"), { done: 0, extra: 0, elapsed: 30, total: 30 });
   assert.deepEqual(P.forgetHabit(log, "walk")["2026-10-20"], ["read"]);
   assert.equal(P.habitDone(P.forgetHabit(log, "read"), "2026-10-18", "read"), false);
+});
+
+test("habits planned for some weekdays: icons, schedule, streaks and month counts", () => {
+  const [gym] = P.normalizeHabits([{ id: "gym", name: "Academia", icon: "dumbbell", days: [5, 1, 3, 3, 9] }]);
+  assert.deepEqual([gym.icon, gym.days], ["dumbbell", [1, 3, 5]]);
+  assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", icon: "rocket", days: [0, 1, 2, 3, 4, 5, 6] }])[0].icon, null);
+  assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", days: [0, 1, 2, 3, 4, 5, 6] }])[0].days, []);
+  // October 2026: the 19th is a Monday, the 21st a Wednesday, the 22nd a Thursday.
+  assert.equal(P.habitScheduled(gym, "2026-10-21"), true);
+  assert.equal(P.habitScheduled(gym, "2026-10-22"), false);
+  let log = {};
+  ["2026-10-16", "2026-10-19", "2026-10-21"].forEach((iso) => { log = P.toggleHabit(log, iso, "gym"); });
+  // Unplanned Thursday today, unplanned Tuesday and weekend skipped, missed Wed 14th stops it.
+  assert.equal(P.habitStreak(log, gym, "2026-10-22"), 3);
+  log = P.toggleHabit(log, "2026-10-20", "gym");
+  assert.equal(P.habitStreak(log, gym, "2026-10-22"), 4);
+  assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-22"), { done: 3, extra: 1, elapsed: 9, total: 13 });
 });
 
 test("calendar events split into all-day and timed slices of a local day", () => {

@@ -467,7 +467,18 @@
   const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
   // ---------- Habits ----------
-  // Habits are [{ id, name, color }]; the log is { iso: [habitId, …] }.
+  // Habits are [{ id, name, color, icon, days }]; the log is
+  // { iso: [habitId, …] }. `days` lists the weekdays (0 = Sunday) a habit is
+  // planned for; an empty list means every day.
+  const HABIT_ICONS = ["dumbbell", "run", "bike", "swim", "yoga", "book", "pen", "lotus", "pill", "moon", "heart", "leaf"];
+
+  function normalizeDays(days) {
+    const list = [...new Set((Array.isArray(days) ? days : []).map(Number))]
+      .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+      .sort((a, b) => a - b);
+    return list.length === 7 ? [] : list;
+  }
+
   function normalizeHabits(raw) {
     if (!Array.isArray(raw)) return [];
     const seen = new Set();
@@ -477,8 +488,19 @@
         id: habit.id,
         name: String(habit.name).trim().slice(0, 60),
         color: PALETTE.includes(habit.color) ? habit.color : PALETTE[index % PALETTE.length],
+        icon: HABIT_ICONS.includes(habit.icon) ? habit.icon : null,
+        days: normalizeDays(habit.days),
       }));
   }
+
+  function habitScheduled(habit, iso) {
+    const days = habit?.days || [];
+    if (!days.length) return true;
+    const date = parseISODate(iso);
+    return Boolean(date) && days.includes(date.getDay());
+  }
+
+  const asHabit = (habitOrId) => (typeof habitOrId === "string" ? { id: habitOrId, days: [] } : habitOrId);
 
   function habitDone(log, iso, id) {
     return Array.isArray(log?.[iso]) && log[iso].includes(id);
@@ -498,32 +520,47 @@
       .filter(([, ids]) => ids.length));
   }
 
-  // Consecutive days done, ending today — or yesterday, so an unchecked
-  // today doesn't break a streak before the day is over.
-  function habitStreak(log, id, todayISO) {
+  // Times done in a row, ending today — or yesterday, so an unchecked today
+  // doesn't break a streak before the day is over. Only a missed planned day
+  // breaks it; an extra day (done when not planned) adds to it.
+  function habitStreak(log, habitOrId, todayISO) {
+    const habit = asHabit(habitOrId);
     let day = parseISODate(todayISO);
     if (!day) return 0;
-    if (!habitDone(log, todayISO, id)) day = addDays(day, -1);
+    if (!habitDone(log, todayISO, habit.id)) day = addDays(day, -1);
     let streak = 0;
-    while (habitDone(log, toISODate(day), id)) {
-      streak += 1;
+    for (let guard = 0; guard < 3660; guard++) {
+      const iso = toISODate(day);
+      if (habitDone(log, iso, habit.id)) streak += 1;
+      else if (habitScheduled(habit, iso)) break;
       day = addDays(day, -1);
     }
     return streak;
   }
 
-  // Days done in a month out of the days that have happened so far.
-  function habitMonth(log, id, year, month, todayISO) {
-    const total = new Date(year, month + 1, 0).getDate();
+  // Planned days done in a month, out of the planned days so far; `extra`
+  // counts days done that weren't planned.
+  function habitMonth(log, habitOrId, year, month, todayISO) {
+    const habit = asHabit(habitOrId);
+    const days = new Date(year, month + 1, 0).getDate();
+    let total = 0;
     let elapsed = 0;
     let done = 0;
-    for (let date = 1; date <= total; date++) {
+    let extra = 0;
+    for (let date = 1; date <= days; date++) {
       const iso = toISODate(new Date(year, month, date));
-      if (iso > todayISO) break;
-      elapsed += 1;
-      if (habitDone(log, iso, id)) done += 1;
+      const planned = habitScheduled(habit, iso);
+      const did = habitDone(log, iso, habit.id);
+      if (planned) total += 1;
+      if (iso > todayISO) continue;
+      if (planned) {
+        elapsed += 1;
+        if (did) done += 1;
+      } else if (did) {
+        extra += 1;
+      }
     }
-    return { done, elapsed, total };
+    return { done, extra, elapsed, total };
   }
 
   // ---------- Calendar events (read-only, from subscribed calendars) ----------
@@ -755,7 +792,9 @@
     MOODS,
     setMood,
     mentalLoad,
+    HABIT_ICONS,
     normalizeHabits,
+    habitScheduled,
     habitDone,
     toggleHabit,
     forgetHabit,

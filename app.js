@@ -112,6 +112,15 @@
     sumLoad: $("sumLoad"),
     todayHabits: $("todayHabits"),
     habitPills: $("habitPills"),
+    habitDialog: $("habitDialog"),
+    habitEditForm: $("habitEditForm"),
+    habitEditName: $("habitEditName"),
+    habitIconPicker: $("habitIconPicker"),
+    habitDayPicker: $("habitDayPicker"),
+    habitDaysHint: $("habitDaysHint"),
+    habitColorPicker: $("habitColorPicker"),
+    habitEditDelete: $("habitEditDelete"),
+    habitEditCancel: $("habitEditCancel"),
     rangeTitle: $("rangeTitle"),
     rangeSub: $("rangeSub"),
     weekProgress: $("weekProgress"),
@@ -659,7 +668,8 @@
         h("div", { class: "day-stamp", "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
           h("span", { class: "date-num", text: String(day.getDate()).padStart(2, "0") }),
           h("span", { class: "dow", text: formatDate(day, { weekday: "short" }) }),
-          h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso]))),
+          h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso])),
+          dayHabitIcons(iso, "stamp-habits")),
         h("div", { class: "day-body" },
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
           weekEventsEl(iso),
@@ -994,6 +1004,7 @@
         h("div", { class: "cell-head" },
           h("span", { class: "cell-num", text: day.getDate() }),
           holiday ? h("span", { class: "cell-holiday", text: holiday }) : null,
+          dayHabitIcons(iso, "cell-habits"),
           moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso])),
         h("ul", { class: "month-items", "data-date": iso },
           meetings.slice(0, limit).map((event) => h("li", {
@@ -1080,6 +1091,54 @@
   }
 
   // ---------- habits & month summary ----------
+  // Line icons for habits, drawn on a 24×24 grid like the rest of the app.
+  const HABIT_ICON_PATHS = {
+    dumbbell: ["M6.5 7.5v9", "M3.5 10v4", "M17.5 7.5v9", "M20.5 10v4", "M6.5 12h11"],
+    run: ["M14.5 6.2a1.7 1.7 0 1 0 0-.01", "M10.5 20l2.2-5-2.6-2.4 1.6-4.4 3 2.6 3 .4", "M6 12l2.8-3.6 3.1-.5", "M12.7 15l3.3 1.3 1.2 3.7"],
+    bike: ["M2.5 17a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0", "M14.5 17a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0", "M6 17l3.5-7h5l3 7", "M9.5 10l3.5 7", "M13 7h2.5"],
+    swim: ["M3 18c2 0 2.2-1.6 4.5-1.6S10 18 12 18s2.2-1.6 4.5-1.6S19 18 21 18", "M16.5 8.2a1.7 1.7 0 1 0 0-.01", "M6.5 14l4.5-4.5 3 2.5 3-1"],
+    yoga: ["M12 5.2a1.7 1.7 0 1 0 0-.01", "M12 8v5.5", "M5.5 10.5l6.5 2 6.5-2", "M8 20l4-6.5 4 6.5"],
+    book: ["M4 5.5c2.7-1 5.3-1 8 .7 2.7-1.7 5.3-1.7 8-.7v13c-2.7-1-5.3-1-8 .7-2.7-1.7-5.3-1.7-8-.7z", "M12 6.2v13.2"],
+    pen: ["M16.5 3.8l3.7 3.7L8 19.7H4.3V16z", "M14 6.3l3.7 3.7"],
+    lotus: ["M12 19.5c-4.2 0-7.2-2.6-8-6.2 3.1 0 6.2 1.6 8 4.2 1.8-2.6 4.9-4.2 8-4.2-.8 3.6-3.8 6.2-8 6.2z", "M12 17.5c-1.9-2.6-1.9-7.2 0-11 1.9 3.8 1.9 8.4 0 11z"],
+    pill: ["M10.6 20.2a4.9 4.9 0 0 1-6.8-6.8l6.6-6.6a4.9 4.9 0 0 1 6.8 6.8z", "M7.1 10.1l6.8 6.8"],
+    moon: ["M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.2 6.2 0 0 0 10.1 10.1z"],
+    heart: ["M12 19.8s-7.2-4.4-7.2-10.1A4.1 4.1 0 0 1 12 7.1a4.1 4.1 0 0 1 7.2 2.6c0 5.7-7.2 10.1-7.2 10.1z"],
+    leaf: ["M5 19.5C5 11.4 10.6 6 19.5 4.5 18.3 13.6 12.9 19.5 5 19.5z", "M5 19.5l8-8"],
+  };
+
+  function habitIconEl(icon, className = "habit-icon") {
+    const paths = HABIT_ICON_PATHS[icon];
+    if (!paths) return null;
+    const svg = svgEl("svg", { class: className, viewBox: "0 0 24 24", "aria-hidden": "true" });
+    paths.forEach((d) => svg.append(svgEl("path", { d })));
+    return svg;
+  }
+
+  // The habit's mark: its icon, or a small colored square.
+  function habitMark(habit) {
+    return habitIconEl(habit.icon) || h("i", { class: "habit-dot", "aria-hidden": "true" });
+  }
+
+  // Icon habits planned (or done as an extra) on a day, for week and month.
+  function dayHabitIcons(iso, className) {
+    const icons = state.habits
+      .filter((habit) => habit.icon && (Planner.habitScheduled(habit, iso) || Planner.habitDone(state.habitLog, iso, habit.id)))
+      .slice(0, 4)
+      .map((habit) => {
+        const done = Planner.habitDone(state.habitLog, iso, habit.id);
+        const svg = habitIconEl(habit.icon, `habit-icon${done ? " is-done" : ""}`);
+        svg.style.setProperty("--habit", habit.color);
+        const title = svgEl("title", {});
+        title.textContent = `${habit.name}${done ? " ✓" : ""}`;
+        svg.prepend(title);
+        svg.setAttribute("role", "img");
+        svg.setAttribute("aria-label", title.textContent);
+        svg.removeAttribute("aria-hidden");
+        return svg;
+      });
+    return icons.length ? h("span", { class: className }, icons) : null;
+  }
   function monthIsos(year, month) {
     const total = new Date(year, month + 1, 0).getDate();
     return Array.from({ length: total }, (_, index) => Core.toISODate(new Date(year, month, index + 1)));
@@ -1113,26 +1172,29 @@
     }), h("span", { class: "hg-corner" })];
 
     const rows = state.habits.flatMap((habit) => {
-      const stats = Planner.habitMonth(state.habitLog, habit.id, year, month, today);
-      const streak = Planner.habitStreak(state.habitLog, habit.id, today);
+      const stats = Planner.habitMonth(state.habitLog, habit, year, month, today);
+      const streak = Planner.habitStreak(state.habitLog, habit, today);
       const pct = stats.elapsed ? Math.round((stats.done / stats.elapsed) * 100) : 0;
       return [
         h("div", { class: "hg-name", style: `--habit: ${habit.color}` },
-          h("i", { "aria-hidden": "true" }),
+          h("button", { type: "button", class: "hg-edit", "data-habit-edit": habit.id, title: t("habitEdit"), "aria-label": t("habitEdit") }, habitMark(habit)),
           h("input", { value: habit.name, maxlength: "60", "data-habit-name": habit.id, "aria-label": t("habitRename"), title: habit.name }),
           h("button", { type: "button", class: "hg-remove", "data-habit-remove": habit.id, title: t("habitRemove"), "aria-label": t("habitRemove"), text: "×" })),
         ...isos.map((iso) => {
           const done = Planner.habitDone(state.habitLog, iso, habit.id);
           const future = iso > today;
+          // Days the habit isn't planned for stay clickable as "extra" days.
+          const off = !Planner.habitScheduled(habit, iso);
+          const label = `${t("habitCell", { habit: habit.name, date: shortDate(iso) })}${off ? ` (${t("habitExtraDay")})` : ""}`;
           return h("button", {
             type: "button",
-            class: `hg-cell${done ? " is-done" : ""}${iso === today ? " is-today" : ""}`,
+            class: `hg-cell${done ? " is-done" : ""}${off ? " is-off" : ""}${iso === today ? " is-today" : ""}`,
             style: `--habit: ${habit.color}`,
             "data-habit-cell": habit.id,
             "data-date": iso,
             "aria-pressed": String(done),
-            "aria-label": t("habitCell", { habit: habit.name, date: shortDate(iso) }),
-            title: t("habitCell", { habit: habit.name, date: shortDate(iso) }),
+            "aria-label": label,
+            title: label,
             disabled: future ? "" : null,
           });
         }),
@@ -1146,14 +1208,23 @@
     els.habitEmpty.hidden = state.habits.length > 0;
 
     const names = new Set(state.habits.map((habit) => habit.name.toLowerCase()));
-    const ideas = t("habitIdeas").split("|").filter((idea) => !names.has(idea.toLowerCase()));
+    const ideas = habitIdeas().filter((idea) => !names.has(idea.name.toLowerCase()));
     els.habitIdeas.replaceChildren(...(ideas.length && state.habits.length < 8
       ? [h("span", { class: "habit-ideas-title", text: t("habitIdeasTitle") }),
-        ...ideas.map((idea) => h("button", { type: "button", class: "chip", "data-habit-idea": idea, text: idea }))]
+        ...ideas.map((idea) => h("button", { type: "button", class: "chip habit-idea", "data-habit-idea": idea.name },
+          habitIconEl(idea.icon), idea.name))]
       : []));
 
     renderMonthSummary(isos, today);
     renderMonthTabs(reference);
+  }
+
+  // "Name:icon:1,3,5" entries from the translations.
+  function habitIdeas() {
+    return t("habitIdeas").split("|").map((entry) => {
+      const [name, icon = "", days = ""] = entry.split(":");
+      return { name, icon: icon || null, days: days ? days.split(",").map(Number) : [] };
+    });
   }
 
   function summaryTitle(key) {
@@ -1234,29 +1305,89 @@
       h("p", { class: "sum-note", text: `${t("sumLoad", { avg: number.format(avg), heavy })} · ${t("sumLoadKey")}` }));
   }
 
+  // Habits planned for the day (or already done as an extra) as pills.
   function renderTodayHabits(iso) {
-    els.todayHabits.hidden = state.habits.length === 0;
+    const habits = state.habits.filter((habit) => Planner.habitScheduled(habit, iso) || Planner.habitDone(state.habitLog, iso, habit.id));
+    els.todayHabits.hidden = habits.length === 0;
     const future = iso > todayISO();
-    els.habitPills.replaceChildren(...state.habits.map((habit) => {
+    els.habitPills.replaceChildren(...habits.map((habit) => {
       const done = Planner.habitDone(state.habitLog, iso, habit.id);
       return h("button", {
         type: "button",
-        class: `habit-pill${done ? " is-done" : ""}`,
+        class: `habit-pill${done ? " is-done" : ""}${habit.icon ? " has-icon" : ""}`,
         style: `--habit: ${habit.color}`,
         "data-habit-cell": habit.id,
         "data-date": iso,
         "aria-pressed": String(done),
         disabled: future ? "" : null,
-      }, h("i", { "aria-hidden": "true" }), habit.name);
+      }, habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }), habit.name);
     }));
   }
 
-  function addHabit(name) {
+  // ---------- habit editor ----------
+  let habitDraft = null;
+
+  function weekdayOrder() {
+    return state.settings.weekStart === 0 ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
+  }
+
+  function renderHabitEditor() {
+    const draft = habitDraft;
+    els.habitIconPicker.replaceChildren(
+      h("button", { type: "button", class: `icon-choice${draft.icon ? "" : " active"}`, "data-icon": "", "aria-pressed": String(!draft.icon), title: t("habitNoIcon"), "aria-label": t("habitNoIcon") },
+        h("i", { class: "habit-dot", "aria-hidden": "true" })),
+      ...Planner.HABIT_ICONS.map((icon) => h("button", {
+        type: "button",
+        class: `icon-choice${draft.icon === icon ? " active" : ""}`,
+        "data-icon": icon,
+        "aria-pressed": String(draft.icon === icon),
+        title: t(`icon-${icon}`),
+        "aria-label": t(`icon-${icon}`),
+      }, habitIconEl(icon))));
+    els.habitIconPicker.style.setProperty("--habit", draft.color);
+
+    const sunday = new Date(2026, 0, 4); // a Sunday, only for weekday names
+    els.habitDayPicker.replaceChildren(...weekdayOrder().map((day) => {
+      const on = !draft.days.length || draft.days.includes(day);
+      const name = formatDate(Planner.addDays(sunday, day), { weekday: "long" });
+      return h("button", {
+        type: "button",
+        class: `day-choice${on ? " active" : ""}${day === 0 ? " is-sun" : day === 6 ? " is-sat" : ""}`,
+        "data-day": day,
+        "aria-pressed": String(on),
+        "aria-label": name,
+        title: capitalize(name),
+        text: formatDate(Planner.addDays(sunday, day), { weekday: "narrow" }),
+      });
+    }));
+    els.habitDaysHint.textContent = !draft.days.length ? t("habitEveryDay")
+      : draft.days.length === 1 ? t("habitDaysOne") : t("habitDaysCount", { n: draft.days.length });
+
+    els.habitColorPicker.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
+      type: "button",
+      class: `cal-color${color === draft.color ? " active" : ""}`,
+      "data-color": color,
+      "aria-pressed": String(color === draft.color),
+      "aria-label": color,
+      style: `--cat: ${color}`,
+    })));
+  }
+
+  function openHabitEditor(id) {
+    const habit = state.habits.find((candidate) => candidate.id === id);
+    if (!habit) return;
+    habitDraft = { ...habit, days: [...habit.days] };
+    els.habitEditName.value = habit.name;
+    renderHabitEditor();
+    els.habitDialog.showModal();
+  }
+
+  function addHabit(name, { icon = null, days = [] } = {}) {
     const clean = String(name || "").trim().slice(0, 60);
     if (!clean || state.habits.some((habit) => habit.name.toLowerCase() === clean.toLowerCase())) return;
     const used = new Set(state.habits.map((habit) => habit.color));
     const color = Planner.PALETTE.find((candidate) => !used.has(candidate)) || Planner.PALETTE[state.habits.length % Planner.PALETTE.length];
-    state.habits = [...state.habits, { id: Planner.newId(), name: clean, color }];
+    state.habits = Planner.normalizeHabits([...state.habits, { id: Planner.newId(), name: clean, color, icon, days }]);
     persistHabits();
     render();
   }
@@ -1853,7 +1984,53 @@
       return;
     }
     const idea = event.target.closest("[data-habit-idea]");
-    if (idea) addHabit(idea.dataset.habitIdea);
+    if (idea) {
+      const preset = habitIdeas().find((candidate) => candidate.name === idea.dataset.habitIdea);
+      addHabit(idea.dataset.habitIdea, preset || {});
+      return;
+    }
+    const edit = event.target.closest("[data-habit-edit]");
+    if (edit) openHabitEditor(edit.dataset.habitEdit);
+  });
+
+  els.habitDialog.addEventListener("click", (event) => {
+    if (event.target === els.habitDialog) {
+      els.habitDialog.close();
+      return;
+    }
+    const icon = event.target.closest("[data-icon]");
+    const day = event.target.closest("[data-day]");
+    const color = event.target.closest("[data-color]");
+    if (icon) habitDraft.icon = icon.dataset.icon || null;
+    else if (color) habitDraft.color = color.dataset.color;
+    else if (day) {
+      const value = Number(day.dataset.day);
+      // Starting from "every day", the first tap keeps only that day.
+      const current = habitDraft.days.length ? habitDraft.days : [];
+      const next = !current.length ? [value]
+        : current.includes(value) ? current.filter((other) => other !== value) : [...current, value];
+      habitDraft.days = next.length === 7 ? [] : next.sort((a, b) => a - b);
+    } else return;
+    renderHabitEditor();
+  });
+
+  els.habitEditForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = els.habitEditName.value.trim().slice(0, 60) || habitDraft.name;
+    state.habits = Planner.normalizeHabits(state.habits.map((habit) => (habit.id === habitDraft.id ? { ...habitDraft, name } : habit)));
+    persistHabits();
+    els.habitDialog.close();
+    render();
+  });
+  els.habitEditCancel.addEventListener("click", () => els.habitDialog.close());
+  els.habitEditDelete.addEventListener("click", () => {
+    const habit = habitDraft;
+    if (!habit || !window.confirm(t("habitRemoveConfirm", { name: habit.name }))) return;
+    state.habits = state.habits.filter((candidate) => candidate.id !== habit.id);
+    state.habitLog = Planner.forgetHabit(state.habitLog, habit.id);
+    persistHabits();
+    els.habitDialog.close();
+    render();
   });
 
   els.habitForm.addEventListener("submit", (event) => {

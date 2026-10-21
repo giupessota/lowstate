@@ -1296,7 +1296,19 @@ svg.i {
 .hg-day.is-sun { color: var(--vermilion); }
 .hg-day.is-today { color: var(--ink); font-weight: 700; background: linear-gradient(transparent 50%, var(--highlight) 50%); }
 .hg-name { display: flex; align-items: center; gap: 6px; min-width: 0; padding-right: 6px; }
-.hg-name i { width: 8px; height: 8px; flex: none; border-radius: 2px; background: var(--habit); }
+.habit-dot { display: inline-block; width: 8px; height: 8px; flex: none; border-radius: 2px; background: var(--habit, var(--ink-2)); }
+.habit-icon { width: 16px; height: 16px; flex: none; fill: none; stroke: var(--habit, currentColor); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.hg-edit { display: grid; place-items: center; width: 22px; height: 22px; flex: none; padding: 0; border: 0; border-radius: 6px; background: transparent; cursor: pointer; }
+.hg-edit:hover { background: color-mix(in srgb, var(--habit) 14%, transparent); }
+.hg-cell.is-off:not(.is-done) { width: min(6px, 100%); border-style: dotted; opacity: .55; }
+.hg-cell.is-off.is-done { opacity: .75; }
+/* Week and month: small habit icons, colored once done */
+.stamp-habits, .cell-habits { display: flex; flex-wrap: wrap; gap: 2px; }
+.stamp-habits { margin-top: 3px; max-width: 40px; }
+.stamp-habits .habit-icon, .cell-habits .habit-icon { width: 12px; height: 12px; stroke: color-mix(in srgb, var(--ink) 35%, transparent); stroke-width: 2; }
+.stamp-habits .habit-icon.is-done, .cell-habits .habit-icon.is-done { stroke: var(--habit); }
+.cell-habits { margin-left: auto; align-self: center; flex-wrap: nowrap; }
+.cell-habits + .mood-mini { margin-left: 2px; }
 .hg-name input {
   flex: 1;
   min-width: 0;
@@ -1339,6 +1351,52 @@ svg.i {
 .habit-ideas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
 .habit-ideas-title { color: var(--muted); font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 
+/* Habit editor */
+.habit-sheet { width: min(420px, calc(100vw - 32px)); }
+.habit-name-input {
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 15px var(--sans);
+}
+.habit-name-input:focus { border-color: var(--ink-2); outline: none; }
+.icon-picker { display: grid; grid-template-columns: repeat(7, 36px); gap: 6px; }
+.icon-choice {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.icon-choice .habit-icon { width: 19px; height: 19px; stroke: var(--ink-2); }
+.icon-choice:hover { border-color: color-mix(in srgb, var(--ink) 35%, transparent); }
+.icon-choice.active { border-color: var(--habit); background: color-mix(in srgb, var(--habit) 14%, var(--paper)); }
+.icon-choice.active .habit-icon { stroke: var(--habit); }
+.day-picker { display: flex; gap: 6px; }
+.day-choice {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font: 600 12px var(--mono);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.day-choice.active { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+.day-choice.is-sun:not(.active) { color: var(--vermilion); }
+.day-choice.is-sat:not(.active) { color: var(--indigo); }
+.field-hint { color: var(--muted); font-size: 12px; }
+
 /* Habit pills on the day page */
 .habit-pills { display: flex; flex-wrap: wrap; gap: 6px; }
 .habit-pill {
@@ -1355,6 +1413,8 @@ svg.i {
   transition: background .15s, border-color .15s;
 }
 .habit-pill i { width: 9px; height: 9px; border: 1.3px solid var(--habit); border-radius: 50%; }
+.habit-pill .habit-icon { width: 15px; height: 15px; stroke: color-mix(in srgb, var(--habit) 70%, var(--ink-2)); }
+.habit-idea .habit-icon { width: 14px; height: 14px; margin-right: 4px; stroke: currentColor; vertical-align: -2px; }
 .habit-pill:hover:not(:disabled) { border-color: var(--habit); }
 .habit-pill.is-done { border-color: var(--habit); background: color-mix(in srgb, var(--habit) 14%, var(--paper)); color: var(--ink); }
 .habit-pill.is-done i { background: var(--habit); }

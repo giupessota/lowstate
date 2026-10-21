@@ -338,6 +338,37 @@
       </form>
     </dialog>
 
+    <dialog class="sheet habit-sheet" id="habitDialog" aria-labelledby="habitDialogTitle">
+      <form class="sheet-body" id="habitEditForm" method="dialog">
+        <header class="sheet-head">
+          <h2 id="habitDialogTitle" data-i18n="habitEdit">Edit habit</h2>
+        </header>
+        <label class="field">
+          <span class="field-label" data-i18n="habitName">Name</span>
+          <input class="habit-name-input" id="habitEditName" maxlength="60" autocomplete="off" required />
+        </label>
+        <div class="field">
+          <span class="field-label" data-i18n="habitIcon">Icon</span>
+          <div class="icon-picker" id="habitIconPicker"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" data-i18n="habitDays">Days</span>
+          <div class="day-picker" id="habitDayPicker"></div>
+          <span class="field-hint" id="habitDaysHint"></span>
+        </div>
+        <div class="field">
+          <span class="field-label" data-i18n="habitColor">Color</span>
+          <div class="cal-colors" id="habitColorPicker"></div>
+        </div>
+        <footer class="sheet-foot">
+          <button type="button" class="btn ghost danger" id="habitEditDelete" data-i18n="habitRemove">Remove habit</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="habitEditCancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="save">Save</button>
+        </footer>
+      </form>
+    </dialog>
+
     <dialog class="sheet settings-sheet" id="settingsDialog" aria-labelledby="settingsTitle">
       <div class="sheet-body">
         <header class="sheet-head">
