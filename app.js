@@ -794,8 +794,13 @@
     if (!line || !inner) return;
     const now = new Date();
     const first = Number(inner.dataset.firstHour);
-    line.style.top = `${((now.getHours() * 60 + now.getMinutes() - first * 60) / 60) * timelineHourHeight()}px`;
+    const y = ((now.getHours() * 60 + now.getMinutes() - first * 60) / 60) * timelineHourHeight();
+    line.style.top = `${y}px`;
     line.firstChild.textContent = Planner.minutesToTime(now.getHours() * 60 + now.getMinutes());
+    // The current time takes the place of an hour label it would overlap.
+    inner.querySelectorAll(".hour-row").forEach((row) => {
+      row.classList.toggle("is-covered", Math.abs(parseFloat(row.style.top) + 9 - y) < 15);
+    });
   }
 
   function minutesAtTimelineY(clientY) {

@@ -935,6 +935,7 @@ svg.i {
   pointer-events: none;
 }
 .hour-label { width: var(--labels); flex: none; padding-top: 3px; color: var(--muted); font: 500 10.5px var(--mono); }
+.hour-row.is-covered .hour-label { visibility: hidden; }
 .hour-slot { flex: 1; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: copy; }
 .hour-slot:hover { background: color-mix(in srgb, var(--highlight) 22%, transparent); }
 
