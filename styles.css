@@ -1220,6 +1220,25 @@ dialog.sheet[open] { animation: sheet-in .18s ease; }
 
 /* Settings */
 .settings-sheet { width: min(500px, calc(100vw - 32px)); }
+.settings-sheet .sheet-body { min-height: 330px; gap: 14px; }
+.set-tabs { display: flex; gap: 2px; margin-top: -4px; padding: 3px; border-radius: 10px; background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.set-tabs button {
+  flex: 1;
+  padding: 7px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.set-tabs button:hover { color: var(--ink); }
+.set-tabs button[aria-selected="true"] { background: var(--paper); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .12); }
+.settings-sheet[data-tab="look"] .set-group:not([data-tab="look"]),
+.settings-sheet[data-tab="planner"] .set-group:not([data-tab="planner"]),
+.settings-sheet[data-tab="water"] .set-group:not([data-tab="water"]),
+.settings-sheet[data-tab="general"] .set-group:not([data-tab="general"]) { display: none; }
 .set-group { display: flex; flex-direction: column; gap: 2px; }
 .set-group h3 { margin: 0 0 2px; color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 .set-row {

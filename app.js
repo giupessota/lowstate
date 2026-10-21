@@ -1199,12 +1199,28 @@
     renderSettings();
   }
 
+  // Settings are split into tabs so the sheet stays short.
+  let settingsTab = "look";
+  function showSettingsTab(tab) {
+    settingsTab = tab;
+    els.settingsDialog.dataset.tab = tab;
+    els.settingsDialog.querySelectorAll(".set-tabs [data-tab]").forEach((button) => {
+      button.setAttribute("aria-selected", String(button.dataset.tab === tab));
+    });
+  }
+
   els.settingsBtn.addEventListener("click", () => {
+    showSettingsTab(settingsTab);
     renderSettings();
     els.settingsDialog.showModal();
   });
   els.settingsClose.addEventListener("click", () => els.settingsDialog.close());
   els.settingsDialog.addEventListener("click", (event) => {
+    const tab = event.target.closest(".set-tabs [data-tab]");
+    if (tab) {
+      showSettingsTab(tab.dataset.tab);
+      return;
+    }
     if (event.target === els.settingsDialog) {
       els.settingsDialog.close();
       return;

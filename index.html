@@ -304,8 +304,14 @@
           </button>
         </header>
 
-        <section class="set-group">
-          <h3 data-i18n="appearance">Appearance</h3>
+        <nav class="set-tabs" role="tablist" data-i18n-aria="settings">
+          <button type="button" role="tab" data-tab="look" data-i18n="appearance">Appearance</button>
+          <button type="button" role="tab" data-tab="planner" data-i18n="tabPlanner">Planner</button>
+          <button type="button" role="tab" data-tab="water" data-i18n="water">Water</button>
+          <button type="button" role="tab" data-tab="general" data-i18n="tabGeneral">General</button>
+        </nav>
+
+        <section class="set-group" data-tab="look">
           <div class="set-row">
             <span data-i18n="theme">Theme</span>
             <div class="seg" data-setting="theme">
@@ -333,6 +339,9 @@
               <button type="button" data-value="pt">PT</button>
             </div>
           </div>
+        </section>
+
+        <section class="set-group" data-tab="planner">
           <div class="set-row">
             <span data-i18n="weekStartsOn">Week starts on</span>
             <div class="seg" data-setting="weekStart">
@@ -358,8 +367,7 @@
           </div>
         </section>
 
-        <section class="set-group">
-          <h3 data-i18n="water">Water</h3>
+        <section class="set-group" data-tab="water">
           <div class="set-row">
             <span data-i18n="waterUnit">Count water in</span>
             <div class="seg" data-setting="waterUnit">
@@ -394,7 +402,7 @@
           </div>
         </section>
 
-        <section class="set-group" id="windowGroup" hidden>
+        <section class="set-group" data-tab="general" id="windowGroup" hidden>
           <h3 data-i18n="window">Window</h3>
           <div class="set-row">
             <span data-i18n="alwaysOnTop">Always on top</span>
@@ -405,7 +413,7 @@
           </div>
         </section>
 
-        <section class="set-group">
+        <section class="set-group" data-tab="general">
           <h3 data-i18n="data">Data</h3>
           <div class="set-row">
             <span></span>
