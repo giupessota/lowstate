@@ -9,9 +9,8 @@ A calm planner for Windows and macOS, inspired by Japanese paper planners
 opens on today's page so you can write down everything the day needs, and
 switches to the week or the month when you want the bigger picture.
 
-> **2.0 is in beta.** This branch (`planner`) is the new planner. The latest
-> published release is still 1.1.7, the original to-do notebook, and `main`
-> stays on 1.x until 2.0 ships.
+> **New in 2.0:** Lowstate grew from a to-do notebook into a planner. The
+> original notebook is release 1.1.7.
 
 ## Features
 
@@ -60,8 +59,10 @@ switches to the week or the month when you want the bigger picture.
 
 Every push to `main` also creates downloadable GitHub Actions artifacts for
 Windows x64 and a universal macOS build that supports both Intel and Apple
-Silicon. Version tags such as `v1.1.7`
-publish those installers to the corresponding GitHub Release.
+Silicon. Version tags such as `v2.0.0`
+publish those installers to the corresponding GitHub Release; tags with a
+suffix such as `v2.1.0-beta.1` are published as pre-releases, which the
+in-app update check ignores.
 
 The installers aren't code-signed, so Windows SmartScreen or macOS Gatekeeper
 will warn on first launch.
@@ -139,7 +140,7 @@ npm run dist:win
 ```
 
 Installer filenames include the target architecture, for example
-`Lowstate-2.0.0-beta.1-universal.dmg` and `Lowstate-Setup-2.0.0-beta.1-x64.exe`.
+`Lowstate-2.0.0-universal.dmg` and `Lowstate-Setup-2.0.0-x64.exe`.
 The Windows installer can also be built on macOS with `npm run dist:win -- --x64`;
 the universal macOS build is `npm run dist:mac -- --universal`.
 
