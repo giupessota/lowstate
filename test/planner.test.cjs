@@ -189,7 +189,7 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
 
 test("habits: toggling, streaks that survive an unchecked today, monthly progress", () => {
   assert.deepEqual(P.normalizeHabits([{ id: "a", name: " Ler " }, { id: "a", name: "dup" }, { id: "b", name: "" }, null]), [
-    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [], start: null, duration: null },
+    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [], start: null, duration: null, times: {} },
   ]);
   let log = {};
   ["2026-10-18", "2026-10-19", "2026-10-20"].forEach((iso) => { log = P.toggleHabit(log, iso, "read"); });
@@ -212,6 +212,15 @@ test("habits planned for some weekdays: icons, schedule, streaks and month count
   const [timed] = P.normalizeHabits([{ id: "t", name: "Academia", start: "07:00", duration: 75 }]);
   assert.deepEqual([timed.start, timed.duration], ["07:00", 75]);
   assert.deepEqual(P.normalizeHabits([{ id: "t", name: "x", start: "25:00", duration: 60 }])[0].duration, null);
+  // Different times per weekday: Mon/Wed 07:00, Fri 18:00 for 90 minutes; Sunday has no time.
+  const [split] = P.normalizeHabits([{ id: "s", name: "Academia", days: [0, 1, 3, 5],
+    times: { 1: { start: "07:00" }, 3: { start: "07:00", duration: 60 }, 5: { start: "18:00", duration: 90 }, 9: { start: "08:00" }, 0: { start: "nope" } } }]);
+  assert.deepEqual(split.times, { 1: { start: "07:00", duration: 60 }, 3: { start: "07:00", duration: 60 }, 5: { start: "18:00", duration: 90 } });
+  assert.deepEqual(P.habitTimeOn(split, "2026-10-19"), { start: "07:00", duration: 60 });
+  assert.deepEqual(P.habitTimeOn(split, "2026-10-23"), { start: "18:00", duration: 90 });
+  assert.equal(P.habitTimeOn(split, "2026-10-25"), null);
+  assert.equal(P.habitTimeOn(split, "2026-10-22"), null);
+  assert.deepEqual(P.habitTimeOn(timed, "2026-10-22"), { start: "07:00", duration: 75 });
   assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", icon: "rocket", days: [0, 1, 2, 3, 4, 5, 6] }])[0].icon, null);
   assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", days: [0, 1, 2, 3, 4, 5, 6] }])[0].days, []);
   // October 2026: the 19th is a Monday, the 21st a Wednesday, the 22nd a Thursday.

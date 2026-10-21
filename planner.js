@@ -479,6 +479,17 @@
     return list.length === 7 ? [] : list;
   }
 
+  // Per-weekday times: { "1": { start: "07:00", duration: 60 }, … }.
+  function normalizeTimes(raw) {
+    if (!raw || typeof raw !== "object") return {};
+    return Object.fromEntries(Object.entries(raw)
+      .filter(([day, time]) => /^[0-6]$/.test(day) && time && isTime(time.start))
+      .map(([day, time]) => [day, {
+        start: time.start,
+        duration: Number.isFinite(time.duration) && time.duration > 0 ? Math.min(Math.round(time.duration), 720) : 60,
+      }]));
+  }
+
   function normalizeHabits(raw) {
     if (!Array.isArray(raw)) return [];
     const seen = new Set();
@@ -490,11 +501,13 @@
         color: PALETTE.includes(habit.color) ? habit.color : PALETTE[index % PALETTE.length],
         icon: HABIT_ICONS.includes(habit.icon) ? habit.icon : null,
         days: normalizeDays(habit.days),
-        // Optional time of day, so a habit like the gym sits on the timeline.
+        // Optional time of day, so a habit like the gym sits on the timeline:
+        // one for every planned day, or `times` per weekday.
         start: isTime(habit.start) ? habit.start : null,
         duration: isTime(habit.start) && Number.isFinite(habit.duration) && habit.duration > 0
           ? Math.min(Math.round(habit.duration), 720)
           : null,
+        times: normalizeTimes(habit.times),
       }));
   }
 
@@ -503,6 +516,18 @@
     if (!days.length) return true;
     const date = parseISODate(iso);
     return Boolean(date) && days.includes(date.getDay());
+  }
+
+  // The habit's time on a day: that weekday's own time when it has per-day
+  // times, otherwise its single time; null when unplanned or untimed.
+  function habitTimeOn(habit, iso) {
+    if (!habit || !habitScheduled(habit, iso)) return null;
+    const times = habit.times || {};
+    if (Object.keys(times).length) {
+      const date = parseISODate(iso);
+      return (date && times[String(date.getDay())]) || null;
+    }
+    return habit.start ? { start: habit.start, duration: habit.duration || 60 } : null;
   }
 
   const asHabit = (habitOrId) => (typeof habitOrId === "string" ? { id: habitOrId, days: [] } : habitOrId);
@@ -800,6 +825,7 @@
     HABIT_ICONS,
     normalizeHabits,
     habitScheduled,
+    habitTimeOn,
     habitDone,
     toggleHabit,
     forgetHabit,

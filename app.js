@@ -121,6 +121,9 @@
     habitColorPicker: $("habitColorPicker"),
     habitEditStart: $("habitEditStart"),
     habitEditDuration: $("habitEditDuration"),
+    habitTimeMode: $("habitTimeMode"),
+    habitSameTime: $("habitSameTime"),
+    habitPerDayTimes: $("habitPerDayTimes"),
     habitEditDelete: $("habitEditDelete"),
     habitEditCancel: $("habitEditCancel"),
     rangeTitle: $("rangeTitle"),
@@ -646,16 +649,18 @@
 
   function weekEventsEl(iso) {
     const { allDay, timed } = dayEvents(iso);
-    const routines = state.habits.filter((habit) => habit.start && Planner.habitScheduled(habit, iso))
-      .sort((a, b) => (a.start < b.start ? -1 : 1));
+    const routines = state.habits
+      .map((habit) => ({ habit, time: Planner.habitTimeOn(habit, iso) }))
+      .filter(({ time }) => time)
+      .sort((a, b) => (a.time.start < b.time.start ? -1 : 1));
     if (!allDay.length && !timed.length && !routines.length) return null;
-    const routineLines = routines.map((habit) => h("li", {
+    const routineLines = routines.map(({ habit, time }) => h("li", {
       class: `event-line routine${Planner.habitDone(state.habitLog, iso, habit.id) ? " is-done" : ""}`,
       style: `--habit: ${habit.color}`,
       title: habit.name,
     },
       habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
-      h("span", { class: "line-time", text: habit.start }),
+      h("span", { class: "line-time", text: time.start }),
       h("span", { class: "event-title", text: habit.name })));
     return h("ul", { class: "day-events" }, routineLines, [...allDay, ...timed].map((event) => h("li", {
       class: `event-line${event.allDay ? " is-allday" : ""}`,
@@ -768,8 +773,9 @@
     }));
     // Habits with a time sit on the timeline on their planned days.
     const routines = state.habits
-      .filter((habit) => habit.start && Planner.habitScheduled(habit, iso))
-      .map((habit) => ({ id: `habit:${habit.id}`, kind: "habit", habit, start: habit.start, duration: habit.duration || 60 }));
+      .map((habit) => ({ habit, time: Planner.habitTimeOn(habit, iso) }))
+      .filter(({ time }) => time)
+      .map(({ habit, time }) => ({ id: `habit:${habit.id}`, kind: "habit", habit, start: time.start, duration: time.duration }));
     const events = Planner.layoutTimeline([...items, ...meetings, ...routines]);
     const { first, last } = timelineRange(events);
     const hour = timelineHourHeight();
@@ -790,7 +796,7 @@
         const { habit } = item;
         const done = Planner.habitDone(state.habitLog, iso, habit.id);
         const lines = Math.max(1, Math.floor((height - 19) / 16));
-        const range = `${habit.start}–${Planner.minutesToTime(Math.min(1439, Planner.timeToMinutes(habit.start) + (habit.duration || 60)))}`;
+        const range = `${item.start}–${Planner.minutesToTime(Math.min(1439, Planner.timeToMinutes(item.start) + item.duration))}`;
         inner.append(h("button", {
           type: "button",
           class: `block routine${done ? " is-done" : ""}${height < 34 ? " short" : ""}`,
@@ -1217,7 +1223,7 @@
           h("button", { type: "button", class: "hg-edit", "data-habit-edit": habit.id, title: t("habitEdit"), "aria-label": t("habitEdit") }, habitMark(habit)),
           h("button", { type: "button", class: "hg-label", "data-habit-edit": habit.id, title: t("habitEdit") },
             h("span", { class: "hg-title", text: habit.name }),
-            h("span", { class: "hg-meta", text: habitScheduleText(habit) })),
+            h("span", { class: "hg-meta" }, habitScheduleParts(habit).map((part) => h("span", { text: part })))),
 ),
         ...isos.map((iso) => {
           const done = Planner.habitDone(state.habitLog, iso, habit.id);
@@ -1348,7 +1354,7 @@
   function renderTodayHabits(iso) {
     const habits = state.habits
       .filter((habit) => Planner.habitScheduled(habit, iso) || Planner.habitDone(state.habitLog, iso, habit.id))
-      .sort((a, b) => (a.start || "99") < (b.start || "99") ? -1 : 1);
+      .sort((a, b) => ((Planner.habitTimeOn(a, iso)?.start || "99") < (Planner.habitTimeOn(b, iso)?.start || "99") ? -1 : 1));
     els.todayHabits.hidden = habits.length === 0;
     const future = iso > todayISO();
     els.habitPills.replaceChildren(...habits.map((habit) => {
@@ -1362,7 +1368,7 @@
         "aria-pressed": String(done),
         disabled: future ? "" : null,
       }, habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
-        habit.start ? h("span", { class: "pill-time", text: habit.start }) : null,
+        Planner.habitTimeOn(habit, iso) ? h("span", { class: "pill-time", text: Planner.habitTimeOn(habit, iso).start }) : null,
         habit.name);
     }));
   }
@@ -1406,11 +1412,35 @@
     els.habitDaysHint.textContent = !draft.days.length ? t("habitEveryDay")
       : draft.days.length === 1 ? t("habitDaysOne") : t("habitDaysCount", { n: draft.days.length });
 
+    // Time: one for every planned day, or a row per planned day.
+    const perDay = draft.timeMode === "per-day";
+    els.habitTimeMode.querySelectorAll("[data-mode]").forEach((button) => {
+      const active = (button.dataset.mode === "per-day") === perDay;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+    els.habitSameTime.hidden = perDay;
+    els.habitPerDayTimes.hidden = !perDay;
     fillSelect(els.habitEditStart, START_OPTIONS, t("habitNoTime"), (value) => value);
     fillSelect(els.habitEditDuration, DURATION_OPTIONS, "—", formatDuration);
     els.habitEditStart.value = draft.start || "";
     els.habitEditDuration.value = draft.start ? String(draft.duration || 60) : "";
     els.habitEditDuration.disabled = !draft.start;
+    if (perDay) {
+      const planned = weekdayOrder().filter((day) => !draft.days.length || draft.days.includes(day));
+      els.habitPerDayTimes.replaceChildren(...planned.map((day) => {
+        const time = draft.times[String(day)] || null;
+        const start = h("select", { "data-day-start": day, "aria-label": `${t("habitTime")} — ${weekdayShort(day)}` });
+        const duration = h("select", { "data-day-duration": day, "aria-label": `${t("habitDuration")} — ${weekdayShort(day)}` });
+        fillSelect(start, START_OPTIONS, t("habitNoTime"), (value) => value);
+        fillSelect(duration, DURATION_OPTIONS, "—", formatDuration);
+        start.value = time?.start || "";
+        duration.value = time ? String(time.duration) : "";
+        duration.disabled = !time;
+        return h("div", { class: `per-day-row${day === 0 ? " is-sun" : day === 6 ? " is-sat" : ""}` },
+          h("span", { class: "per-day-name", text: weekdayShort(day) }), start, duration);
+      }));
+    }
 
     els.habitColorPicker.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
       type: "button",
@@ -1425,7 +1455,12 @@
   function openHabitEditor(id) {
     const habit = state.habits.find((candidate) => candidate.id === id);
     if (!habit) return;
-    habitDraft = { ...habit, days: [...habit.days] };
+    habitDraft = {
+      ...habit,
+      days: [...habit.days],
+      times: { ...habit.times },
+      timeMode: Object.keys(habit.times || {}).length ? "per-day" : "same",
+    };
     els.habitEditName.value = habit.name;
     renderHabitEditor();
     els.habitDialog.showModal();
@@ -1444,15 +1479,24 @@
     openHabitEditor(id);
   }
 
-  // "07:00 · mon wed fri", "Every day", …
-  function habitScheduleText(habit) {
-    const sunday = new Date(2026, 0, 4);
-    const days = habit.days.length
-      ? weekdayOrder().filter((day) => habit.days.includes(day))
-        .map((day) => formatDate(Planner.addDays(sunday, day), { weekday: "short" }).replace(".", "").toLowerCase())
-        .join(" ")
-      : t("habitEveryDay");
-    return habit.start ? `${habit.start} · ${days}` : days;
+  const weekdayShort = (day) => formatDate(Planner.addDays(new Date(2026, 0, 4), day), { weekday: "short" }).replace(".", "").toLowerCase();
+
+  // ["07:00 · mon wed fri"], ["mon wed 07:00", "fri 18:00"], ["Every day"], …
+  function habitScheduleParts(habit) {
+    const planned = weekdayOrder().filter((day) => !habit.days.length || habit.days.includes(day));
+    const times = habit.times || {};
+    if (Object.keys(times).length) {
+      const groups = [];
+      planned.forEach((day) => {
+        const start = times[String(day)]?.start || null;
+        const group = groups.find((candidate) => candidate.start === start);
+        if (group) group.days.push(day);
+        else groups.push({ start, days: [day] });
+      });
+      return groups.map((group) => `${group.days.map(weekdayShort).join(" ")}${group.start ? ` ${group.start}` : ""}`);
+    }
+    const days = habit.days.length ? planned.map(weekdayShort).join(" ") : t("habitEveryDay");
+    return [habit.start ? `${habit.start} · ${days}` : days];
   }
 
   function renderSidebar() {
@@ -2069,7 +2113,13 @@
   els.habitEditForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const name = els.habitEditName.value.trim().slice(0, 60) || habitDraft.name;
-    state.habits = Planner.normalizeHabits(state.habits.map((habit) => (habit.id === habitDraft.id ? { ...habitDraft, name } : habit)));
+    const { timeMode, ...draft } = habitDraft;
+    // Keep only one way of timing: per-day times drop the single time and
+    // vice versa; times for days no longer planned are dropped too.
+    const saved = timeMode === "per-day"
+      ? { ...draft, start: null, duration: null, times: Object.fromEntries(Object.entries(draft.times).filter(([day]) => !draft.days.length || draft.days.includes(Number(day)))) }
+      : { ...draft, times: {} };
+    state.habits = Planner.normalizeHabits(state.habits.map((habit) => (habit.id === habitDraft.id ? { ...saved, name } : habit)));
     persistHabits();
     els.habitDialog.close();
     render();
@@ -2082,6 +2132,35 @@
   });
   els.habitEditDuration.addEventListener("change", () => {
     habitDraft.duration = Number(els.habitEditDuration.value) || 60;
+  });
+  els.habitTimeMode.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-mode]");
+    if (!button || button.dataset.mode === habitDraft.timeMode) return;
+    if (button.dataset.mode === "per-day") {
+      // Start every planned day from the single time, if there was one.
+      const planned = weekdayOrder().filter((day) => !habitDraft.days.length || habitDraft.days.includes(day));
+      habitDraft.times = habitDraft.start
+        ? Object.fromEntries(planned.map((day) => [String(day), { start: habitDraft.start, duration: habitDraft.duration || 60 }]))
+        : {};
+    } else {
+      const first = Object.values(habitDraft.times)[0];
+      habitDraft.start = first?.start || habitDraft.start || null;
+      habitDraft.duration = first?.duration || habitDraft.duration || null;
+    }
+    habitDraft.timeMode = button.dataset.mode;
+    renderHabitEditor();
+  });
+  els.habitPerDayTimes.addEventListener("change", (event) => {
+    const start = event.target.closest("[data-day-start]");
+    const duration = event.target.closest("[data-day-duration]");
+    if (start) {
+      const day = start.dataset.dayStart;
+      if (start.value) habitDraft.times[day] = { start: start.value, duration: habitDraft.times[day]?.duration || 60 };
+      else delete habitDraft.times[day];
+    } else if (duration && habitDraft.times[duration.dataset.dayDuration]) {
+      habitDraft.times[duration.dataset.dayDuration].duration = Number(duration.value) || 60;
+    } else return;
+    renderHabitEditor();
   });
   els.habitEditDelete.addEventListener("click", () => {
     const habit = habitDraft;
