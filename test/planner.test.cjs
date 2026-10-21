@@ -271,6 +271,39 @@ test("habits only count between their start and end dates", () => {
   assert.equal(P.habitStreak(log, fresh, "2026-10-13"), 2);
 });
 
+test("reminders cover timed tasks, habits and meetings today and tomorrow", () => {
+  const now = new Date(2026, 9, 21, 9, 0); // Wednesday 21 October 2026, 09:00
+  const local = (d, h, m = 0) => new Date(2026, 9, d, h, m);
+  const items = [
+    P.normalizeItem({ id: "a", title: "Dentista", date: "2026-10-21", start: "14:30" }),
+    P.normalizeItem({ id: "b", title: "Feita", date: "2026-10-21", start: "15:00", done: true }),
+    P.normalizeItem({ id: "c", title: "Depois", date: "2026-10-21", start: "16:00", focus: "later" }),
+    P.normalizeItem({ id: "d", title: "Amanhã", date: "2026-10-22", start: "08:00" }),
+    P.normalizeItem({ id: "e", title: "Sem hora", date: "2026-10-21" }),
+    P.normalizeItem({ id: "f", title: "Longe", date: "2026-10-25", start: "08:00" }),
+  ];
+  const habits = P.normalizeHabits([{ id: "gym", name: "Academia", days: [3, 5], start: "18:00", duration: 60 }]);
+  const events = [
+    { id: "m1", title: "Daily", allDay: false, start: local(21, 9, 30).toISOString(), end: local(21, 9, 45).toISOString() },
+    { id: "m2", title: "Feriado", allDay: true, start: "2026-10-22", end: "2026-10-23" },
+    { id: "m3", title: "Retro", allDay: false, start: local(24, 16).toISOString(), end: local(24, 17).toISOString() },
+  ];
+  const list = P.reminders({ items, habits, events, now, lead: 10, morningAt: "08:00" });
+  assert.deepEqual(list.map((r) => [r.kind, r.title, r.start, r.iso]), [
+    ["morning", "", "08:00", "2026-10-21"],
+    ["meeting", "Daily", "09:30", "2026-10-21"],
+    ["task", "Dentista", "14:30", "2026-10-21"],
+    ["habit", "Academia", "18:00", "2026-10-21"],
+    ["task", "Amanhã", "08:00", "2026-10-22"],
+  ]);
+  assert.equal(list[1].at, local(21, 9, 20).getTime());
+  assert.equal(new Set(list.map((r) => r.key)).size, list.length);
+  const quiet = P.reminders({ items, habits, events, now, lead: 5, kinds: { tasks: false, meetings: false } });
+  assert.deepEqual(quiet.map((r) => r.kind), ["habit"]);
+  const doneGym = P.reminders({ habits, habitLog: { "2026-10-21": ["gym"] }, now, kinds: { tasks: false, meetings: false } });
+  assert.deepEqual(doneGym, []);
+});
+
 test("calendar events split into all-day and timed slices of a local day", () => {
   const local = (y, m, d, h, min = 0) => new Date(y, m - 1, d, h, min).toISOString();
   const events = [

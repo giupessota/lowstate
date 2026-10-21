@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, safeStorage, session, Tray } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
@@ -30,6 +30,9 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       sandbox: true,
+      // Reminders are timed in the page; keep its timers running while the
+      // window is hidden in the tray / behind other windows.
+      backgroundThrottling: false,
       preload: path.join(__dirname, "preload.cjs")
     }
   });
@@ -305,6 +308,27 @@ ipcMain.handle("calendars-remove", (_event, id) => {
 ipcMain.handle("calendars-refresh", async () => {
   await refreshCalendars();
   return calendarPayload();
+});
+
+// Native notifications for reminders. Clicking one brings the window up on
+// that day. References are kept so they aren't garbage-collected (which
+// would drop the click handler).
+const liveNotifications = new Set();
+ipcMain.on("notify", (_event, payload) => {
+  if (!Notification.isSupported() || !payload || typeof payload !== "object") return;
+  const title = String(payload.title || "Lowstate").slice(0, 120);
+  const body = String(payload.body || "").slice(0, 240);
+  const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.iso || "")) ? payload.iso : null;
+  const notification = new Notification({ title, body });
+  liveNotifications.add(notification);
+  const release = () => liveNotifications.delete(notification);
+  notification.on("click", () => {
+    release();
+    focusWindow();
+    if (iso && window) window.webContents.send("open-day", iso);
+  });
+  notification.on("close", release);
+  notification.show();
 });
 
 ipcMain.on("hide-window", () => { if (window) window.hide(); });

@@ -1436,6 +1436,16 @@ svg.i {
 .schedule-time input[type="time"] { font-family: var(--mono); }
 .row-remove { width: 28px; height: 28px; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font-size: 18px; cursor: pointer; }
 .row-remove:hover { background: color-mix(in srgb, var(--vermilion) 12%, transparent); color: var(--vermilion); }
+.notify-kinds .chip { cursor: pointer; }
+.morning-row { display: flex; align-items: center; gap: 8px; }
+.morning-row input[type="time"] {
+  padding: 5px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 13px var(--mono);
+}
 .period-row { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 8px; }
 .period-field { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font: 500 10px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
 .period-field input {
@@ -1633,6 +1643,7 @@ dialog.sheet[open] { animation: sheet-in .18s ease; }
 .settings-sheet[data-tab="planner"] .set-group:not([data-tab="planner"]),
 .settings-sheet[data-tab="water"] .set-group:not([data-tab="water"]),
 .settings-sheet[data-tab="calendars"] .set-group:not([data-tab="calendars"]),
+.settings-sheet[data-tab="notify"] .set-group:not([data-tab="notify"]),
 .settings-sheet[data-tab="general"] .set-group:not([data-tab="general"]) { display: none; }
 .set-group { display: flex; flex-direction: column; gap: 2px; }
 .set-group h3 { margin: 0 0 2px; color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; }

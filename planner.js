@@ -644,6 +644,47 @@
     return { done, extra, elapsed, total };
   }
 
+  // ---------- Reminders ----------
+  // Everything worth a heads-up today and tomorrow, each with the moment to
+  // fire (`at`, ms) and a stable `key` so it's only shown once. The caller
+  // decides which are due and builds the words.
+  function reminders({ items = [], habits = [], habitLog = {}, events = [], now = new Date(), lead = 10, kinds = {}, morningAt = null } = {}) {
+    const today = startOfDay(now);
+    const days = [toISODate(today), toISODate(addDays(today, 1))];
+    const at = (iso, time) => parseISODate(iso).getTime() + timeToMinutes(time) * 60000;
+    const out = [];
+    if (kinds.tasks !== false) {
+      items.filter((item) => days.includes(item.date) && item.start && !item.done && item.focus !== "later").forEach((item) => {
+        out.push({ key: `task:${item.id}:${item.date}T${item.start}`, kind: "task", at: at(item.date, item.start) - lead * 60000, iso: item.date, start: item.start, title: item.title });
+      });
+    }
+    if (kinds.habits !== false) {
+      days.forEach((iso) => habits.forEach((habit) => {
+        const time = habitTimeOn(habit, iso);
+        if (!time || habitDone(habitLog, iso, habit.id)) return;
+        out.push({ key: `habit:${habit.id}:${iso}`, kind: "habit", at: at(iso, time.start) - lead * 60000, iso, start: time.start, title: habit.name });
+      }));
+    }
+    if (kinds.meetings !== false) {
+      const until = addDays(today, 2).getTime();
+      events.filter((event) => !event.allDay).forEach((event) => {
+        const start = new Date(event.start);
+        if (start.getTime() < today.getTime() || start.getTime() >= until) return;
+        out.push({
+          key: `event:${event.id}`,
+          kind: "meeting",
+          at: start.getTime() - lead * 60000,
+          iso: toISODate(start),
+          start: minutesToTime(start.getHours() * 60 + start.getMinutes()),
+          title: event.title,
+          event,
+        });
+      });
+    }
+    if (isTime(morningAt)) out.push({ key: `morning:${days[0]}`, kind: "morning", at: at(days[0], morningAt), iso: days[0], start: morningAt, title: "" });
+    return out.sort((a, b) => a.at - b.at);
+  }
+
   // ---------- Calendar events (read-only, from subscribed calendars) ----------
   // Events come from the desktop app: all-day ones carry ISO dates with an
   // exclusive end, timed ones absolute instants. This splits them for one
@@ -873,6 +914,7 @@
     MOODS,
     setMood,
     mentalLoad,
+    reminders,
     HABIT_ICONS,
     normalizeHabits,
     habitScheduled,

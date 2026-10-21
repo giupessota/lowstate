@@ -27,5 +27,7 @@ contextBridge.exposeInMainWorld("desktopGadget", {
   setShortcuts: (map) => ipcRenderer.invoke("update-shortcuts", map),
   openExternal: (url) => ipcRenderer.send("open-external", url),
   onQuickCapture: (cb) => ipcRenderer.on("quick-capture", (_e, mode) => cb(mode)),
-  onUpdateAvailable: (cb) => ipcRenderer.on("update-available", (_e, info) => cb(info))
+  onUpdateAvailable: (cb) => ipcRenderer.on("update-available", (_e, info) => cb(info)),
+  notify: (payload) => ipcRenderer.send("notify", payload),
+  onOpenDay: (cb) => ipcRenderer.on("open-day", (_e, iso) => cb(iso))
 });

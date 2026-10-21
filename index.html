@@ -394,6 +394,7 @@
           <button type="button" role="tab" data-tab="planner" data-i18n="tabPlanner">Planner</button>
           <button type="button" role="tab" data-tab="water" data-i18n="water">Water</button>
           <button type="button" role="tab" data-tab="calendars" data-i18n="tabCalendars">Calendars</button>
+          <button type="button" role="tab" data-tab="notify" data-i18n="tabNotify">Reminders</button>
           <button type="button" role="tab" data-tab="general" data-i18n="tabGeneral">General</button>
         </nav>
 
@@ -510,6 +511,48 @@
             <p data-i18n="calHelpIcloud"></p>
             <p class="cal-privacy" data-i18n="calHelpPrivacy"></p>
           </details>
+        </section>
+
+        <section class="set-group" data-tab="notify">
+          <p class="cal-note" id="notifyWebNote" data-i18n="notifyDesktopOnly"></p>
+          <div class="set-row">
+            <span data-i18n="notifyOn">Reminders</span>
+            <div class="seg" data-setting="notifyOn">
+              <button type="button" data-value="on" data-i18n="on">ON</button>
+              <button type="button" data-value="off" data-i18n="off">OFF</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="notifyLead">Remind me</span>
+            <div class="seg" data-setting="notifyLead">
+              <button type="button" data-value="5">5 MIN</button>
+              <button type="button" data-value="10">10 MIN</button>
+              <button type="button" data-value="15">15 MIN</button>
+              <button type="button" data-value="30">30 MIN</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="notifyKinds">About</span>
+            <div class="chip-row notify-kinds" id="notifyKinds">
+              <button type="button" class="chip" data-notify-kind="tasks" data-i18n="notifyTasks">Tasks</button>
+              <button type="button" class="chip" data-notify-kind="habits" data-i18n="notifyHabits">Habits</button>
+              <button type="button" class="chip" data-notify-kind="meetings" data-i18n="notifyMeetings">Meetings</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="morningOn">Morning summary</span>
+            <div class="morning-row">
+              <input type="time" id="morningAt" step="900" data-i18n-aria="morningAt" />
+              <div class="seg" data-setting="morningOn">
+                <button type="button" data-value="on" data-i18n="on">ON</button>
+                <button type="button" data-value="off" data-i18n="off">OFF</button>
+              </div>
+            </div>
+          </div>
+          <div class="set-row">
+            <span></span>
+            <button type="button" class="btn" id="notifyTest" data-i18n="notifyTest">Send a test</button>
+          </div>
         </section>
 
         <section class="set-group" data-tab="general" id="windowGroup" hidden>

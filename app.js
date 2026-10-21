@@ -75,6 +75,10 @@
     loadMeter: $("loadMeter"),
     dayAllDay: $("dayAllDay"),
     calWebNote: $("calWebNote"),
+    notifyWebNote: $("notifyWebNote"),
+    notifyKinds: $("notifyKinds"),
+    morningAt: $("morningAt"),
+    notifyTest: $("notifyTest"),
     calHead: $("calHead"),
     calSummary: $("calSummary"),
     calRefresh: $("calRefresh"),
@@ -299,6 +303,11 @@
       waterUnit: savedSettings.waterUnit === "liters" ? "liters" : "glasses",
       glassMl: Planner.CONTAINER_SIZES.includes(savedSettings.glassMl) ? savedSettings.glassMl : 250,
       waterGoal: Planner.clampWaterGoal(savedSettings.waterGoal ?? Planner.WATER_GOAL.fallback),
+      notifyOn: savedSettings.notifyOn !== false,
+      notifyLead: [5, 10, 15, 30].includes(savedSettings.notifyLead) ? savedSettings.notifyLead : 10,
+      notifyKinds: { tasks: true, habits: true, meetings: true, ...(savedSettings.notifyKinds || {}) },
+      morningOn: savedSettings.morningOn !== false,
+      morningAt: Planner.isTime(savedSettings.morningAt) ? savedSettings.morningAt : "08:00",
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
@@ -1752,6 +1761,9 @@
       waterUnit: state.settings.waterUnit,
       glassMl: String(state.settings.glassMl),
       alwaysOnTop: alwaysOnTop() ? "on" : "off",
+      notifyOn: state.settings.notifyOn ? "on" : "off",
+      notifyLead: String(state.settings.notifyLead),
+      morningOn: state.settings.morningOn ? "on" : "off",
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
       seg.querySelectorAll("button").forEach((button) => {
@@ -1766,6 +1778,7 @@
     const unitButton = els.settingsDialog.querySelector('[data-setting="waterUnit"] [data-value="glasses"]');
     unitButton.textContent = t(Planner.isBottle(state.settings.glassMl) ? "waterUnitBottles" : "waterUnitGlasses");
     renderCalendarSettings();
+    renderNotifySettings();
     els.windowGroup.hidden = !desktop;
     const count = Store.pruneTrash().length;
     els.trashSummary.textContent = t("trashCount", { count });
@@ -1802,6 +1815,12 @@
       if (setting === "glassMl" && Planner.CONTAINER_SIZES.includes(Number(value))) state.settings.glassMl = Number(value);
       persistSettings();
       render();
+    } else if (setting === "notifyOn" || setting === "morningOn") {
+      state.settings[setting] = value === "on";
+      persistSettings();
+    } else if (setting === "notifyLead") {
+      state.settings.notifyLead = [5, 10, 15, 30].includes(Number(value)) ? Number(value) : 10;
+      persistSettings();
     } else if (setting === "alwaysOnTop") {
       Store.setRaw(KEYS.alwaysOnTop, value);
       desktop?.setAlwaysOnTop(value === "on");
@@ -2429,6 +2448,117 @@
     document.querySelectorAll(".dragging").forEach((node) => node.classList.remove("dragging"));
     document.body.classList.remove("is-dragging");
   });
+
+  // ---------- reminders (desktop notifications) ----------
+  // Shown keys live outside the app's data (not backed up) so a restart
+  // doesn't repeat a reminder; entries older than two days are dropped.
+  const NOTIFIED_KEY = "lowstate.notified";
+  let notified = {};
+  try {
+    notified = JSON.parse(localStorage.getItem(NOTIFIED_KEY) || "{}") || {};
+  } catch {
+    notified = {};
+  }
+  const saveNotified = () => {
+    const cutoff = Date.now() - 2 * 86400000;
+    notified = Object.fromEntries(Object.entries(notified).filter(([, at]) => at > cutoff));
+    try {
+      localStorage.setItem(NOTIFIED_KEY, JSON.stringify(notified));
+    } catch {
+      // Private mode or full storage: reminders may repeat after a restart.
+    }
+  };
+
+  function renderNotifySettings() {
+    els.notifyWebNote.textContent = t("notifyDesktopOnly");
+    els.notifyKinds.querySelectorAll("[data-notify-kind]").forEach((chip) => {
+      const on = state.settings.notifyKinds[chip.dataset.notifyKind] !== false;
+      chip.classList.toggle("active", on);
+      chip.setAttribute("aria-pressed", String(on));
+    });
+    if (document.activeElement !== els.morningAt) els.morningAt.value = state.settings.morningAt;
+    els.notifyTest.disabled = !desktop?.notify;
+  }
+
+  // "3 meetings (first at 10:00) · Gym at 18:00 · 2 must-do"
+  function morningBody(iso) {
+    const parts = [];
+    const meetings = Planner.eventsForDay(state.events, iso).timed;
+    if (meetings.length === 1) parts.push(t("morningMeeting", { time: clockTime(new Date(meetings[0].start)) }));
+    else if (meetings.length > 1) parts.push(t("morningMeetings", { n: meetings.length, time: clockTime(new Date(meetings[0].start)) }));
+    state.habits.forEach((habit) => {
+      const time = Planner.habitTimeOn(habit, iso);
+      if (time) parts.push(t("morningHabit", { name: habit.name, time: time.start }));
+    });
+    const must = Planner.itemsForDay(state.items, iso).filter((item) => item.focus === "must" && !item.done).length;
+    if (must) parts.push(t("morningMust", { n: must }));
+    const overdue = Planner.overdueItems(state.items, iso).length;
+    if (overdue) parts.push(t("morningOverdue", { n: overdue }));
+    return parts.length ? parts.join(" · ") : t("morningEmpty");
+  }
+
+  // Checked every 30 seconds: anything whose moment has come in the last ten
+  // minutes and wasn't shown yet becomes a notification. Older ones (the
+  // computer was asleep) are skipped rather than delivered late.
+  function checkReminders() {
+    if (!desktop?.notify || !state.settings.notifyOn) return;
+    const now = Date.now();
+    const due = Planner.reminders({
+      items: state.items,
+      habits: state.habits,
+      habitLog: state.habitLog,
+      events: state.events,
+      now: new Date(now),
+      lead: state.settings.notifyLead,
+      kinds: state.settings.notifyKinds,
+      morningAt: state.settings.morningOn ? state.settings.morningAt : null,
+    }).filter((reminder) => reminder.at <= now && now - reminder.at < 10 * 60000 && !notified[reminder.key]);
+    if (!due.length) return;
+    due.forEach((reminder) => {
+      notified[reminder.key] = now;
+      if (reminder.kind === "morning") {
+        desktop.notify({ title: t("morningTitle"), body: morningBody(reminder.iso), iso: reminder.iso });
+        return;
+      }
+      const minutes = Math.max(0, Math.round((reminder.at + state.settings.notifyLead * 60000 - now) / 60000));
+      const when = minutes ? t("remindIn", { time: reminder.start, n: minutes }) : t("remindNow", { time: reminder.start });
+      const extra = reminder.kind === "meeting"
+        ? [reminder.event.location, calendarById(reminder.event.calendarId)?.name].filter(Boolean)
+        : [];
+      desktop.notify({
+        title: reminder.title || t("untitledEvent"),
+        body: [when, ...extra].join(" · "),
+        iso: reminder.iso,
+      });
+    });
+    saveNotified();
+  }
+
+  els.notifyKinds.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-notify-kind]");
+    if (!chip) return;
+    const kind = chip.dataset.notifyKind;
+    state.settings.notifyKinds = { ...state.settings.notifyKinds, [kind]: state.settings.notifyKinds[kind] === false };
+    persistSettings();
+    renderNotifySettings();
+  });
+  els.morningAt.addEventListener("change", () => {
+    if (!Planner.isTime(els.morningAt.value)) return;
+    state.settings.morningAt = els.morningAt.value;
+    persistSettings();
+  });
+  els.notifyTest.addEventListener("click", () => {
+    desktop?.notify?.({ title: "Lowstate", body: t("notifyTestBody"), iso: todayISO() });
+  });
+
+  if (desktop?.notify) {
+    setInterval(checkReminders, 30000);
+    setTimeout(checkReminders, 5000);
+    desktop.onOpenDay?.((iso) => {
+      document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
+      openDay(iso);
+    });
+  }
 
   // ---------- desktop integration ----------
   if (desktop) {
