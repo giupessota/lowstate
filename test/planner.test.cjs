@@ -221,6 +221,23 @@ test("habits planned for some weekdays: icons, schedule, streaks and month count
   assert.equal(P.habitTimeOn(split, "2026-10-25"), null);
   assert.equal(P.habitTimeOn(split, "2026-10-22"), null);
   assert.deepEqual(P.habitTimeOn(timed, "2026-10-22"), { start: "07:00", duration: 75 });
+
+  // The editor's rows: days that share a time are one row.
+  assert.deepEqual(P.scheduleRows(split), [
+    { days: [0], start: null, duration: 60 },
+    { days: [1, 3], start: "07:00", duration: 60 },
+    { days: [5], start: "18:00", duration: 90 },
+  ]);
+  assert.deepEqual(P.scheduleRows(timed), [{ days: [], start: "07:00", duration: 75 }]);
+  assert.deepEqual(P.habitFromRows([{ days: [3, 1], start: "07:00", duration: 60 }, { days: [5], start: "18:00", duration: 90 }]), {
+    days: [1, 3, 5], start: null, duration: null,
+    times: { 1: { start: "07:00", duration: 60 }, 3: { start: "07:00", duration: 60 }, 5: { start: "18:00", duration: 90 } },
+  });
+  assert.deepEqual(P.habitFromRows([{ days: [1, 3, 5], start: "07:00", duration: 45 }, { days: [], start: "09:00", duration: 60 }]),
+    { days: [1, 3, 5], start: "07:00", duration: 45, times: {} });
+  assert.deepEqual(P.habitFromRows([{ days: [], start: null, duration: 60 }]), { days: [], start: null, duration: null, times: {} });
+  // Round trip keeps the habit the same.
+  assert.deepEqual(P.normalizeHabits([{ ...split, ...P.habitFromRows(P.scheduleRows(split)) }])[0], split);
   assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", icon: "rocket", days: [0, 1, 2, 3, 4, 5, 6] }])[0].icon, null);
   assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", days: [0, 1, 2, 3, 4, 5, 6] }])[0].days, []);
   // October 2026: the 19th is a Monday, the 21st a Wednesday, the 22nd a Thursday.

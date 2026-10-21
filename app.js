@@ -37,7 +37,6 @@
   const TAPE_PATTERNS = ["stripes", "dots", "gingham", "waves"];
   const TAPE_COLORS = ["--sakura", "--asagi", "--yamabuki", "--matcha", "--fuji"];
   const TAB_COLORS = ["--indigo", "--vermilion", "--matcha", "--yamabuki", "--fuji", "--asagi"];
-  const START_OPTIONS = Array.from({ length: 96 }, (_, index) => Planner.minutesToTime(index * 15));
   const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
   const VIEWS = ["day", "week", "month", "habits"];
 
@@ -116,14 +115,10 @@
     habitEditForm: $("habitEditForm"),
     habitEditName: $("habitEditName"),
     habitIconPicker: $("habitIconPicker"),
-    habitDayPicker: $("habitDayPicker"),
+    habitRows: $("habitRows"),
+    habitAddRow: $("habitAddRow"),
     habitDaysHint: $("habitDaysHint"),
     habitColorPicker: $("habitColorPicker"),
-    habitEditStart: $("habitEditStart"),
-    habitEditDuration: $("habitEditDuration"),
-    habitTimeMode: $("habitTimeMode"),
-    habitSameTime: $("habitSameTime"),
-    habitPerDayTimes: $("habitPerDayTimes"),
     habitEditDelete: $("habitEditDelete"),
     habitEditCancel: $("habitEditCancel"),
     rangeTitle: $("rangeTitle"),
@@ -1395,52 +1390,7 @@
       }, habitIconEl(icon))));
     els.habitIconPicker.style.setProperty("--habit", draft.color);
 
-    const sunday = new Date(2026, 0, 4); // a Sunday, only for weekday names
-    els.habitDayPicker.replaceChildren(...weekdayOrder().map((day) => {
-      const on = !draft.days.length || draft.days.includes(day);
-      const name = formatDate(Planner.addDays(sunday, day), { weekday: "long" });
-      return h("button", {
-        type: "button",
-        class: `day-choice${on ? " active" : ""}${day === 0 ? " is-sun" : day === 6 ? " is-sat" : ""}`,
-        "data-day": day,
-        "aria-pressed": String(on),
-        "aria-label": name,
-        title: capitalize(name),
-        text: formatDate(Planner.addDays(sunday, day), { weekday: "narrow" }),
-      });
-    }));
-    els.habitDaysHint.textContent = !draft.days.length ? t("habitEveryDay")
-      : draft.days.length === 1 ? t("habitDaysOne") : t("habitDaysCount", { n: draft.days.length });
-
-    // Time: one for every planned day, or a row per planned day.
-    const perDay = draft.timeMode === "per-day";
-    els.habitTimeMode.querySelectorAll("[data-mode]").forEach((button) => {
-      const active = (button.dataset.mode === "per-day") === perDay;
-      button.classList.toggle("active", active);
-      button.setAttribute("aria-pressed", String(active));
-    });
-    els.habitSameTime.hidden = perDay;
-    els.habitPerDayTimes.hidden = !perDay;
-    fillSelect(els.habitEditStart, START_OPTIONS, t("habitNoTime"), (value) => value);
-    fillSelect(els.habitEditDuration, DURATION_OPTIONS, "—", formatDuration);
-    els.habitEditStart.value = draft.start || "";
-    els.habitEditDuration.value = draft.start ? String(draft.duration || 60) : "";
-    els.habitEditDuration.disabled = !draft.start;
-    if (perDay) {
-      const planned = weekdayOrder().filter((day) => !draft.days.length || draft.days.includes(day));
-      els.habitPerDayTimes.replaceChildren(...planned.map((day) => {
-        const time = draft.times[String(day)] || null;
-        const start = h("select", { "data-day-start": day, "aria-label": `${t("habitTime")} — ${weekdayShort(day)}` });
-        const duration = h("select", { "data-day-duration": day, "aria-label": `${t("habitDuration")} — ${weekdayShort(day)}` });
-        fillSelect(start, START_OPTIONS, t("habitNoTime"), (value) => value);
-        fillSelect(duration, DURATION_OPTIONS, "—", formatDuration);
-        start.value = time?.start || "";
-        duration.value = time ? String(time.duration) : "";
-        duration.disabled = !time;
-        return h("div", { class: `per-day-row${day === 0 ? " is-sun" : day === 6 ? " is-sat" : ""}` },
-          h("span", { class: "per-day-name", text: weekdayShort(day) }), start, duration);
-      }));
-    }
+    renderHabitRows();
 
     els.habitColorPicker.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
       type: "button",
@@ -1452,15 +1402,47 @@
     })));
   }
 
+  // "When": rows of days + time + duration. A day belongs to one row at most.
+  function renderHabitRows() {
+    const rows = habitDraft.rows;
+    const sunday = new Date(2026, 0, 4); // a Sunday, only for weekday names
+    els.habitRows.replaceChildren(...rows.map((row, index) => {
+      const duration = h("select", { "data-row-duration": index, "aria-label": t("habitDuration") });
+      fillSelect(duration, DURATION_OPTIONS, "—", formatDuration);
+      duration.value = row.start ? String(row.duration || 60) : "";
+      duration.disabled = !row.start;
+      return h("div", { class: "schedule-row" },
+        h("div", { class: "day-picker" }, weekdayOrder().map((day) => {
+          const on = row.days.includes(day);
+          const name = formatDate(Planner.addDays(sunday, day), { weekday: "long" });
+          return h("button", {
+            type: "button",
+            class: `day-choice${on ? " active" : ""}${day === 0 ? " is-sun" : day === 6 ? " is-sat" : ""}`,
+            "data-row": index,
+            "data-day": day,
+            "aria-pressed": String(on),
+            "aria-label": name,
+            title: capitalize(name),
+            text: formatDate(Planner.addDays(sunday, day), { weekday: "narrow" }),
+          });
+        })),
+        h("div", { class: "schedule-time" },
+          h("input", { type: "time", step: "900", value: row.start || "", "data-row-start": index, "aria-label": t("habitTime") }),
+          duration,
+          rows.length > 1
+            ? h("button", { type: "button", class: "row-remove", "data-row-remove": index, title: t("habitRemoveTime"), "aria-label": t("habitRemoveTime"), text: "×" })
+            : null));
+    }));
+    const days = new Set(rows.flatMap((row) => row.days));
+    els.habitDaysHint.textContent = !days.size ? t("habitNoDaysHint")
+      : days.size === 7 ? t("habitEveryDay")
+        : days.size === 1 ? t("habitDaysOne") : t("habitDaysCount", { n: days.size });
+  }
+
   function openHabitEditor(id) {
     const habit = state.habits.find((candidate) => candidate.id === id);
     if (!habit) return;
-    habitDraft = {
-      ...habit,
-      days: [...habit.days],
-      times: { ...habit.times },
-      timeMode: Object.keys(habit.times || {}).length ? "per-day" : "same",
-    };
+    habitDraft = { ...habit, rows: Planner.scheduleRows(habit) };
     els.habitEditName.value = habit.name;
     renderHabitEditor();
     els.habitDialog.showModal();
@@ -1581,7 +1563,6 @@
       chip.classList.toggle("active", quick[chip.dataset.dateQuick] === draft.date);
     });
 
-    fillSelect(els.itemStart, START_OPTIONS, t("noTimeOption"), (value) => value);
     fillSelect(els.itemDuration, DURATION_OPTIONS, "—", formatDuration);
     els.itemStart.value = draft.start || "";
     els.itemDuration.value = draft.duration ? String(draft.duration) : "";
@@ -2097,15 +2078,24 @@
     const icon = event.target.closest("[data-icon]");
     const day = event.target.closest("[data-day]");
     const color = event.target.closest("[data-color]");
+    const remove = event.target.closest("[data-row-remove]");
     if (icon) habitDraft.icon = icon.dataset.icon || null;
     else if (color) habitDraft.color = color.dataset.color;
     else if (day) {
       const value = Number(day.dataset.day);
-      // Starting from "every day", the first tap keeps only that day.
-      const current = habitDraft.days.length ? habitDraft.days : [];
-      const next = !current.length ? [value]
-        : current.includes(value) ? current.filter((other) => other !== value) : [...current, value];
-      habitDraft.days = next.length === 7 ? [] : next.sort((a, b) => a - b);
+      const row = habitDraft.rows[Number(day.dataset.row)];
+      if (row.days.includes(value)) row.days = row.days.filter((other) => other !== value);
+      else {
+        // A day can only have one time: picking it here takes it from other rows.
+        habitDraft.rows.forEach((other) => { other.days = other.days.filter((candidate) => candidate !== value); });
+        row.days = [...row.days, value].sort((a, b) => a - b);
+      }
+      renderHabitRows();
+      return;
+    } else if (remove) {
+      habitDraft.rows.splice(Number(remove.dataset.rowRemove), 1);
+      renderHabitRows();
+      return;
     } else return;
     renderHabitEditor();
   });
@@ -2113,54 +2103,32 @@
   els.habitEditForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const name = els.habitEditName.value.trim().slice(0, 60) || habitDraft.name;
-    const { timeMode, ...draft } = habitDraft;
-    // Keep only one way of timing: per-day times drop the single time and
-    // vice versa; times for days no longer planned are dropped too.
-    const saved = timeMode === "per-day"
-      ? { ...draft, start: null, duration: null, times: Object.fromEntries(Object.entries(draft.times).filter(([day]) => !draft.days.length || draft.days.includes(Number(day)))) }
-      : { ...draft, times: {} };
+    const { rows, ...draft } = habitDraft;
+    const saved = { ...draft, ...Planner.habitFromRows(rows) };
     state.habits = Planner.normalizeHabits(state.habits.map((habit) => (habit.id === habitDraft.id ? { ...saved, name } : habit)));
     persistHabits();
     els.habitDialog.close();
     render();
   });
   els.habitEditCancel.addEventListener("click", () => els.habitDialog.close());
-  els.habitEditStart.addEventListener("change", () => {
-    habitDraft.start = els.habitEditStart.value || null;
-    habitDraft.duration = habitDraft.start ? habitDraft.duration || 60 : null;
-    renderHabitEditor();
+  // Times are typed or stepped in a time field; the row isn't redrawn while
+  // typing, only the duration next to it is switched on or off.
+  els.habitRows.addEventListener("input", (event) => {
+    const start = event.target.closest("[data-row-start]");
+    if (!start) return;
+    const row = habitDraft.rows[Number(start.dataset.rowStart)];
+    row.start = Planner.isTime(start.value) ? start.value : null;
+    const duration = els.habitRows.querySelector(`[data-row-duration="${start.dataset.rowStart}"]`);
+    duration.disabled = !row.start;
+    if (row.start && !duration.value) duration.value = String(row.duration || 60);
   });
-  els.habitEditDuration.addEventListener("change", () => {
-    habitDraft.duration = Number(els.habitEditDuration.value) || 60;
+  els.habitRows.addEventListener("change", (event) => {
+    const duration = event.target.closest("[data-row-duration]");
+    if (duration) habitDraft.rows[Number(duration.dataset.rowDuration)].duration = Number(duration.value) || 60;
   });
-  els.habitTimeMode.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-mode]");
-    if (!button || button.dataset.mode === habitDraft.timeMode) return;
-    if (button.dataset.mode === "per-day") {
-      // Start every planned day from the single time, if there was one.
-      const planned = weekdayOrder().filter((day) => !habitDraft.days.length || habitDraft.days.includes(day));
-      habitDraft.times = habitDraft.start
-        ? Object.fromEntries(planned.map((day) => [String(day), { start: habitDraft.start, duration: habitDraft.duration || 60 }]))
-        : {};
-    } else {
-      const first = Object.values(habitDraft.times)[0];
-      habitDraft.start = first?.start || habitDraft.start || null;
-      habitDraft.duration = first?.duration || habitDraft.duration || null;
-    }
-    habitDraft.timeMode = button.dataset.mode;
-    renderHabitEditor();
-  });
-  els.habitPerDayTimes.addEventListener("change", (event) => {
-    const start = event.target.closest("[data-day-start]");
-    const duration = event.target.closest("[data-day-duration]");
-    if (start) {
-      const day = start.dataset.dayStart;
-      if (start.value) habitDraft.times[day] = { start: start.value, duration: habitDraft.times[day]?.duration || 60 };
-      else delete habitDraft.times[day];
-    } else if (duration && habitDraft.times[duration.dataset.dayDuration]) {
-      habitDraft.times[duration.dataset.dayDuration].duration = Number(duration.value) || 60;
-    } else return;
-    renderHabitEditor();
+  els.habitAddRow.addEventListener("click", () => {
+    habitDraft.rows.push({ days: [], start: null, duration: 60 });
+    renderHabitRows();
   });
   els.habitEditDelete.addEventListener("click", () => {
     const habit = habitDraft;

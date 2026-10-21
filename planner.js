@@ -530,6 +530,42 @@
     return habit.start ? { start: habit.start, duration: habit.duration || 60 } : null;
   }
 
+  // The editor shows a habit's schedule as rows of { days, start, duration }:
+  // one row for "these days at this time", more rows for other times.
+  function scheduleRows(habit) {
+    const times = habit?.times || {};
+    if (!Object.keys(times).length) {
+      return [{ days: [...(habit?.days || [])], start: habit?.start || null, duration: habit?.duration || 60 }];
+    }
+    const planned = habit.days.length ? habit.days : [0, 1, 2, 3, 4, 5, 6];
+    const rows = [];
+    planned.forEach((day) => {
+      const time = times[String(day)] || null;
+      const key = time ? `${time.start}|${time.duration}` : "none";
+      let row = rows.find((candidate) => candidate.key === key);
+      if (!row) rows.push(row = { key, days: [], start: time?.start || null, duration: time?.duration || 60 });
+      row.days.push(day);
+    });
+    return rows.map(({ key, ...row }) => row);
+  }
+
+  // Back from rows: one row (or one row with days) keeps a single time;
+  // several become per-weekday times. No days picked at all = every day.
+  function habitFromRows(rows) {
+    const list = Array.isArray(rows) && rows.length ? rows : [{ days: [], start: null, duration: 60 }];
+    const used = list.filter((row) => row.days?.length);
+    if (used.length <= 1) {
+      const row = used[0] || list[0];
+      const start = isTime(row.start) ? row.start : null;
+      return { days: normalizeDays(row.days), start, duration: start ? row.duration || 60 : null, times: {} };
+    }
+    const times = {};
+    used.forEach((row) => {
+      if (isTime(row.start)) row.days.forEach((day) => { times[String(day)] = { start: row.start, duration: row.duration || 60 }; });
+    });
+    return { days: normalizeDays(used.flatMap((row) => row.days)), start: null, duration: null, times: normalizeTimes(times) };
+  }
+
   const asHabit = (habitOrId) => (typeof habitOrId === "string" ? { id: habitOrId, days: [] } : habitOrId);
 
   function habitDone(log, iso, id) {
@@ -826,6 +862,8 @@
     normalizeHabits,
     habitScheduled,
     habitTimeOn,
+    scheduleRows,
+    habitFromRows,
     habitDone,
     toggleHabit,
     forgetHabit,

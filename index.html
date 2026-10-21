@@ -293,7 +293,7 @@
         <div class="field-grid">
           <label class="field">
             <span class="field-label" data-i18n="fieldTime">Time</span>
-            <select id="itemStart"></select>
+            <input type="time" id="itemStart" step="900" />
           </label>
           <label class="field">
             <span class="field-label" data-i18n="fieldDuration">Duration</span>
@@ -352,23 +352,12 @@
           <div class="icon-picker" id="habitIconPicker"></div>
         </div>
         <div class="field">
-          <span class="field-label" data-i18n="habitDays">Days</span>
-          <div class="day-picker" id="habitDayPicker"></div>
-          <span class="field-hint" id="habitDaysHint"></span>
-        </div>
-        <div class="field">
-          <div class="field-head">
-            <span class="field-label" data-i18n="habitTime">Time</span>
-            <div class="seg time-mode" id="habitTimeMode">
-              <button type="button" data-mode="same" data-i18n="habitSameTime">SAME EVERY DAY</button>
-              <button type="button" data-mode="per-day" data-i18n="habitPerDay">PER DAY</button>
-            </div>
+          <span class="field-label" data-i18n="habitWhen">When</span>
+          <div class="schedule-rows" id="habitRows"></div>
+          <div class="schedule-foot">
+            <button type="button" class="focus-action" id="habitAddRow" data-i18n="habitAddTime">+ Another time</button>
+            <span class="field-hint" id="habitDaysHint"></span>
           </div>
-          <div class="field-grid" id="habitSameTime">
-            <select id="habitEditStart" data-i18n-aria="habitTime"></select>
-            <select id="habitEditDuration" data-i18n-aria="habitDuration"></select>
-          </div>
-          <div class="per-day-times" id="habitPerDayTimes" hidden></div>
         </div>
         <div class="field">
           <span class="field-label" data-i18n="habitColor">Color</span>
