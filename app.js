@@ -801,7 +801,8 @@
 
     const candidate = score >= 7 && iso >= todayISO() ? Planner.postponeCandidate(state.items, iso) : null;
     els.loadMeter.className = `load level-${level}${hasOwn ? " is-own" : ""}`;
-    els.loadMeter.replaceChildren(
+    // replaceChildren (unlike h) would print a null child as "null".
+    els.loadMeter.replaceChildren(...[
       h("div", { class: "load-head", title: why },
         h("span", { class: "load-title", text: t("load") }),
         h("span", { class: "load-ticks", role: "group" }, ticks),
@@ -810,7 +811,8 @@
         h("span", { class: "load-source", text: hasOwn ? `${t("loadYours")} · ${t("loadEstimateIs", { n: estimate.score })}` : `${t("loadEstimate")} · ${t("loadAdjust")}` })),
       score >= 5 || candidate ? h("p", { class: "load-text" },
         t(`loadText-${level}`),
-        candidate ? h("button", { type: "button", class: "load-action", "data-postpone": candidate.id, text: t("loadPostpone", { title: candidate.title }) }) : null) : null);
+        candidate ? h("button", { type: "button", class: "load-action", "data-postpone": candidate.id, text: t("loadPostpone", { title: candidate.title }) }) : null) : null,
+    ].filter(Boolean));
   }
 
   const FOCUS_LABELS = { must: "focusMust", could: "focusCould", later: "focusLater" };
