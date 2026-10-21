@@ -189,7 +189,7 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
 
 test("habits: toggling, streaks that survive an unchecked today, monthly progress", () => {
   assert.deepEqual(P.normalizeHabits([{ id: "a", name: " Ler " }, { id: "a", name: "dup" }, { id: "b", name: "" }, null]), [
-    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [], start: null, duration: null, times: {} },
+    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [], start: null, duration: null, times: {}, since: null, until: null },
   ]);
   let log = {};
   ["2026-10-18", "2026-10-19", "2026-10-20"].forEach((iso) => { log = P.toggleHabit(log, iso, "read"); });
@@ -250,6 +250,25 @@ test("habits planned for some weekdays: icons, schedule, streaks and month count
   log = P.toggleHabit(log, "2026-10-20", "gym");
   assert.equal(P.habitStreak(log, gym, "2026-10-22"), 4);
   assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-22"), { done: 3, extra: 1, elapsed: 9, total: 13 });
+});
+
+test("habits only count between their start and end dates", () => {
+  const [walk] = P.normalizeHabits([{ id: "w", name: "Caminhar", since: "2026-10-12", until: "2026-10-23" }]);
+  assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", since: "2026-10-12", until: "2026-10-01" }])[0].until, null);
+  assert.equal(P.habitScheduled(walk, "2026-10-11"), false);
+  assert.equal(P.habitScheduled(walk, "2026-10-12"), true);
+  assert.equal(P.habitScheduled(walk, "2026-10-24"), false);
+  assert.equal(P.habitTimeOn({ ...walk, start: "07:00" }, "2026-10-30"), null);
+  assert.equal(P.habitActiveBetween(walk, "2026-09-01", "2026-09-30"), false);
+  assert.equal(P.habitActiveBetween(walk, "2026-10-01", "2026-10-31"), true);
+  assert.equal(P.habitActiveBetween(walk, "2026-11-01", "2026-11-30"), false);
+  // October 2026, today the 25th: planned from the 12th to the 23rd only.
+  let log = {};
+  ["2026-10-12", "2026-10-13", "2026-10-23"].forEach((iso) => { log = P.toggleHabit(log, iso, "w"); });
+  assert.deepEqual(P.habitMonth(log, walk, 2026, 9, "2026-10-25"), { done: 3, extra: 0, elapsed: 12, total: 12 });
+  const fresh = { ...walk, until: null };
+  log = P.toggleHabit(P.toggleHabit({}, "2026-10-12", "w"), "2026-10-13", "w");
+  assert.equal(P.habitStreak(log, fresh, "2026-10-13"), 2);
 });
 
 test("calendar events split into all-day and timed slices of a local day", () => {

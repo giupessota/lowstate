@@ -508,10 +508,24 @@
           ? Math.min(Math.round(habit.duration), 720)
           : null,
         times: normalizeTimes(habit.times),
+        // Active period: from `since` (inclusive) until `until` (inclusive,
+        // null = still going). Outside it the habit isn't planned or shown.
+        since: parseISODate(habit.since) ? habit.since : null,
+        until: parseISODate(habit.until) && (!parseISODate(habit.since) || habit.until >= habit.since) ? habit.until : null,
       }));
   }
 
+  function habitActive(habit, iso) {
+    return (!habit?.since || iso >= habit.since) && (!habit?.until || iso <= habit.until);
+  }
+
+  // Active in any day between `from` and `to` (ISO dates, inclusive).
+  function habitActiveBetween(habit, from, to) {
+    return (!habit?.since || habit.since <= to) && (!habit?.until || habit.until >= from);
+  }
+
   function habitScheduled(habit, iso) {
+    if (!habitActive(habit, iso)) return false;
     const days = habit?.days || [];
     if (!days.length) return true;
     const date = parseISODate(iso);
@@ -597,6 +611,7 @@
     let streak = 0;
     for (let guard = 0; guard < 3660; guard++) {
       const iso = toISODate(day);
+      if (habit.since && iso < habit.since) break;
       if (habitDone(log, iso, habit.id)) streak += 1;
       else if (habitScheduled(habit, iso)) break;
       day = addDays(day, -1);
@@ -861,6 +876,8 @@
     HABIT_ICONS,
     normalizeHabits,
     habitScheduled,
+    habitActive,
+    habitActiveBetween,
     habitTimeOn,
     scheduleRows,
     habitFromRows,

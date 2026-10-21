@@ -117,6 +117,9 @@
     habitIconPicker: $("habitIconPicker"),
     habitRows: $("habitRows"),
     habitAddRow: $("habitAddRow"),
+    habitSince: $("habitSince"),
+    habitUntil: $("habitUntil"),
+    habitEndToggle: $("habitEndToggle"),
     habitDaysHint: $("habitDaysHint"),
     habitColorPicker: $("habitColorPicker"),
     habitEditDelete: $("habitEditDelete"),
@@ -328,6 +331,14 @@
     Store.save(KEYS.habits, state.habits);
     Store.save(KEYS.habitLog, state.habitLog);
   };
+
+  // Habits from before start dates existed begin on their first logged day
+  // (or today), so earlier months don't show them at 0%.
+  if (state.habits.some((habit) => !habit.since)) {
+    const firstLogged = (id) => Object.keys(state.habitLog).filter((iso) => state.habitLog[iso].includes(id)).sort()[0];
+    state.habits = state.habits.map((habit) => (habit.since ? habit : { ...habit, since: firstLogged(habit.id) || todayISO() }));
+    Store.save(KEYS.habits, state.habits);
+  }
 
   if (initial.changed) {
     persistItems();
@@ -1161,7 +1172,7 @@
   // Icon habits planned (or done as an extra) on a day, for week and month.
   function dayHabitIcons(iso, className) {
     const icons = state.habits
-      .filter((habit) => habit.icon && (Planner.habitScheduled(habit, iso) || Planner.habitDone(state.habitLog, iso, habit.id)))
+      .filter((habit) => habit.icon && (Planner.habitScheduled(habit, iso) || (Planner.habitActive(habit, iso) && Planner.habitDone(state.habitLog, iso, habit.id))))
       .slice(0, 4)
       .map((habit) => {
         const done = Planner.habitDone(state.habitLog, iso, habit.id);
@@ -1209,7 +1220,8 @@
       return h("span", { class: classes.join(" "), text: label ? String(day) : "" });
     }), h("span", { class: "hg-corner" })];
 
-    const rows = state.habits.flatMap((habit) => {
+    const visible = state.habits.filter((habit) => Planner.habitActiveBetween(habit, isos[0], isos[isos.length - 1]));
+    const rows = visible.flatMap((habit) => {
       const stats = Planner.habitMonth(state.habitLog, habit, year, month, today);
       const streak = Planner.habitStreak(state.habitLog, habit, today);
       const pct = stats.elapsed ? Math.round((stats.done / stats.elapsed) * 100) : 0;
@@ -1218,9 +1230,12 @@
           h("button", { type: "button", class: "hg-edit", "data-habit-edit": habit.id, title: t("habitEdit"), "aria-label": t("habitEdit") }, habitMark(habit)),
           h("button", { type: "button", class: "hg-label", "data-habit-edit": habit.id, title: t("habitEdit") },
             h("span", { class: "hg-title", text: habit.name }),
-            h("span", { class: "hg-meta" }, habitScheduleParts(habit).map((part) => h("span", { text: part })))),
-),
+            h("span", { class: "hg-meta" }, [
+              ...habitScheduleParts(habit),
+              ...(habit.until ? [t("habitEnded", { date: shortDate(habit.until) })] : []),
+            ].map((part) => h("span", { text: part }))))),
         ...isos.map((iso) => {
+          if (!Planner.habitActive(habit, iso)) return h("span", { class: "hg-cell is-inactive", "aria-hidden": "true" });
           const done = Planner.habitDone(state.habitLog, iso, habit.id);
           const future = iso > today;
           // Days the habit isn't planned for stay clickable as "extra" days.
@@ -1239,13 +1254,14 @@
           });
         }),
         h("div", { class: "hg-stat", title: t("habitMonthPct", stats) },
-          h("strong", { text: `${pct}%` }),
+          h("strong", { text: stats.elapsed ? `${pct}%` : "—" }),
           streak ? h("span", { title: t("habitStreak", { n: streak }), text: `${streak}d` }) : null),
       ];
     });
     els.habitGrid.replaceChildren(...head, ...rows);
-    els.habitGrid.hidden = state.habits.length === 0;
-    els.habitEmpty.hidden = state.habits.length > 0;
+    els.habitGrid.hidden = visible.length === 0;
+    els.habitEmpty.hidden = visible.length > 0;
+    els.habitEmpty.textContent = state.habits.length ? t("habitNoneThisMonth") : t("habitEmpty");
 
     const names = new Set(state.habits.map((habit) => habit.name.toLowerCase()));
     const ideas = habitIdeas().filter((idea) => !names.has(idea.name.toLowerCase()));
@@ -1348,7 +1364,7 @@
   // Habits planned for the day (or already done as an extra) as pills.
   function renderTodayHabits(iso) {
     const habits = state.habits
-      .filter((habit) => Planner.habitScheduled(habit, iso) || Planner.habitDone(state.habitLog, iso, habit.id))
+      .filter((habit) => Planner.habitScheduled(habit, iso) || (Planner.habitActive(habit, iso) && Planner.habitDone(state.habitLog, iso, habit.id)))
       .sort((a, b) => ((Planner.habitTimeOn(a, iso)?.start || "99") < (Planner.habitTimeOn(b, iso)?.start || "99") ? -1 : 1));
     els.todayHabits.hidden = habits.length === 0;
     const future = iso > todayISO();
@@ -1391,6 +1407,10 @@
     els.habitIconPicker.style.setProperty("--habit", draft.color);
 
     renderHabitRows();
+    els.habitSince.value = draft.since || "";
+    els.habitUntil.value = draft.until || "";
+    els.habitUntil.min = draft.since || "";
+    els.habitEndToggle.textContent = draft.until ? t("habitReactivate") : t("habitEndToday");
 
     els.habitColorPicker.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
       type: "button",
@@ -1454,7 +1474,7 @@
     const used = new Set(state.habits.map((habit) => habit.color));
     const color = Planner.PALETTE.find((candidate) => !used.has(candidate)) || Planner.PALETTE[state.habits.length % Planner.PALETTE.length];
     const id = Planner.newId();
-    state.habits = Planner.normalizeHabits([...state.habits, { id, name: clean, color, icon, days }]);
+    state.habits = Planner.normalizeHabits([...state.habits, { id, name: clean, color, icon, days, since: todayISO() }]);
     persistHabits();
     render();
     // Straight into the editor, so days and a time are set while it's fresh.
@@ -2125,6 +2145,21 @@
   els.habitRows.addEventListener("change", (event) => {
     const duration = event.target.closest("[data-row-duration]");
     if (duration) habitDraft.rows[Number(duration.dataset.rowDuration)].duration = Number(duration.value) || 60;
+  });
+  els.habitSince.addEventListener("change", () => {
+    habitDraft.since = els.habitSince.value || todayISO();
+    if (habitDraft.until && habitDraft.until < habitDraft.since) habitDraft.until = null;
+    renderHabitEditor();
+  });
+  els.habitUntil.addEventListener("change", () => {
+    habitDraft.until = els.habitUntil.value || null;
+    renderHabitEditor();
+  });
+  // Ending keeps the history; reactivating just clears the end date.
+  els.habitEndToggle.addEventListener("click", () => {
+    habitDraft.until = habitDraft.until ? null : todayISO();
+    if (habitDraft.since && habitDraft.until && habitDraft.until < habitDraft.since) habitDraft.since = habitDraft.until;
+    renderHabitEditor();
   });
   els.habitAddRow.addEventListener("click", () => {
     habitDraft.rows.push({ days: [], start: null, duration: 60 });
