@@ -255,23 +255,25 @@ svg.i {
   text-underline-offset: 3px;
 }
 
+/* A quiet dashed row the size of a note; it only firms up when in use */
 .capture {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 10px;
-  border: 1px solid var(--cover-line);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, .12);
+  padding: 0 9px;
+  border: 1px dashed rgba(239, 232, 216, .22);
+  border-radius: 7px;
+  background: transparent;
   color: var(--cover-muted);
   transition: border-color .15s, background .15s;
 }
-.capture svg.i { width: 16px; height: 16px; }
-.capture:focus-within { border-color: rgba(239, 232, 216, .45); background: rgba(0, 0, 0, .2); color: var(--cover-ink); }
+.capture svg.i { width: 14px; height: 14px; }
+.capture:hover { border-color: rgba(239, 232, 216, .38); }
+.capture:focus-within { border-style: solid; border-color: rgba(239, 232, 216, .45); background: var(--cover-fill); color: var(--cover-ink); }
 .capture input {
   flex: 1;
   min-width: 0;
-  padding: 9px 0;
+  padding: 7px 0;
   border: 0;
   outline: none;
   background: transparent;
@@ -293,7 +295,7 @@ svg.i {
 .overdue .side-list { max-height: 210px; }
 .side-list:empty { display: none; }
 .side-section.drop-target .side-list, .side-section.drop-target .side-empty { border-radius: 8px; outline: 1.5px dashed rgba(239, 232, 216, .4); outline-offset: 2px; }
-.side-empty { margin: 0; padding: 2px 6px; color: var(--cover-muted); font-size: 12.5px; line-height: 1.5; }
+.side-empty { margin: 0; padding: 0 4px; color: var(--cover-muted); font-size: 11.5px; font-style: italic; line-height: 1.45; opacity: .85; }
 
 .side-foot { display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid var(--cover-line); }
 .update-pill {
