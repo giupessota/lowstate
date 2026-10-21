@@ -110,6 +110,16 @@
     todayHabits: $("todayHabits"),
     habitPills: $("habitPills"),
     habitDialog: $("habitDialog"),
+    habitDetail: $("habitDetail"),
+    habitDetailIcon: $("habitDetailIcon"),
+    habitDetailTitle: $("habitDetailTitle"),
+    habitDetailMeta: $("habitDetailMeta"),
+    habitDetailMonth: $("habitDetailMonth"),
+    habitDetailStats: $("habitDetailStats"),
+    habitDetailDays: $("habitDetailDays"),
+    habitDetailInsight: $("habitDetailInsight"),
+    habitDetailClose: $("habitDetailClose"),
+    habitDetailEdit: $("habitDetailEdit"),
     habitEditForm: $("habitEditForm"),
     habitEditName: $("habitEditName"),
     habitIconPicker: $("habitIconPicker"),
@@ -1452,6 +1462,67 @@
         : days.size === 1 ? t("habitDaysOne") : t("habitDaysCount", { n: days.size });
   }
 
+  // ---------- habit detail ----------
+  let detailHabitId = null;
+
+  function renderHabitDetail() {
+    const habit = state.habits.find((candidate) => candidate.id === detailHabitId);
+    if (!habit) return;
+    const today = todayISO();
+    // The month being looked at in Habits, otherwise this month.
+    const reference = state.view === "habits" ? state.anchor : new Date();
+    const year = reference.getFullYear();
+    const month = reference.getMonth();
+    const stats = Planner.habitMonth(state.habitLog, habit, year, month, today);
+    const streak = Planner.habitStreak(state.habitLog, habit, today);
+
+    els.habitDetail.style.setProperty("--habit", habit.color);
+    els.habitDetailIcon.replaceChildren(habitMark(habit));
+    els.habitDetailTitle.textContent = habit.name;
+    els.habitDetailMeta.replaceChildren(...habitScheduleParts(habit).map((part) => h("span", { text: part })));
+    els.habitDetailMonth.textContent = capitalize(formatDate(new Date(year, month, 1), { month: "long", year: "numeric" }));
+
+    const stat = (value, label) => h("div", { class: "detail-stat" }, h("strong", { text: value }), h("span", { text: label }));
+    els.habitDetailStats.replaceChildren(
+      stat(String(stats.done + stats.extra), t("habitDone")),
+      stat(String(streak), t("habitStreakLabel")),
+      stat(stats.elapsed ? `${Math.round((stats.done / stats.elapsed) * 100)}%` : "—", t("habitConsistency")));
+
+    // Two weeks ending with this one, laid out in weekday columns.
+    const weekStart = Planner.startOfWeek(Core.parseISODate(today), state.settings.weekStart);
+    const days = Array.from({ length: 14 }, (_, index) => Planner.addDays(weekStart, index - 7));
+    els.habitDetailDays.replaceChildren(
+      ...days.slice(0, 7).map((day) => h("span", { class: "dd-head", text: formatDate(day, { weekday: "narrow" }) })),
+      ...days.map((day) => {
+        const iso = Core.toISODate(day);
+        const done = Planner.habitDone(state.habitLog, iso, habit.id);
+        const planned = Planner.habitScheduled(habit, iso);
+        const future = iso > today;
+        const label = `${t("habitCell", { habit: habit.name, date: shortDate(iso) })}${planned ? "" : ` (${t("habitExtraDay")})`}`;
+        return h("button", {
+          type: "button",
+          class: `dd-cell${done ? " is-done" : ""}${planned ? "" : " is-off"}${iso === today ? " is-today" : ""}`,
+          "data-habit-cell": habit.id,
+          "data-date": iso,
+          "aria-pressed": String(done),
+          "aria-label": label,
+          title: label,
+          disabled: future || !Planner.habitActive(habit, iso) ? "" : null,
+        }, h("span", { class: "dd-num", text: day.getDate() }));
+      }));
+
+    const insight = Planner.habitInsight(state.habitLog, habit, today);
+    els.habitDetailInsight.textContent = insight.kind === "best"
+      ? t("insightBest", { day: t("insightDays").split("|")[insight.day] })
+      : insight.kind === "perfect" ? t("insightPerfect") : t("insightNone");
+  }
+
+  function openHabitDetail(id) {
+    detailHabitId = id;
+    renderHabitDetail();
+    if (!els.habitDetail.open) els.habitDetail.showModal();
+  }
+
   function openHabitEditor(id) {
     const habit = state.habits.find((candidate) => candidate.id === id);
     if (!habit) return;
@@ -2081,6 +2152,7 @@
       state.habitLog = Planner.toggleHabit(state.habitLog, cell.dataset.date, cell.dataset.habitCell);
       persistHabits();
       render();
+      if (els.habitDetail.open) renderHabitDetail();
       return;
     }
     const idea = event.target.closest("[data-habit-idea]");
@@ -2090,7 +2162,7 @@
       return;
     }
     const edit = event.target.closest("[data-habit-edit]");
-    if (edit) openHabitEditor(edit.dataset.habitEdit);
+    if (edit) openHabitDetail(edit.dataset.habitEdit);
   });
 
   els.habitDialog.addEventListener("click", (event) => {
@@ -2134,6 +2206,14 @@
     render();
   });
   els.habitEditCancel.addEventListener("click", () => els.habitDialog.close());
+  els.habitDetailClose.addEventListener("click", () => els.habitDetail.close());
+  els.habitDetailEdit.addEventListener("click", () => {
+    els.habitDetail.close();
+    openHabitEditor(detailHabitId);
+  });
+  els.habitDetail.addEventListener("click", (event) => {
+    if (event.target === els.habitDetail) els.habitDetail.close();
+  });
   // Times are typed or stepped in a time field; the row isn't redrawn while
   // typing, only the duration next to it is switched on or off.
   els.habitRows.addEventListener("input", (event) => {

@@ -252,6 +252,22 @@ test("habits planned for some weekdays: icons, schedule, streaks and month count
   assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-22"), { done: 3, extra: 1, elapsed: 9, total: 13 });
 });
 
+test("habit insight names the most reliable weekday, or says there isn't enough yet", () => {
+  // Wednesday 21 October 2026; gym planned Mon/Wed/Fri since September.
+  const [gym] = P.normalizeHabits([{ id: "g", name: "Academia", days: [1, 3, 5], since: "2026-09-01" }]);
+  assert.deepEqual(P.habitInsight({}, gym, "2026-10-21"), { kind: "none" });
+  let log = {};
+  // Every Wednesday done, Mondays half, Fridays never (last three weeks).
+  ["2026-10-07", "2026-10-14", "2026-09-30", "2026-10-12", "2026-09-28"].forEach((iso) => { log = P.toggleHabit(log, iso, "g"); });
+  const insight = P.habitInsight(log, gym, "2026-10-21", 3);
+  assert.equal(insight.kind, "best");
+  assert.equal(insight.day, 3);
+  assert.equal(insight.rate, 1);
+  let all = {};
+  ["2026-10-05", "2026-10-07", "2026-10-09", "2026-10-12", "2026-10-14", "2026-10-16", "2026-10-19"].forEach((iso) => { all = P.toggleHabit(all, iso, "g"); });
+  assert.deepEqual(P.habitInsight(all, gym, "2026-10-21", 2), { kind: "perfect" });
+});
+
 test("habits only count between their start and end dates", () => {
   const [walk] = P.normalizeHabits([{ id: "w", name: "Caminhar", since: "2026-10-12", until: "2026-10-23" }]);
   assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", since: "2026-10-12", until: "2026-10-01" }])[0].until, null);

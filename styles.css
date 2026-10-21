@@ -1328,6 +1328,40 @@ svg.i {
 .event-line.routine.is-done .habit-icon { stroke: var(--habit); }
 .pill-time { color: var(--ink-2); font: 500 11px var(--mono); }
 
+/* Habit detail: numbers, two weeks and one pattern, on paper */
+.detail-sheet { width: min(440px, calc(100vw - 32px)); }
+.detail-head { align-items: flex-start; }
+.detail-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: color-mix(in srgb, var(--habit) 14%, var(--paper)); }
+.detail-icon .habit-icon { width: 22px; height: 22px; }
+.detail-name { display: flex; flex: 1; flex-direction: column; gap: 2px; min-width: 0; }
+.detail-name h2 { margin: 0; font-size: 19px; }
+.detail-stats { display: grid; grid-template-columns: repeat(3, 1fr); }
+.detail-stat { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 0; }
+.detail-stat + .detail-stat { border-left: 1px solid var(--rule); }
+.detail-stat strong { font: 400 30px/1.1 var(--mono); letter-spacing: -.03em; }
+.detail-stat span { color: var(--muted); font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.detail-days { display: grid; grid-template-columns: repeat(7, 1fr); justify-items: center; gap: 6px 0; margin-top: 8px; }
+.dd-head { color: var(--muted); font: 500 10px var(--mono); text-transform: uppercase; }
+.dd-cell {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1.3px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dd-num { font: 500 10px var(--mono); }
+.dd-cell.is-off:not(.is-done) { border-style: dotted; border-color: color-mix(in srgb, var(--ink) 18%, transparent); }
+.dd-cell.is-done { border-color: var(--habit); background: var(--habit); color: #fff; }
+.dd-cell.is-today { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px color-mix(in srgb, var(--ink) 40%, transparent); }
+.dd-cell:hover:not(:disabled) { border-color: var(--habit); }
+.dd-cell:disabled { opacity: .35; cursor: default; }
+.detail-insight { margin: 0; padding-top: 12px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 13.5px; font-style: italic; }
+
 /* Habit editor */
 .habit-sheet { width: min(420px, calc(100vw - 32px)); }
 .habit-sheet .sheet-body { max-height: calc(100vh - 48px); overflow-y: auto; }

@@ -619,6 +619,32 @@
     return streak;
   }
 
+  // A pattern from the last few weeks (today excluded, it isn't over):
+  // { kind: "perfect" } when no planned day was missed, { kind: "best", day,
+  // rate } for the weekday done most reliably, or { kind: "none" } when
+  // there isn't enough to say (weekdays need two planned days to count).
+  function habitInsight(log, habitOrId, todayISO, weeks = 8) {
+    const habit = asHabit(habitOrId);
+    const end = parseISODate(todayISO);
+    if (!end) return { kind: "none" };
+    const byDay = Array.from({ length: 7 }, (_, day) => ({ day, planned: 0, done: 0 }));
+    for (let back = 1; back <= weeks * 7; back++) {
+      const date = addDays(end, -back);
+      const iso = toISODate(date);
+      if (!habitScheduled(habit, iso)) continue;
+      byDay[date.getDay()].planned += 1;
+      if (habitDone(log, iso, habit.id)) byDay[date.getDay()].done += 1;
+    }
+    const counted = byDay.filter((entry) => entry.planned >= 2);
+    const done = counted.reduce((sum, entry) => sum + entry.done, 0);
+    if (!counted.length || !done) return { kind: "none" };
+    if (counted.every((entry) => entry.done === entry.planned)) return { kind: "perfect" };
+    const best = counted
+      .map((entry) => ({ ...entry, rate: entry.done / entry.planned }))
+      .sort((a, b) => b.rate - a.rate || b.planned - a.planned)[0];
+    return { kind: "best", day: best.day, rate: best.rate };
+  }
+
   // Planned days done in a month, out of the planned days so far; `extra`
   // counts days done that weren't planned.
   function habitMonth(log, habitOrId, year, month, todayISO) {
@@ -918,6 +944,7 @@
     HABIT_ICONS,
     normalizeHabits,
     habitScheduled,
+    habitInsight,
     habitActive,
     habitActiveBetween,
     habitTimeOn,

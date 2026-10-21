@@ -334,6 +334,30 @@
       </form>
     </dialog>
 
+    <dialog class="sheet detail-sheet" id="habitDetail" aria-labelledby="habitDetailTitle">
+      <div class="sheet-body">
+        <header class="sheet-head detail-head">
+          <span class="detail-icon" id="habitDetailIcon" aria-hidden="true"></span>
+          <div class="detail-name">
+            <h2 id="habitDetailTitle"></h2>
+            <span class="hg-meta" id="habitDetailMeta"></span>
+          </div>
+          <span class="range-mark" id="habitDetailMonth"></span>
+        </header>
+        <div class="detail-stats" id="habitDetailStats"></div>
+        <section>
+          <h3 class="field-label" data-i18n="habitLast14">Last 14 days</h3>
+          <div class="detail-days" id="habitDetailDays"></div>
+        </section>
+        <p class="detail-insight" id="habitDetailInsight"></p>
+        <footer class="sheet-foot">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="habitDetailClose" data-i18n="close">Close</button>
+          <button type="button" class="btn primary" id="habitDetailEdit" data-i18n="habitEditButton">Edit</button>
+        </footer>
+      </div>
+    </dialog>
+
     <dialog class="sheet habit-sheet" id="habitDialog" aria-labelledby="habitDialogTitle">
       <form class="sheet-body" id="habitEditForm" method="dialog">
         <header class="sheet-head">
