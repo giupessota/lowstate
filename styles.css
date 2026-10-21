@@ -741,6 +741,7 @@ svg.i {
 /* Water: a row of glasses that fill up */
 .section-title .water-sum { margin-left: auto; color: var(--muted); letter-spacing: .06em; text-transform: none; }
 .section-title .water-sum.is-done { color: var(--asagi); }
+.container-picks { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .water-row { display: flex; flex-wrap: wrap; align-items: center; gap: 2px; }
 .glass {
   display: grid;

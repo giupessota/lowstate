@@ -172,6 +172,8 @@ test("water: target glasses, per-day counts and liters", () => {
   assert.equal(P.waterTarget(2000, 250), 8);
   assert.equal(P.waterTarget(2000, 300), 7);
   assert.equal(P.waterTarget(1500, 500), 3);
+  assert.equal(P.waterTarget(2000, 1200), 2);
+  assert.ok(P.isBottle(750) && !P.isBottle(300));
   let water = P.setWater({}, "2026-10-20", 3);
   assert.deepEqual(water, { "2026-10-20": 3 });
   water = P.setWater(water, "2026-10-20", 0);

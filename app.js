@@ -253,7 +253,7 @@
       holidays: savedSettings.holidays === "off" ? "off" : "br",
       quotes: Planner.QUOTE_STYLES.includes(savedSettings.quotes) ? savedSettings.quotes : "proverbs",
       waterUnit: savedSettings.waterUnit === "liters" ? "liters" : "glasses",
-      glassMl: Planner.GLASS_SIZES.includes(savedSettings.glassMl) ? savedSettings.glassMl : 250,
+      glassMl: Planner.CONTAINER_SIZES.includes(savedSettings.glassMl) ? savedSettings.glassMl : 250,
       waterGoal: Planner.WATER_GOALS.includes(savedSettings.waterGoal) ? savedSettings.waterGoal : 2000,
     },
     goals: Store.loadObject(KEYS.goals),
@@ -490,9 +490,16 @@
     }, moodEl(mood), h("span", { text: t(`mood-${mood}`) }))));
   }
 
-  // A glass outline with the water level inside, on an 18×22 grid.
-  function glassEl() {
+  // A glass (or bottle) outline with the water level inside, on an 18×22 grid.
+  function glassEl(bottle) {
     const svg = svgEl("svg", { class: "glass-icon", viewBox: "0 0 18 22", "aria-hidden": "true" });
+    if (bottle) {
+      svg.append(
+        svgEl("path", { class: "glass-water", d: "M4.4 10h9.2v9.4a1 1 0 0 1-1 1H5.4a1 1 0 0 1-1-1Z" }),
+        svgEl("rect", { class: "glass-rim", x: 6.5, y: 0.8, width: 5, height: 2.6, rx: 0.8 }),
+        svgEl("path", { class: "glass-rim", d: "M6.8 3.4h4.4v1.6c0 .9 3.3 1.7 3.3 3.8v11a1.6 1.6 0 0 1-1.6 1.6H5.1a1.6 1.6 0 0 1-1.6-1.6v-11c0-2.1 3.3-2.9 3.3-3.8Z" }));
+      return svg;
+    }
     svg.append(
       svgEl("path", { class: "glass-water", d: "M3.6 8.5h10.8l-1.1 11H4.7Z" }),
       svgEl("path", { class: "glass-rim", d: "M2.2 2.5h13.6l-1.7 17.6a1.6 1.6 0 0 1-1.6 1.4H5.5a1.6 1.6 0 0 1-1.6-1.4Z" }));
@@ -504,20 +511,22 @@
     const target = Planner.waterTarget(waterGoal, glassMl);
     const count = state.water[iso] || 0;
     const slots = Math.max(target, count);
+    const bottle = Planner.isBottle(glassMl);
+    const word = bottle ? { n: "bottleN", add: "addBottle", remove: "removeBottle", sum: "waterBottles" } : { n: "glassN", add: "addGlass", remove: "removeGlass", sum: "waterGlasses" };
     const glasses = Array.from({ length: slots }, (_, index) => h("button", {
       type: "button",
       class: `glass${index < count ? " is-full" : ""}${index >= target ? " is-extra" : ""}`,
       "data-glass": index + 1,
       "aria-pressed": String(index < count),
-      "aria-label": t("glassN", { n: index + 1 }),
-      title: t("glassN", { n: index + 1 }),
-    }, glassEl()));
+      "aria-label": t(word.n, { n: index + 1 }),
+      title: t(word.n, { n: index + 1 }),
+    }, glassEl(bottle)));
     els.waterRow.replaceChildren(...glasses,
-      h("button", { type: "button", class: "water-step", "data-water": "-1", "aria-label": t("removeGlass"), title: t("removeGlass"), disabled: count === 0 ? "" : null, text: "−" }),
-      h("button", { type: "button", class: "water-step", "data-water": "1", "aria-label": t("addGlass"), title: t("addGlass"), text: "+" }));
+      h("button", { type: "button", class: "water-step", "data-water": "-1", "aria-label": t(word.remove), title: t(word.remove), disabled: count === 0 ? "" : null, text: "−" }),
+      h("button", { type: "button", class: "water-step", "data-water": "1", "aria-label": t(word.add), title: t(word.add), text: "+" }));
     els.waterSum.textContent = waterUnit === "liters"
       ? t("waterLiters", { n: Planner.formatLiters(count * glassMl, I18n.language).replace(" L", ""), total: Planner.formatLiters(waterGoal, I18n.language) })
-      : t("waterGlasses", { n: count, total: target });
+      : t(word.sum, { n: count, total: target });
     els.waterSum.classList.toggle("is-done", count >= target);
   }
 
@@ -1144,6 +1153,8 @@
     els.settingsDialog.querySelectorAll('[data-setting="waterGoal"] button').forEach((button) => {
       button.textContent = Planner.formatLiters(Number(button.dataset.value), I18n.language);
     });
+    const unitButton = els.settingsDialog.querySelector('[data-setting="waterUnit"] [data-value="glasses"]');
+    unitButton.textContent = t(Planner.isBottle(state.settings.glassMl) ? "waterUnitBottles" : "waterUnitGlasses");
     els.windowGroup.hidden = !desktop;
     const count = Store.pruneTrash().length;
     els.trashSummary.textContent = t("trashCount", { count });
@@ -1177,7 +1188,7 @@
       render();
     } else if (setting === "waterUnit" || setting === "glassMl" || setting === "waterGoal") {
       if (setting === "waterUnit") state.settings.waterUnit = value === "liters" ? "liters" : "glasses";
-      if (setting === "glassMl" && Planner.GLASS_SIZES.includes(Number(value))) state.settings.glassMl = Number(value);
+      if (setting === "glassMl" && Planner.CONTAINER_SIZES.includes(Number(value))) state.settings.glassMl = Number(value);
       if (setting === "waterGoal" && Planner.WATER_GOALS.includes(Number(value))) state.settings.waterGoal = Number(value);
       persistSettings();
       render();

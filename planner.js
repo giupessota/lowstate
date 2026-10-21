@@ -461,7 +461,12 @@
   const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
   // ---------- Water ----------
-  const GLASS_SIZES = [200, 250, 300, 500];
+  // Glasses, then the most common bottles: 500 ml, 750 ml squeeze, 1 L and
+  // 1.2 L (Stanley Quencher size).
+  const GLASS_SIZES = [200, 250, 300];
+  const BOTTLE_SIZES = [500, 750, 1000, 1200];
+  const CONTAINER_SIZES = [...GLASS_SIZES, ...BOTTLE_SIZES];
+  const isBottle = (ml) => ml >= 500;
   const WATER_GOALS = [1500, 2000, 2500, 3000];
   const MAX_GLASSES = 30;
 
@@ -567,6 +572,9 @@
     MOODS,
     setMood,
     GLASS_SIZES,
+    BOTTLE_SIZES,
+    CONTAINER_SIZES,
+    isBottle,
     WATER_GOALS,
     waterTarget,
     setWater,
