@@ -34,8 +34,6 @@
   const ICON_CHECK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
   const ICON_TODAY = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 7l5 5-5 5"/></svg>';
   const SVG_NS = "http://www.w3.org/2000/svg";
-  const TAPE_PATTERNS = ["stripes", "dots", "gingham", "waves"];
-  const TAPE_COLORS = ["--sakura", "--asagi", "--yamabuki", "--matcha", "--fuji"];
   const TAB_COLORS = ["--indigo", "--vermilion", "--matcha", "--yamabuki", "--fuji", "--asagi"];
   const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
   const VIEWS = ["day", "week", "month", "habits"];
@@ -43,7 +41,6 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     weekGrid: $("weekGrid"),
-    washi: $("washi"),
     monthNum: $("monthNum"),
     monthName: $("monthName"),
     yearMark: $("yearMark"),
@@ -56,7 +53,6 @@
     weekNotes: $("weekNotes"),
     weekView: $("weekView"),
     dayView: $("dayView"),
-    dayWashi: $("dayWashi"),
     dayBig: $("dayBig"),
     dayWeekday: $("dayWeekday"),
     dayMonth: $("dayMonth"),
@@ -93,14 +89,12 @@
     waterRow: $("waterRow"),
     waterSum: $("waterSum"),
     monthView: $("monthView"),
-    monthWashi: $("monthWashi"),
     mvMonthNum: $("mvMonthNum"),
     mvMonthName: $("mvMonthName"),
     mvYear: $("mvYear"),
     monthWeekdays: $("monthWeekdays"),
     monthGrid: $("monthGrid"),
     habitsView: $("habitsView"),
-    habitsWashi: $("habitsWashi"),
     hvMonthNum: $("hvMonthNum"),
     hvMonthName: $("hvMonthName"),
     hvYear: $("hvYear"),
@@ -729,8 +723,6 @@
       ? formatDate(reference, { month: "long" })
       : `${formatDate(days[0], { month: "short" })} – ${formatDate(days[6], { month: "short" })}`;
     els.yearMark.textContent = String(reference.getFullYear());
-    els.washi.dataset.pattern = TAPE_PATTERNS[weekNumber % TAPE_PATTERNS.length];
-    els.washi.style.setProperty("--tape", `var(${TAPE_COLORS[weekNumber % TAPE_COLORS.length]})`);
 
     renderDays(days);
 
@@ -741,11 +733,6 @@
     renderGoals();
     renderNotes();
     renderMonthTabs(reference);
-  }
-
-  function setWashi(element, seed) {
-    element.dataset.pattern = TAPE_PATTERNS[seed % TAPE_PATTERNS.length];
-    element.style.setProperty("--tape", `var(${TAPE_COLORS[seed % TAPE_COLORS.length]})`);
   }
 
   // ---------- day page (Hobonichi Techo style) ----------
@@ -920,7 +907,6 @@
       title: eventTooltip(event),
       style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
     }, eventTitle(event))));
-    setWashi(els.dayWashi, Planner.dayOfYear(day));
 
     showQuote(els.dayProverb, Planner.dayOfYear(day));
 
@@ -1042,7 +1028,6 @@
     els.mvMonthNum.textContent = String(month + 1).padStart(2, "0");
     els.mvMonthName.textContent = formatDate(reference, { month: "long" });
     els.mvYear.textContent = String(year);
-    setWashi(els.monthWashi, month + 3);
 
     const weeks = Planner.monthGrid(year, month, state.settings.weekStart);
     els.monthWeekdays.replaceChildren(...weeks[0].map((day) => h("span", {
@@ -1212,7 +1197,6 @@
     els.hvMonthName.textContent = capitalize(formatDate(reference, { month: "long" }));
     els.hvYear.textContent = String(year);
     els.hvRange.textContent = capitalize(formatDate(reference, { month: "long", year: "numeric" }));
-    setWashi(els.habitsWashi, month + 7);
 
     // Grid: habit names, one column per day, then month % and streak.
     els.habitGrid.style.setProperty("--days", isos.length);

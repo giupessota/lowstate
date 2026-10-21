@@ -1,7 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap");
 
 /* Inspired by Japanese planners (Hobonichi Weeks): cream Tomoe-River-like
-   paper with a 3.7 mm grid, sumi ink, traditional ink colors, washi tape,
+   paper with a 3.7 mm grid, sumi ink, traditional ink colors,
    Saturday in indigo and Sunday/holidays in vermilion. */
 :root {
   color-scheme: light;
@@ -542,51 +542,6 @@ svg.i {
   min-height: 52px;
   padding-bottom: 10px;
   border-bottom: 1.5px solid var(--ink);
-}
-
-/* Washi tape across the top of the left page */
-/* Translucent paper tape stuck over the page's top edge: straight long
-   edges, finely torn ends, a faint fibre texture, and the grid showing
-   through (multiply). */
-.washi {
-  --tape-base: color-mix(in srgb, var(--tape) 58%, transparent);
-  --tape-fibre: repeating-linear-gradient(90deg, rgba(255, 255, 255, .07) 0 1px, transparent 1px 3px);
-  position: absolute;
-  top: -33px; /* half over the page's top edge (22px padding above the head) */
-  left: 22px;
-  width: 128px;
-  height: 22px;
-  transform: rotate(-3deg);
-  mix-blend-mode: multiply;
-  clip-path: polygon(1.5% 0, 98.6% 0, 100% 11%, 98.2% 24%, 99.6% 37%, 97.9% 51%, 99.5% 64%, 98.1% 78%, 100% 90%, 98.7% 100%, 1.3% 100%, 0 89%, 1.9% 75%, .4% 61%, 2.1% 47%, .5% 33%, 1.7% 19%, 0 7%);
-  filter: drop-shadow(0 1px 0 rgba(60, 50, 30, .06));
-  pointer-events: none;
-}
-:root[data-theme="dark"] .washi { --tape-base: color-mix(in srgb, var(--tape) 42%, transparent); mix-blend-mode: normal; }
-.washi[data-pattern="stripes"] {
-  background:
-    var(--tape-fibre),
-    repeating-linear-gradient(-45deg, transparent 0 5px, rgba(255, 255, 255, .38) 5px 8px),
-    var(--tape-base);
-}
-.washi[data-pattern="dots"] {
-  background:
-    var(--tape-fibre),
-    radial-gradient(circle, rgba(255, 255, 255, .55) 1.3px, transparent 1.7px) 2px 3px / 8px 8px,
-    var(--tape-base);
-}
-.washi[data-pattern="gingham"] {
-  background:
-    var(--tape-fibre),
-    linear-gradient(90deg, rgba(255, 255, 255, .28) 50%, transparent 50%) 0 0 / 10px 10px,
-    linear-gradient(rgba(255, 255, 255, .28) 50%, transparent 50%) 0 0 / 10px 10px,
-    var(--tape-base);
-}
-.washi[data-pattern="waves"] {
-  background:
-    var(--tape-fibre),
-    radial-gradient(circle at 50% 100%, transparent 4px, rgba(255, 255, 255, .4) 4.5px 5.5px, transparent 6px) 0 2px / 12px 8px,
-    var(--tape-base);
 }
 
 .month-mark { display: flex; align-items: flex-end; gap: 10px; }
@@ -1717,8 +1672,7 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
 
 /* ===== Smaller windows ===== */
 @media (max-width: 1100px) {
-  /* padding-top keeps the washi tape from being clipped by the scroller */
-  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, auto); overflow-y: auto; gap: 14px; padding-top: 14px; }
+  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, auto); overflow-y: auto; gap: 14px; }
   .timeline { flex: none; height: 60vh; }
   .month-grid { grid-auto-rows: minmax(90px, auto); }
   .page-left, .page-right { border-radius: 12px; }
