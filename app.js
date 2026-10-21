@@ -107,6 +107,7 @@
     sumMood: $("sumMood"),
     sumWater: $("sumWater"),
     sumLoad: $("sumLoad"),
+    sumPatterns: $("sumPatterns"),
     todayHabits: $("todayHabits"),
     habitPills: $("habitPills"),
     habitDialog: $("habitDialog"),
@@ -1362,6 +1363,55 @@
       }))),
       summaryAxis(isos),
       h("p", { class: "sum-note", text: `${t("sumLoad", { avg: number.format(avg), heavy })} · ${t("sumLoadKey")}` }));
+
+    renderPatterns(today);
+  }
+
+  const DROP_ICON = "M12 3.5c3 4 5.5 7 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 10.5 9 7.5 12 3.5z";
+  const LOAD_ICON = ["M6 19v-5", "M12 19V9", "M18 19V5"];
+
+  function patternIcon(pattern) {
+    const habit = state.habits.find((candidate) => candidate.id === pattern.habitId);
+    if (habit) {
+      const icon = habitIconEl(habit.icon, "habit-icon") || h("i", { class: "habit-dot" });
+      if (icon.style) icon.style.setProperty("--habit", habit.color);
+      return icon;
+    }
+    const svg = svgEl("svg", { class: "habit-icon pattern-icon", viewBox: "0 0 24 24", "aria-hidden": "true" });
+    (pattern.kind === "mood-water" ? [DROP_ICON] : LOAD_ICON).forEach((d) => svg.append(svgEl("path", { d })));
+    return svg;
+  }
+
+  // Observations across mood, water, reported load and habits — only with
+  // enough days behind them, always with the counts.
+  function renderPatterns(today) {
+    const target = Planner.waterTarget(state.settings.waterGoal, state.settings.glassMl);
+    const { patterns, moodDays } = Planner.patterns({
+      moods: state.moods,
+      water: state.water,
+      waterTarget: target,
+      loads: state.loads,
+      habits: state.habits,
+      habitLog: state.habitLog,
+      todayISO: today,
+    });
+    const lines = patterns.map((pattern) => {
+      const habit = state.habits.find((candidate) => candidate.id === pattern.habitId);
+      const direction = pattern.kind === "load-habit" || pattern.kind === "mood-load"
+        ? (pattern.diff < 0 ? "down" : "up")
+        : (pattern.diff > 0 ? "up" : "down");
+      return h("li", { class: "pattern" },
+        patternIcon(pattern),
+        h("div", {},
+          h("p", { text: t(`pattern-${pattern.kind}-${direction}`, { habit: habit?.name || "" }) }),
+          h("span", { class: "pattern-basis", text: t(`basis-${pattern.kind}`, { na: pattern.na, nb: pattern.nb }) })));
+    });
+    els.sumPatterns.replaceChildren(
+      summaryTitle("patternsTitle"),
+      lines.length
+        ? h("ul", { class: "pattern-list" }, lines)
+        : h("p", { class: "sum-note", text: moodDays < 10 ? t("patternsNeedMood", { n: moodDays }) : t("patternsNone") }),
+      h("p", { class: "pattern-note", text: t("patternsNote") }));
   }
 
   // Habits planned for the day (or already done as an extra) as pills.

@@ -645,6 +645,77 @@
     return { kind: "best", day: best.day, rate: best.rate };
   }
 
+  // ---------- Patterns across mood, water, load and habits ----------
+  // Observations from the last `days` days (today excluded): days are split
+  // in two groups and only clear differences between groups that are big
+  // enough are reported, with the counts behind them. They describe what
+  // goes together, never what causes what.
+  const MOOD_SCORE = { great: 5, good: 4, okay: 3, tiring: 2, stressed: 2, rough: 1 };
+  const PATTERN_RULES = {
+    mood: { min: 5, diff: 0.5, scale: 4 },
+    load: { min: 4, diff: 1, scale: 10 },
+  };
+
+  const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+  function comparison(a, b, rule) {
+    if (a.length < rule.min || b.length < rule.min) return null;
+    const diff = mean(a) - mean(b);
+    if (Math.abs(diff) < rule.diff) return null;
+    return { a: mean(a), b: mean(b), na: a.length, nb: b.length, diff, strength: Math.abs(diff) / rule.scale };
+  }
+
+  function patterns({ moods = {}, water = {}, waterTarget = 8, loads = {}, habits = [], habitLog = {}, todayISO, days = 56, limit = 3 } = {}) {
+    const today = parseISODate(todayISO);
+    if (!today) return { patterns: [], moodDays: 0 };
+    const isos = Array.from({ length: days }, (_, index) => toISODate(addDays(today, -(index + 1))));
+    const moodOf = (iso) => MOOD_SCORE[moods[iso]];
+    const moodIsos = isos.filter((iso) => moodOf(iso));
+    const loadOf = (iso) => (Number.isInteger(loads[iso]) ? loads[iso] : null);
+    const found = [];
+
+    // Mood on days the water goal was met vs. not (only when water is tracked).
+    if (isos.filter((iso) => water[iso] > 0).length >= PATTERN_RULES.mood.min) {
+      const met = moodIsos.filter((iso) => (water[iso] || 0) >= waterTarget).map(moodOf);
+      const missed = moodIsos.filter((iso) => (water[iso] || 0) < waterTarget).map(moodOf);
+      const result = comparison(met, missed, PATTERN_RULES.mood);
+      if (result) found.push({ kind: "mood-water", ...result });
+    }
+
+    habits.forEach((habit) => {
+      // Mood on planned days the habit was done vs. skipped.
+      const planned = moodIsos.filter((iso) => habitScheduled(habit, iso));
+      const withHabit = comparison(
+        planned.filter((iso) => habitDone(habitLog, iso, habit.id)).map(moodOf),
+        planned.filter((iso) => !habitDone(habitLog, iso, habit.id)).map(moodOf),
+        PATTERN_RULES.mood);
+      if (withHabit) found.push({ kind: "mood-habit", habitId: habit.id, ...withHabit });
+
+      // Reported load the day after a planned day, done vs. skipped.
+      const after = isos.filter((iso) => habitScheduled(habit, iso))
+        .map((iso) => ({ iso, next: toISODate(addDays(parseISODate(iso), 1)) }))
+        .filter(({ next }) => next < todayISO && loadOf(next) !== null);
+      const nextDay = comparison(
+        after.filter(({ iso }) => habitDone(habitLog, iso, habit.id)).map(({ next }) => loadOf(next)),
+        after.filter(({ iso }) => !habitDone(habitLog, iso, habit.id)).map(({ next }) => loadOf(next)),
+        PATTERN_RULES.load);
+      if (nextDay) found.push({ kind: "load-habit", habitId: habit.id, ...nextDay });
+    });
+
+    // Mood on days you reported a heavy load (7+) vs. a light one (up to 4).
+    const rated = moodIsos.filter((iso) => loadOf(iso) !== null);
+    const heavy = comparison(
+      rated.filter((iso) => loadOf(iso) >= 7).map(moodOf),
+      rated.filter((iso) => loadOf(iso) <= 4).map(moodOf),
+      { ...PATTERN_RULES.mood, min: 4 });
+    if (heavy) found.push({ kind: "mood-load", ...heavy });
+
+    return {
+      patterns: found.sort((a, b) => b.strength - a.strength).slice(0, limit),
+      moodDays: moodIsos.length,
+    };
+  }
+
   // Planned days done in a month, out of the planned days so far; `extra`
   // counts days done that weren't planned.
   function habitMonth(log, habitOrId, year, month, todayISO) {
@@ -945,6 +1016,7 @@
     normalizeHabits,
     habitScheduled,
     habitInsight,
+    patterns,
     habitActive,
     habitActiveBetween,
     habitTimeOn,

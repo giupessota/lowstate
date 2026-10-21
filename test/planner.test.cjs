@@ -252,6 +252,44 @@ test("habits planned for some weekdays: icons, schedule, streaks and month count
   assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-22"), { done: 3, extra: 1, elapsed: 9, total: 13 });
 });
 
+test("patterns need enough days on both sides and a clear difference", () => {
+  const today = "2026-10-21";
+  const back = (n) => { const d = new Date(2026, 9, 21 - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  // Three days of data say nothing.
+  let moods = { [back(1)]: "great", [back(2)]: "rough", [back(3)]: "good" };
+  let water = { [back(1)]: 8, [back(2)]: 2, [back(3)]: 8 };
+  assert.deepEqual(P.patterns({ moods, water, waterTarget: 8, todayISO: today }).patterns, []);
+  // Twelve days: good moods when the goal is met, low ones when it isn't.
+  moods = {};
+  water = {};
+  for (let n = 1; n <= 12; n++) {
+    const met = n % 2 === 0;
+    moods[back(n)] = met ? "good" : "tiring";
+    water[back(n)] = met ? 8 : 3;
+  }
+  const result = P.patterns({ moods, water, waterTarget: 8, todayISO: today });
+  assert.equal(result.moodDays, 12);
+  assert.equal(result.patterns.length, 1);
+  assert.deepEqual(
+    [result.patterns[0].kind, result.patterns[0].na, result.patterns[0].nb, result.patterns[0].diff],
+    ["mood-water", 6, 6, 2]);
+  // Same mood whatever the water: no pattern.
+  const flat = Object.fromEntries(Object.keys(moods).map((iso) => [iso, "good"]));
+  assert.deepEqual(P.patterns({ moods: flat, water, waterTarget: 8, todayISO: today }).patterns, []);
+  // Reported load lower the day after a walk.
+  const [walk] = P.normalizeHabits([{ id: "walk", name: "Caminhar", since: "2026-08-01" }]);
+  let log = {};
+  const loads = {};
+  for (let n = 2; n <= 17; n++) {
+    if (n % 2 === 0) log = P.toggleHabit(log, back(n), "walk");
+    loads[back(n - 1)] = n % 2 === 0 ? 3 : 7;
+  }
+  const after = P.patterns({ habits: [walk], habitLog: log, loads, todayISO: today }).patterns;
+  assert.equal(after[0].kind, "load-habit");
+  assert.equal(after[0].habitId, "walk");
+  assert.ok(after[0].a < after[0].b);
+});
+
 test("habit insight names the most reliable weekday, or says there isn't enough yet", () => {
   // Wednesday 21 October 2026; gym planned Mon/Wed/Fri since September.
   const [gym] = P.normalizeHabits([{ id: "g", name: "Academia", days: [1, 3, 5], since: "2026-09-01" }]);
