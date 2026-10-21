@@ -187,6 +187,25 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
   assert.equal(P.loadLevel(10), "veryHeavy");
 });
 
+test("habits: toggling, streaks that survive an unchecked today, monthly progress", () => {
+  assert.deepEqual(P.normalizeHabits([{ id: "a", name: " Ler " }, { id: "a", name: "dup" }, { id: "b", name: "" }, null]), [
+    { id: "a", name: "Ler", color: P.PALETTE[0] },
+  ]);
+  let log = {};
+  ["2026-10-18", "2026-10-19", "2026-10-20"].forEach((iso) => { log = P.toggleHabit(log, iso, "read"); });
+  log = P.toggleHabit(log, "2026-10-20", "walk");
+  assert.equal(P.habitStreak(log, "read", "2026-10-21"), 3);
+  log = P.toggleHabit(log, "2026-10-21", "read");
+  assert.equal(P.habitStreak(log, "read", "2026-10-21"), 4);
+  assert.equal(P.habitStreak(log, "walk", "2026-10-22"), 0);
+  log = P.toggleHabit(log, "2026-10-21", "read");
+  assert.deepEqual(log["2026-10-21"], undefined);
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 9, "2026-10-21"), { done: 3, elapsed: 21, total: 31 });
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 8, "2026-10-21"), { done: 0, elapsed: 30, total: 30 });
+  assert.deepEqual(P.forgetHabit(log, "walk")["2026-10-20"], ["read"]);
+  assert.equal(P.habitDone(P.forgetHabit(log, "read"), "2026-10-18", "read"), false);
+});
+
 test("calendar events split into all-day and timed slices of a local day", () => {
   const local = (y, m, d, h, min = 0) => new Date(y, m - 1, d, h, min).toISOString();
   const events = [

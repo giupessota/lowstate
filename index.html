@@ -141,6 +141,10 @@
                 <h2 class="section-title"><span data-i18n="water">Water</span><span class="water-sum" id="waterSum"></span></h2>
                 <div class="water-row" id="waterRow" role="group" data-i18n-aria="water"></div>
               </section>
+              <section class="today-habits" id="todayHabits" hidden>
+                <h2 class="section-title"><span data-i18n="viewHabits">Habits</span></h2>
+                <div class="habit-pills" id="habitPills"></div>
+              </section>
               <section class="mood">
                 <h2 class="section-title"><span data-i18n="dayMood">Mood of the day</span></h2>
                 <div class="mood-picker" id="moodPicker" role="group" data-i18n-aria="dayMood"></div>
@@ -219,11 +223,40 @@
           </div>
         </section>
 
-        <section class="view placeholder-view" id="placeholderView" hidden>
-          <div class="placeholder-card">
-            <div class="placeholder-icon" id="placeholderIcon"></div>
-            <h2 data-i18n="comingTitle">Coming in the next step</h2>
-            <p id="placeholderText"></p>
+        <section class="view habits-view" id="habitsView" hidden>
+          <div class="spread">
+            <article class="page page-left">
+              <header class="page-head">
+                <span class="washi" id="habitsWashi" aria-hidden="true"></span>
+                <div class="month-mark">
+                  <span class="month-num" id="hvMonthNum"></span>
+                  <div class="month-text">
+                    <strong data-i18n="viewHabits">Habits</strong>
+                    <span class="day-month" id="hvMonthName"></span>
+                  </div>
+                </div>
+                <span class="year-mark" id="hvYear"></span>
+              </header>
+              <div class="habit-grid" id="habitGrid" role="grid"></div>
+              <p class="focus-hint habit-empty" id="habitEmpty" data-i18n="habitEmpty"></p>
+              <form class="habit-add" id="habitForm">
+                <span class="day-capture-mark" aria-hidden="true">+</span>
+                <input id="habitInput" maxlength="60" autocomplete="off" data-i18n-placeholder="habitPlaceholder" data-i18n-aria="habitPlaceholder" />
+              </form>
+              <div class="habit-ideas" id="habitIdeas"></div>
+            </article>
+
+            <article class="page page-right">
+              <header class="page-head">
+                <div class="week-mark"><strong data-i18n="thisMonth">This month</strong></div>
+                <span class="range-mark" id="hvRange"></span>
+              </header>
+              <section class="summary" id="sumMood"></section>
+              <section class="summary" id="sumWater"></section>
+              <section class="summary" id="sumLoad"></section>
+            </article>
+
+            <nav class="month-tabs" data-i18n-aria="months" aria-label="Months"></nav>
           </div>
         </section>
       </main>

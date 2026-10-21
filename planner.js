@@ -466,6 +466,66 @@
   // ---------- Mood of the day ----------
   const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
+  // ---------- Habits ----------
+  // Habits are [{ id, name, color }]; the log is { iso: [habitId, …] }.
+  function normalizeHabits(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    return raw
+      .filter((habit) => habit && typeof habit.id === "string" && String(habit.name ?? "").trim() && !seen.has(habit.id) && seen.add(habit.id))
+      .map((habit, index) => ({
+        id: habit.id,
+        name: String(habit.name).trim().slice(0, 60),
+        color: PALETTE.includes(habit.color) ? habit.color : PALETTE[index % PALETTE.length],
+      }));
+  }
+
+  function habitDone(log, iso, id) {
+    return Array.isArray(log?.[iso]) && log[iso].includes(id);
+  }
+
+  // Returns a new log with the habit flipped for that day.
+  function toggleHabit(log, iso, id) {
+    const { [iso]: day = [], ...rest } = log || {};
+    const next = day.includes(id) ? day.filter((other) => other !== id) : [...day, id];
+    return next.length ? { ...rest, [iso]: next } : rest;
+  }
+
+  // Drops a removed habit from every day of the log.
+  function forgetHabit(log, id) {
+    return Object.fromEntries(Object.entries(log || {})
+      .map(([iso, ids]) => [iso, (ids || []).filter((other) => other !== id)])
+      .filter(([, ids]) => ids.length));
+  }
+
+  // Consecutive days done, ending today — or yesterday, so an unchecked
+  // today doesn't break a streak before the day is over.
+  function habitStreak(log, id, todayISO) {
+    let day = parseISODate(todayISO);
+    if (!day) return 0;
+    if (!habitDone(log, todayISO, id)) day = addDays(day, -1);
+    let streak = 0;
+    while (habitDone(log, toISODate(day), id)) {
+      streak += 1;
+      day = addDays(day, -1);
+    }
+    return streak;
+  }
+
+  // Days done in a month out of the days that have happened so far.
+  function habitMonth(log, id, year, month, todayISO) {
+    const total = new Date(year, month + 1, 0).getDate();
+    let elapsed = 0;
+    let done = 0;
+    for (let date = 1; date <= total; date++) {
+      const iso = toISODate(new Date(year, month, date));
+      if (iso > todayISO) break;
+      elapsed += 1;
+      if (habitDone(log, iso, id)) done += 1;
+    }
+    return { done, elapsed, total };
+  }
+
   // ---------- Calendar events (read-only, from subscribed calendars) ----------
   // Events come from the desktop app: all-day ones carry ISO dates with an
   // exclusive end, timed ones absolute instants. This splits them for one
@@ -695,6 +755,12 @@
     MOODS,
     setMood,
     mentalLoad,
+    normalizeHabits,
+    habitDone,
+    toggleHabit,
+    forgetHabit,
+    habitStreak,
+    habitMonth,
     eventsForDay,
     busyMinutes,
     loadLevel,

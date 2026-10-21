@@ -1283,32 +1283,115 @@ svg.i {
 .mini.is-urgent .item-body { color: var(--vermilion); font-weight: 600; }
 .cell-more { padding-left: 3px; color: var(--muted); font: 500 10px var(--mono); }
 
-/* ===== Placeholder views ===== */
-.placeholder-view { display: grid; place-items: center; }
-.placeholder-card {
-  max-width: 400px;
-  padding: 38px 34px;
-  border-radius: 12px;
-  background-color: var(--paper);
-  background-image: var(--grid-image);
-  background-size: var(--grid-size) var(--grid-size);
-  box-shadow: var(--page-shadow);
-  text-align: center;
-}
-.placeholder-icon {
-  width: 52px;
-  height: 52px;
+/* ===== Habits: a month grid of dots, and the month at a glance ===== */
+.habit-grid {
   display: grid;
-  place-items: center;
-  margin: 0 auto 14px;
-  border: 1.5px solid var(--ink);
-  border-radius: 12px;
-  color: var(--ink);
-  transform: rotate(-3deg);
+  grid-template-columns: minmax(100px, 160px) repeat(var(--days), minmax(0, 1fr)) 40px;
+  align-items: center;
+  gap: 4px 1px;
+  margin-top: 14px;
 }
-.placeholder-icon svg.i { width: 26px; height: 26px; }
-.placeholder-card h2 { margin: 0 0 6px; font-size: 18px; }
-.placeholder-card p { margin: 0; color: var(--ink-2); }
+.hg-day { color: var(--muted); font: 500 8.5px var(--mono); text-align: center; }
+.hg-day.is-sat { color: var(--indigo); }
+.hg-day.is-sun { color: var(--vermilion); }
+.hg-day.is-today { color: var(--ink); font-weight: 700; background: linear-gradient(transparent 50%, var(--highlight) 50%); }
+.hg-name { display: flex; align-items: center; gap: 6px; min-width: 0; padding-right: 6px; }
+.hg-name i { width: 8px; height: 8px; flex: none; border-radius: 2px; background: var(--habit); }
+.hg-name input {
+  flex: 1;
+  min-width: 0;
+  padding: 3px 2px;
+  border: 0;
+  border-bottom: 1px dashed transparent;
+  outline: none;
+  background: transparent;
+  color: var(--ink);
+  font: 13px var(--sans);
+  text-overflow: ellipsis;
+}
+.hg-name input:hover, .hg-name input:focus { border-bottom-color: var(--rule); }
+.hg-remove { width: 18px; height: 18px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--muted); opacity: 0; cursor: pointer; }
+.hg-name:hover .hg-remove, .hg-remove:focus-visible { opacity: 1; }
+.hg-remove:hover { color: var(--vermilion); }
+.hg-cell {
+  justify-self: center;
+  width: min(12px, 100%);
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1.2px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  transition: background .12s, transform .12s;
+}
+.hg-cell:hover:not(:disabled) { border-color: var(--habit); transform: scale(1.15); }
+.hg-cell.is-done { border-color: var(--habit); background: var(--habit); }
+.hg-cell.is-today { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px color-mix(in srgb, var(--ink) 35%, transparent); }
+.hg-cell:disabled { border-style: dotted; opacity: .35; cursor: default; }
+.hg-stat { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.hg-stat strong { font: 600 11px var(--mono); }
+.hg-stat span { color: var(--muted); font: 500 9.5px var(--mono); }
+.habit-empty { margin-top: 14px; padding-left: 4px; }
+.habit-add { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 2px 4px; border-bottom: 1px solid var(--rule); }
+.habit-add:focus-within { border-bottom-color: var(--ink-2); }
+.habit-add input { flex: 1; min-width: 0; padding: 7px 0; border: 0; outline: none; background: transparent; font-size: 14px; }
+.habit-add input::placeholder { color: var(--muted); font-style: italic; }
+.habit-ideas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.habit-ideas-title { color: var(--muted); font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+
+/* Habit pills on the day page */
+.habit-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.habit-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--ink-2);
+  font: 13px var(--sans);
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+}
+.habit-pill i { width: 9px; height: 9px; border: 1.3px solid var(--habit); border-radius: 50%; }
+.habit-pill:hover:not(:disabled) { border-color: var(--habit); }
+.habit-pill.is-done { border-color: var(--habit); background: color-mix(in srgb, var(--habit) 14%, var(--paper)); color: var(--ink); }
+.habit-pill.is-done i { background: var(--habit); }
+.habit-pill:disabled { opacity: .45; cursor: default; }
+
+/* Month summary: thin bars and faces on shared day columns */
+.summary { margin-top: 4px; }
+.sum-strip, .sum-bars, .sum-axis { display: grid; grid-template-columns: repeat(var(--days), minmax(0, 1fr)); gap: 2px; }
+.sum-face { display: grid; place-items: center; height: 16px; }
+.sum-face i { width: 3px; height: 3px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 25%, transparent); }
+.sum-face.is-future i { opacity: .35; }
+.sum-face .mood-mini { width: 12px; height: 12px; }
+.sum-bars { position: relative; align-items: end; height: 54px; border-bottom: 1px solid var(--rule); }
+.sum-bars[style*="--goal"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--goal) * 100%);
+  border-top: 1px dashed color-mix(in srgb, var(--asagi) 70%, var(--ink));
+  pointer-events: none;
+}
+.sum-bar { height: max(calc(var(--v) * 100%), 0px); border-radius: 3px 3px 0 0; }
+.sum-bar.water { background: color-mix(in srgb, var(--asagi) 45%, var(--paper)); }
+.sum-bar.water.is-met { background: var(--asagi); }
+.sum-bar.load { --load: var(--matcha); background: color-mix(in srgb, var(--load) 35%, var(--paper)); }
+.sum-bar.load.is-own { background: var(--load); }
+.sum-bar.load.level-moderate { --load: var(--yamabuki); }
+.sum-bar.load.level-heavy { --load: color-mix(in srgb, var(--vermilion) 55%, var(--yamabuki)); }
+.sum-bar.load.level-veryHeavy { --load: var(--vermilion); }
+.sum-bar.is-future { background: transparent; }
+.sum-axis span { color: var(--muted); font: 500 8.5px var(--mono); text-align: center; }
+.sum-axis { margin-top: 3px; }
+.sum-note { margin: 6px 0 0; color: var(--ink-2); font-size: 12.5px; }
+.sum-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 6px 0 0; color: var(--ink-2); font-size: 12.5px; }
+.sum-count { display: inline-flex; align-items: center; gap: 4px; }
+
 
 /* ===== Sheets (item editor & settings) ===== */
 dialog.sheet {
