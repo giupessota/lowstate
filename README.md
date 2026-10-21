@@ -39,6 +39,23 @@ switches to the week or the month when you want the bigger picture.
   day; click a day to open it
 - Month index tabs on the page edge
 
+**Calendars** (desktop app)
+
+- Connect Google, Outlook and iCloud calendars by pasting each one's secret
+  iCal link (Settings → Calendars). Meetings show up read-only on the
+  timeline, all-day events above it, and both in the week and month views;
+  busy meeting time counts toward the mental load
+- Recurring events, moved or cancelled occurrences and time zones are handled
+  by [ical.js](https://github.com/kewisch/ical.js); calendars refresh every
+  15 minutes and when you come back to the window
+- The links work like passwords, so they stay in the desktop app's main
+  process, encrypted with the OS keychain (macOS Keychain / Windows DPAPI),
+  in `calendars.json` next to the data snapshot. They never reach the page,
+  aren't part of backups, and only the host is shown. Browsers can't read
+  these links (no CORS), so the web app doesn't offer calendars
+- Work accounts (Google Workspace, Microsoft 365) may have the secret link
+  turned off by an administrator
+
 **Everything else**
 
 - "To schedule" list for things without a date, plus an Overdue list

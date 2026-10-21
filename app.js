@@ -6,6 +6,7 @@
   const Store = window.LowstateStorage;
   const I18n = window.LowstateI18n;
   const desktop = window.desktopGadget || null;
+  const calendarsApi = window.desktopCalendars || null;
 
   const KEYS = {
     items: "type-todo.planner.items.v1",
@@ -72,6 +73,18 @@
     moodPicker: $("moodPicker"),
     moodReason: $("moodReason"),
     loadMeter: $("loadMeter"),
+    dayAllDay: $("dayAllDay"),
+    calWebNote: $("calWebNote"),
+    calHead: $("calHead"),
+    calSummary: $("calSummary"),
+    calRefresh: $("calRefresh"),
+    calList: $("calList"),
+    calAddForm: $("calAddForm"),
+    calName: $("calName"),
+    calUrl: $("calUrl"),
+    calColors: $("calColors"),
+    calAddBtn: $("calAddBtn"),
+    calStatus: $("calStatus"),
     waterGoalValue: $("waterGoalValue"),
     waterRow: $("waterRow"),
     waterSum: $("waterSum"),
@@ -268,6 +281,9 @@
     water: Store.loadObject(KEYS.water),
     moodNotes: Store.loadObject(KEYS.moodNotes),
     loads: Store.loadObject(KEYS.loads),
+    // Read-only events from subscribed calendars (desktop only).
+    calendars: [],
+    events: [],
     editingId: null,
     draft: null,
     dragId: null,
@@ -597,6 +613,19 @@
     }
   }
 
+  function weekEventsEl(iso) {
+    const { allDay, timed } = dayEvents(iso);
+    if (!allDay.length && !timed.length) return null;
+    return h("ul", { class: "day-events" }, [...allDay, ...timed].map((event) => h("li", {
+      class: `event-line${event.allDay ? " is-allday" : ""}`,
+      title: eventTooltip(event),
+      style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
+    },
+      h("i", { "aria-hidden": "true" }),
+      event.allDay ? null : h("span", { class: "line-time", text: clockTime(new Date(event.start)) }),
+      h("span", { class: "event-title", text: eventTitle(event) }))));
+  }
+
   function renderDays(days) {
     els.weekGrid.replaceChildren(...days.map((day) => {
       const iso = Core.toISODate(day);
@@ -613,6 +642,7 @@
           h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso]))),
         h("div", { class: "day-body" },
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
+          weekEventsEl(iso),
           h("ul", { class: "day-items", "data-date": iso },
             Planner.itemsForDay(state.items, iso).map((item) => itemEl(item, "line"))),
           h("form", { class: "day-add", "data-date": iso },
@@ -669,9 +699,32 @@
     return { first: Math.min(TIMELINE_START, earliest), last: 24 };
   }
 
+  // ---------- calendar events ----------
+  const calendarById = (id) => state.calendars.find((calendar) => calendar.id === id) || null;
+  const clockTime = (date) => `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const eventRange = (event) => (event.allDay ? t("allDay") : `${clockTime(new Date(event.start))}–${clockTime(new Date(event.end))}`);
+  const eventTitle = (event) => event.title || t("untitledEvent");
+
+  function eventTooltip(event) {
+    const calendar = calendarById(event.calendarId);
+    return [eventTitle(event), eventRange(event), event.location, calendar?.name].filter(Boolean).join("\n");
+  }
+
+  function dayEvents(iso) {
+    return Planner.eventsForDay(state.events, iso);
+  }
+
   function renderTimeline(iso) {
     const items = Planner.itemsForDay(state.items, iso);
-    const events = Planner.layoutTimeline(items);
+    // Meetings share the timeline (and its lanes) with tasks, as read-only blocks.
+    const meetings = dayEvents(iso).timed.map((event) => ({
+      id: event.id,
+      kind: "event",
+      event,
+      start: Planner.minutesToTime(Math.min(event.startMin, 1425)),
+      duration: Math.max(15, event.endMin - Math.min(event.startMin, 1425)),
+    }));
+    const events = Planner.layoutTimeline([...items, ...meetings]);
     const { first, last } = timelineRange(events);
     const hour = timelineHourHeight();
     const inner = h("div", { class: "timeline-inner", "data-first-hour": first, style: `height: ${(last - first) * hour}px` });
@@ -685,9 +738,22 @@
 
     events.forEach((event) => {
       const { item } = event;
-      const category = categoryById(item.category);
       const top = ((event.start - first * 60) / 60) * hour;
       const height = Math.max(((event.end - event.start) / 60) * hour - 2, 20);
+      if (item.kind === "event") {
+        const calendar = calendarById(item.event.calendarId);
+        const lines = Math.max(1, Math.floor((height - 19) / 16));
+        inner.append(h("div", {
+          class: `block event${height < 34 ? " short" : ""}${item.event.busy === false ? " is-free" : ""}`,
+          title: eventTooltip(item.event),
+          style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${calendar ? ` --cat: ${calendar.color};` : ""}`,
+        },
+          h("div", { class: "item-body", tabindex: "0" },
+            h("span", { class: "block-time", text: eventRange(item.event) }),
+            h("span", { class: "block-title", text: eventTitle(item.event) }))));
+        return;
+      }
+      const category = categoryById(item.category);
       const classes = ["item", "block"];
       if (item.done) classes.push("is-done");
       if (item.priority === "urgent") classes.push("is-urgent");
@@ -754,6 +820,13 @@
     els.dayOfYear.textContent = t("dayOfYear", { n: Planner.dayOfYear(day), total: Planner.daysInYear(day.getFullYear()) });
     els.dayHoliday.hidden = !holiday;
     els.dayHoliday.textContent = holiday || "";
+    const allDay = dayEvents(iso).allDay;
+    els.dayAllDay.hidden = allDay.length === 0;
+    els.dayAllDay.replaceChildren(...allDay.map((event) => h("span", {
+      class: "allday-chip",
+      title: eventTooltip(event),
+      style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
+    }, eventTitle(event))));
     setWashi(els.dayWashi, Planner.dayOfYear(day));
 
     showQuote(els.dayProverb, Planner.dayOfYear(day));
@@ -777,7 +850,7 @@
   // Mental load: the app's estimate as a ghost, the person's own rating
   // solid. Clicking a tick sets the rating; clicking it again clears it.
   function renderLoad(iso) {
-    const estimate = Planner.mentalLoad(state.items, iso, { todayISO: todayISO(), moods: state.moods });
+    const estimate = Planner.mentalLoad(state.items, iso, { todayISO: todayISO(), moods: state.moods, events: state.events });
     const own = state.loads[iso];
     const hasOwn = Number.isInteger(own);
     const score = hasOwn ? own : estimate.score;
@@ -888,14 +961,28 @@
       const iso = Core.toISODate(day);
       const holiday = holidayFor(iso);
       const items = Planner.itemsForDay(state.items, iso);
+      const { allDay: allDayEvents, timed: timedEvents } = dayEvents(iso);
+      const meetings = [...allDayEvents, ...timedEvents];
       const classes = dayClasses(day, "month-cell") + (day.getMonth() === month ? "" : " is-other");
       return h("div", { class: classes, "data-date": iso, "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
         h("div", { class: "cell-head" },
           h("span", { class: "cell-num", text: day.getDate() }),
           holiday ? h("span", { class: "cell-holiday", text: holiday }) : null,
           moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso])),
-        h("ul", { class: "month-items", "data-date": iso }, items.slice(0, limit).map((item) => itemEl(item, "mini"))),
-        items.length > limit ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length - limit }) }) : null);
+        h("ul", { class: "month-items", "data-date": iso },
+          meetings.slice(0, limit).map((event) => h("li", {
+            class: "mini event",
+            title: eventTooltip(event),
+            style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
+          },
+            h("i", { "aria-hidden": "true" }),
+            h("span", { class: "item-body" },
+              event.allDay ? null : h("span", { class: "mini-time", text: clockTime(new Date(event.start)) }),
+              eventTitle(event)))),
+          items.slice(0, Math.max(0, limit - meetings.length)).map((item) => itemEl(item, "mini"))),
+        items.length + meetings.length > limit
+          ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length + meetings.length - limit }) })
+          : null);
     }));
     renderMonthTabs(reference);
   }
@@ -1237,6 +1324,7 @@
     els.settingsDialog.querySelector('[data-step="250"]').disabled = state.settings.waterGoal >= Planner.WATER_GOAL.max;
     const unitButton = els.settingsDialog.querySelector('[data-setting="waterUnit"] [data-value="glasses"]');
     unitButton.textContent = t(Planner.isBottle(state.settings.glassMl) ? "waterUnitBottles" : "waterUnitGlasses");
+    renderCalendarSettings();
     els.windowGroup.hidden = !desktop;
     const count = Store.pruneTrash().length;
     els.trashSummary.textContent = t("trashCount", { count });
@@ -1278,6 +1366,117 @@
       desktop?.setAlwaysOnTop(value === "on");
     }
     renderSettings();
+  }
+
+  // ---------- calendar subscriptions (Settings → Calendars) ----------
+  let calendarColor = null;
+  let calendarBusy = false;
+
+  function timeAgo(timestamp) {
+    const minutes = Math.round((Date.now() - timestamp) / 60000);
+    const format = new Intl.RelativeTimeFormat(I18n.language === "pt" ? "pt-BR" : "en-GB", { numeric: "auto" });
+    if (minutes < 1) return format.format(0, "minute");
+    if (minutes < 60) return format.format(-minutes, "minute");
+    if (minutes < 60 * 24) return format.format(-Math.round(minutes / 60), "hour");
+    return format.format(-Math.round(minutes / 1440), "day");
+  }
+
+  function renderCalendarSettings() {
+    els.calWebNote.hidden = Boolean(calendarsApi);
+    els.calAddForm.hidden = !calendarsApi;
+    els.calHead.hidden = !calendarsApi || state.calendars.length === 0;
+    if (!calendarsApi) {
+      els.calList.replaceChildren();
+      return;
+    }
+    els.calSummary.textContent = t("calEvents", { n: state.events.length });
+    els.calList.replaceChildren(...(state.calendars.length
+      ? state.calendars.map((calendar) => {
+        const status = calendar.error
+          ? t(`calErr-${calendar.error}`)
+          : calendar.lastSync ? t("calSynced", { when: timeAgo(calendar.lastSync) }) : t("calSyncing");
+        return h("li", { class: `cal-row${calendar.enabled ? "" : " is-hidden"}`, style: `--cat: ${calendar.color}` },
+          h("span", { class: "cal-dot", "aria-hidden": "true" }),
+          h("div", { class: "cal-info" },
+            h("strong", { text: calendar.name }),
+            h("span", { class: `cal-meta${calendar.error ? " is-error" : ""}`, text: `${calendar.host} · ${t("calEvents", { n: calendar.count })} · ${status}` })),
+          h("button", {
+            type: "button",
+            class: "cal-toggle",
+            "data-cal-toggle": calendar.id,
+            "aria-pressed": String(calendar.enabled),
+            title: calendar.enabled ? t("calHide") : t("calShow"),
+            text: calendar.enabled ? t("calShown") : t("calHidden"),
+          }),
+          h("button", { type: "button", class: "cal-remove", "data-cal-remove": calendar.id, title: t("calRemove"), "aria-label": t("calRemove"), text: "×" }));
+      })
+      : [h("li", { class: "cal-empty", text: t("calEmpty") })]));
+
+    const used = new Set(state.calendars.map((calendar) => calendar.color));
+    if (!calendarColor) calendarColor = Planner.PALETTE.find((color) => !used.has(color)) || Planner.PALETTE[0];
+    els.calColors.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
+      type: "button",
+      class: `cal-color${color === calendarColor ? " active" : ""}`,
+      "data-cal-color": color,
+      "aria-pressed": String(color === calendarColor),
+      "aria-label": color,
+      style: `--cat: ${color}`,
+    })));
+    els.calAddBtn.disabled = calendarBusy;
+  }
+
+  function applyCalendars(payload) {
+    state.calendars = Array.isArray(payload?.calendars) ? payload.calendars : [];
+    state.events = Array.isArray(payload?.events) ? payload.events : [];
+    render();
+    if (els.settingsDialog.open) renderCalendarSettings();
+  }
+
+  els.calAddForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!calendarsApi || calendarBusy) return;
+    calendarBusy = true;
+    els.calStatus.className = "cal-status";
+    els.calStatus.textContent = t("calAdding");
+    renderCalendarSettings();
+    const result = await calendarsApi.add({ name: els.calName.value, color: calendarColor, url: els.calUrl.value });
+    calendarBusy = false;
+    if (result?.ok) {
+      els.calName.value = "";
+      els.calUrl.value = "";
+      calendarColor = null;
+      els.calStatus.textContent = t("calAdded", { n: result.calendar.count });
+    } else {
+      els.calStatus.className = "cal-status is-error";
+      els.calStatus.textContent = t(`calErr-${result?.error || "network"}`);
+    }
+    renderCalendarSettings();
+  });
+
+  els.settingsDialog.addEventListener("click", async (event) => {
+    const color = event.target.closest("[data-cal-color]");
+    const toggle = event.target.closest("[data-cal-toggle]");
+    const remove = event.target.closest("[data-cal-remove]");
+    if (color) {
+      calendarColor = color.dataset.calColor;
+      renderCalendarSettings();
+    } else if (toggle && calendarsApi) {
+      const calendar = calendarById(toggle.dataset.calToggle);
+      if (calendar) applyCalendars(await calendarsApi.update(calendar.id, { enabled: !calendar.enabled }));
+    } else if (remove && calendarsApi) {
+      const calendar = calendarById(remove.dataset.calRemove);
+      if (calendar && window.confirm(t("calRemoveConfirm", { name: calendar.name }))) {
+        applyCalendars(await calendarsApi.remove(calendar.id));
+      }
+    } else if (event.target.closest("#calRefresh") && calendarsApi) {
+      els.calSummary.textContent = t("calSyncing");
+      applyCalendars(await calendarsApi.refresh());
+    }
+  });
+
+  if (calendarsApi) {
+    calendarsApi.get().then(applyCalendars).catch(() => {});
+    calendarsApi.onUpdate(applyCalendars);
   }
 
   // Settings are split into tabs so the sheet stays short.

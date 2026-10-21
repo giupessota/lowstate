@@ -466,6 +466,47 @@
   // ---------- Mood of the day ----------
   const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
+  // ---------- Calendar events (read-only, from subscribed calendars) ----------
+  // Events come from the desktop app: all-day ones carry ISO dates with an
+  // exclusive end, timed ones absolute instants. This splits them for one
+  // local day, clipping timed events to that day's minutes.
+  function eventsForDay(events, iso) {
+    const dayStart = parseISODate(iso);
+    if (!dayStart) return { allDay: [], timed: [] };
+    const dayEnd = addDays(dayStart, 1);
+    const allDay = [];
+    const timed = [];
+    (events || []).forEach((event) => {
+      if (event.allDay) {
+        if (event.start <= iso && iso < event.end) allDay.push(event);
+        return;
+      }
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      if (!(end > dayStart && start < dayEnd) && !(+start === +end && start >= dayStart && start < dayEnd)) return;
+      const startMin = Math.max(0, Math.round((start - dayStart) / 60000));
+      const endMin = Math.min(1440, Math.round((end - dayStart) / 60000));
+      timed.push({ ...event, startMin, endMin: Math.max(endMin, startMin + 15) });
+    });
+    timed.sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+    allDay.sort((a, b) => a.title.localeCompare(b.title));
+    return { allDay, timed };
+  }
+
+  // Minutes of busy meetings in a day, overlapping ones counted once.
+  function busyMinutes(events, iso) {
+    const spans = eventsForDay(events, iso).timed.filter((event) => event.busy !== false)
+      .map((event) => [event.startMin, Math.min(1440, event.endMin)]);
+    let total = 0;
+    let reach = -1;
+    spans.forEach(([start, end]) => {
+      if (end <= reach) return;
+      total += end - Math.max(start, reach);
+      reach = end;
+    });
+    return total;
+  }
+
   // ---------- Mental load (perceived, not a stress measure) ----------
   // A rough 0–10 estimate of how full the day feels, from what the planner
   // knows: open must-dos and urgent items, busy hours on the timeline,
@@ -473,7 +514,7 @@
   // The person can always override it with their own number.
   const HEAVY_MOODS = ["tiring", "stressed", "rough"];
 
-  function mentalLoad(items, iso, { todayISO = iso, moods = {} } = {}) {
+  function mentalLoad(items, iso, { todayISO = iso, moods = {}, events = [] } = {}) {
     const day = items.filter((item) => item.date === iso);
     const open = day.filter((item) => !item.done && item.focus !== "later");
     const must = open.filter((item) => item.focus === "must").length;
@@ -482,6 +523,7 @@
     const minutes = day
       .filter((item) => item.start && item.focus !== "later")
       .reduce((sum, item) => sum + (item.duration || 60), 0);
+    const meetingMinutes = busyMinutes(events, iso);
     const overdue = iso === todayISO ? overdueItems(items, todayISO).length : 0;
     const date = parseISODate(iso);
     const heavyDays = date
@@ -491,12 +533,20 @@
     const raw = Math.min(must * 1.2, 4)
       + Math.min(could * 0.4, 2)
       + Math.min(urgent * 0.5, 1.5)
-      + Math.min((minutes / 60) * 0.5, 3)
+      + Math.min(((minutes + meetingMinutes) / 60) * 0.5, 3)
       + Math.min(overdue * 0.5, 2)
       + Math.min(heavyDays * 0.5, 1);
     return {
       score: Math.max(0, Math.min(10, Math.round(raw))),
-      factors: { must, could, urgent, hours: Math.round((minutes / 60) * 10) / 10, overdue, heavyDays },
+      factors: {
+        must,
+        could,
+        urgent,
+        hours: Math.round((minutes / 60) * 10) / 10,
+        meetings: Math.round((meetingMinutes / 60) * 10) / 10,
+        overdue,
+        heavyDays,
+      },
     };
   }
 
@@ -645,6 +695,8 @@
     MOODS,
     setMood,
     mentalLoad,
+    eventsForDay,
+    busyMinutes,
     loadLevel,
     setLoad,
     postponeCandidate,

@@ -179,12 +179,39 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
     P.normalizeItem({ title: "old", date: "2026-10-19" }),
   ];
   const load = P.mentalLoad(busy, day, { todayISO: day, moods: { "2026-10-20": "stressed" } });
-  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, overdue: 1, heavyDays: 1 });
+  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, meetings: 0, overdue: 1, heavyDays: 1 });
   assert.equal(load.score, 8);
   assert.equal(P.mentalLoad(busy, day, { todayISO: "2026-10-20" }).factors.overdue, 0);
   assert.equal(P.loadLevel(2), "light");
   assert.equal(P.loadLevel(7), "heavy");
   assert.equal(P.loadLevel(10), "veryHeavy");
+});
+
+test("calendar events split into all-day and timed slices of a local day", () => {
+  const local = (y, m, d, h, min = 0) => new Date(y, m - 1, d, h, min).toISOString();
+  const events = [
+    { id: "a", title: "Feriado", allDay: true, start: "2026-11-02", end: "2026-11-03" },
+    { id: "b", title: "Viagem", allDay: true, start: "2026-11-01", end: "2026-11-04" },
+    { id: "c", title: "Reunião", allDay: false, start: local(2026, 11, 2, 9), end: local(2026, 11, 2, 10, 30), busy: true },
+    { id: "d", title: "Plantão", allDay: false, start: local(2026, 11, 1, 22), end: local(2026, 11, 2, 2), busy: true },
+    { id: "e", title: "Ontem", allDay: false, start: local(2026, 11, 1, 9), end: local(2026, 11, 1, 10), busy: true },
+    { id: "f", title: "Lembrete", allDay: false, start: local(2026, 11, 2, 15), end: local(2026, 11, 2, 15), busy: false },
+  ];
+  const day = P.eventsForDay(events, "2026-11-02");
+  assert.deepEqual(day.allDay.map((event) => event.title), ["Feriado", "Viagem"]);
+  assert.deepEqual(day.timed.map((event) => [event.title, event.startMin, event.endMin]), [
+    ["Plantão", 0, 120], ["Reunião", 540, 630], ["Lembrete", 900, 915],
+  ]);
+  assert.deepEqual(P.eventsForDay(events, "2026-11-04").allDay, []);
+  assert.equal(P.busyMinutes(events, "2026-11-02"), 210);
+  const overlapping = [
+    { id: "x", allDay: false, start: local(2026, 11, 3, 9), end: local(2026, 11, 3, 11), busy: true },
+    { id: "y", allDay: false, start: local(2026, 11, 3, 10), end: local(2026, 11, 3, 12), busy: true },
+  ];
+  assert.equal(P.busyMinutes(overlapping, "2026-11-03"), 180);
+  const load = P.mentalLoad([], "2026-11-03", { events: overlapping });
+  assert.equal(load.factors.meetings, 3);
+  assert.equal(load.score, 2);
 });
 
 test("perceived load can be set and cleared; postpone picks the last plain could-do", () => {

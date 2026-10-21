@@ -117,6 +117,7 @@
                 </div>
               </header>
               <p class="holiday day-holiday" id="dayHoliday" hidden></p>
+              <div class="allday" id="dayAllDay" hidden></div>
               <div class="timeline" id="timeline" data-i18n-aria="timeline" role="region" aria-label="Timeline"></div>
               <footer class="proverb">
                 <span class="proverb-tr" id="dayProverb"></span>
@@ -317,6 +318,7 @@
           <button type="button" role="tab" data-tab="look" data-i18n="appearance">Appearance</button>
           <button type="button" role="tab" data-tab="planner" data-i18n="tabPlanner">Planner</button>
           <button type="button" role="tab" data-tab="water" data-i18n="water">Water</button>
+          <button type="button" role="tab" data-tab="calendars" data-i18n="tabCalendars">Calendars</button>
           <button type="button" role="tab" data-tab="general" data-i18n="tabGeneral">General</button>
         </nav>
 
@@ -408,6 +410,31 @@
               <button type="button" data-step="250" aria-label="+250 ml">+</button>
             </div>
           </div>
+        </section>
+
+        <section class="set-group cal-group" data-tab="calendars">
+          <p class="cal-note" id="calWebNote" data-i18n="calDesktopOnly" hidden></p>
+          <div class="cal-head" id="calHead" hidden>
+            <span class="cal-summary" id="calSummary"></span>
+            <button type="button" class="focus-action" id="calRefresh" data-i18n="calRefresh">Refresh now</button>
+          </div>
+          <ul class="cal-list" id="calList"></ul>
+          <form class="cal-add" id="calAddForm" hidden>
+            <input id="calName" maxlength="60" autocomplete="off" data-i18n-placeholder="calNamePlaceholder" data-i18n-aria="calNamePlaceholder" />
+            <input id="calUrl" type="url" autocomplete="off" spellcheck="false" data-i18n-placeholder="calUrlPlaceholder" data-i18n-aria="calUrlPlaceholder" required />
+            <div class="cal-add-row">
+              <div class="cal-colors" id="calColors"></div>
+              <button type="submit" class="btn primary" id="calAddBtn" data-i18n="calAdd">ADD</button>
+            </div>
+            <p class="cal-status" id="calStatus" role="status"></p>
+          </form>
+          <details class="cal-help">
+            <summary data-i18n="calHelpTitle">Where do I find the link?</summary>
+            <p data-i18n="calHelpGoogle"></p>
+            <p data-i18n="calHelpOutlook"></p>
+            <p data-i18n="calHelpIcloud"></p>
+            <p class="cal-privacy" data-i18n="calHelpPrivacy"></p>
+          </details>
         </section>
 
         <section class="set-group" data-tab="general" id="windowGroup" hidden>

@@ -1,9 +1,10 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, session, Tray } = require("electron");
+const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, safeStorage, session, Tray } = require("electron");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
 const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
+const { createCalendarStore } = require("./desktop-calendars.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
@@ -226,6 +227,84 @@ app.whenReady().then(async () => {
   createTray();
   registerShortcuts(shortcuts);
   setTimeout(checkForUpdate, 2000);
+  initCalendars();
+});
+
+// ---------- calendar subscriptions (read-only ICS) ----------
+const CALENDAR_REFRESH = 15 * 60 * 1000;
+let calendarStore = null;
+let calendarRefresh = null;
+let calendarRefreshedAt = 0;
+
+// The secret links are encrypted with the OS keychain when available
+// ("s:"), otherwise only obscured ("p:") in a file readable by this user.
+function encryptSecret(text) {
+  if (safeStorage.isEncryptionAvailable()) return `s:${safeStorage.encryptString(text).toString("base64")}`;
+  return `p:${Buffer.from(text).toString("base64")}`;
+}
+
+function decryptSecret(value) {
+  if (value.startsWith("s:")) return safeStorage.decryptString(Buffer.from(value.slice(2), "base64"));
+  return Buffer.from(value.slice(2), "base64").toString();
+}
+
+function calendarPayload() {
+  return calendarStore ? { calendars: calendarStore.list(), events: calendarStore.events() } : { calendars: [], events: [] };
+}
+
+function sendCalendars() {
+  if (window && !window.isDestroyed()) window.webContents.send("calendars-updated", calendarPayload());
+}
+
+function refreshCalendars() {
+  if (!calendarStore) return Promise.resolve();
+  if (!calendarRefresh) {
+    calendarRefresh = calendarStore.refresh().finally(() => {
+      calendarRefresh = null;
+      calendarRefreshedAt = Date.now();
+      sendCalendars();
+    });
+  }
+  return calendarRefresh;
+}
+
+function initCalendars() {
+  const directory = path.dirname(desktopStoragePaths().current);
+  calendarStore = createCalendarStore({
+    file: path.join(directory, "calendars.json"),
+    cacheFile: path.join(directory, "calendar-events.json"),
+    encrypt: encryptSecret,
+    decrypt: decryptSecret,
+  });
+  setTimeout(refreshCalendars, 3000);
+  setInterval(refreshCalendars, CALENDAR_REFRESH);
+  // Coming back to the window after a while picks up new meetings sooner.
+  window?.on("focus", () => {
+    if (Date.now() - calendarRefreshedAt > 5 * 60 * 1000) refreshCalendars();
+  });
+}
+
+ipcMain.handle("calendars-get", () => calendarPayload());
+ipcMain.handle("calendars-add", async (_event, input) => {
+  if (!calendarStore) return { ok: false, error: "network" };
+  const { name, color, url } = input || {};
+  const result = await calendarStore.add({ name: String(name || ""), color: String(color || ""), url: String(url || "") });
+  if (result.ok) sendCalendars();
+  return result;
+});
+ipcMain.handle("calendars-update", (_event, id, changes) => {
+  calendarStore?.update(String(id), changes && typeof changes === "object" ? changes : {});
+  sendCalendars();
+  return calendarPayload();
+});
+ipcMain.handle("calendars-remove", (_event, id) => {
+  calendarStore?.remove(String(id));
+  sendCalendars();
+  return calendarPayload();
+});
+ipcMain.handle("calendars-refresh", async () => {
+  await refreshCalendars();
+  return calendarPayload();
 });
 
 ipcMain.on("hide-window", () => { if (window) window.hide(); });
