@@ -490,6 +490,11 @@
         color: PALETTE.includes(habit.color) ? habit.color : PALETTE[index % PALETTE.length],
         icon: HABIT_ICONS.includes(habit.icon) ? habit.icon : null,
         days: normalizeDays(habit.days),
+        // Optional time of day, so a habit like the gym sits on the timeline.
+        start: isTime(habit.start) ? habit.start : null,
+        duration: isTime(habit.start) && Number.isFinite(habit.duration) && habit.duration > 0
+          ? Math.min(Math.round(habit.duration), 720)
+          : null,
       }));
   }
 

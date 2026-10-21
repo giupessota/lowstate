@@ -119,6 +119,8 @@
     habitDayPicker: $("habitDayPicker"),
     habitDaysHint: $("habitDaysHint"),
     habitColorPicker: $("habitColorPicker"),
+    habitEditStart: $("habitEditStart"),
+    habitEditDuration: $("habitEditDuration"),
     habitEditDelete: $("habitEditDelete"),
     habitEditCancel: $("habitEditCancel"),
     rangeTitle: $("rangeTitle"),
@@ -644,8 +646,18 @@
 
   function weekEventsEl(iso) {
     const { allDay, timed } = dayEvents(iso);
-    if (!allDay.length && !timed.length) return null;
-    return h("ul", { class: "day-events" }, [...allDay, ...timed].map((event) => h("li", {
+    const routines = state.habits.filter((habit) => habit.start && Planner.habitScheduled(habit, iso))
+      .sort((a, b) => (a.start < b.start ? -1 : 1));
+    if (!allDay.length && !timed.length && !routines.length) return null;
+    const routineLines = routines.map((habit) => h("li", {
+      class: `event-line routine${Planner.habitDone(state.habitLog, iso, habit.id) ? " is-done" : ""}`,
+      style: `--habit: ${habit.color}`,
+      title: habit.name,
+    },
+      habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
+      h("span", { class: "line-time", text: habit.start }),
+      h("span", { class: "event-title", text: habit.name })));
+    return h("ul", { class: "day-events" }, routineLines, [...allDay, ...timed].map((event) => h("li", {
       class: `event-line${event.allDay ? " is-allday" : ""}`,
       title: eventTooltip(event),
       style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
@@ -754,7 +766,11 @@
       start: Planner.minutesToTime(Math.min(event.startMin, 1425)),
       duration: Math.max(15, event.endMin - Math.min(event.startMin, 1425)),
     }));
-    const events = Planner.layoutTimeline([...items, ...meetings]);
+    // Habits with a time sit on the timeline on their planned days.
+    const routines = state.habits
+      .filter((habit) => habit.start && Planner.habitScheduled(habit, iso))
+      .map((habit) => ({ id: `habit:${habit.id}`, kind: "habit", habit, start: habit.start, duration: habit.duration || 60 }));
+    const events = Planner.layoutTimeline([...items, ...meetings, ...routines]);
     const { first, last } = timelineRange(events);
     const hour = timelineHourHeight();
     const inner = h("div", { class: "timeline-inner", "data-first-hour": first, style: `height: ${(last - first) * hour}px` });
@@ -770,6 +786,27 @@
       const { item } = event;
       const top = ((event.start - first * 60) / 60) * hour;
       const height = Math.max(((event.end - event.start) / 60) * hour - 2, 20);
+      if (item.kind === "habit") {
+        const { habit } = item;
+        const done = Planner.habitDone(state.habitLog, iso, habit.id);
+        const lines = Math.max(1, Math.floor((height - 19) / 16));
+        const range = `${habit.start}–${Planner.minutesToTime(Math.min(1439, Planner.timeToMinutes(habit.start) + (habit.duration || 60)))}`;
+        inner.append(h("button", {
+          type: "button",
+          class: `block routine${done ? " is-done" : ""}${height < 34 ? " short" : ""}`,
+          "data-habit-cell": habit.id,
+          "data-date": iso,
+          "aria-pressed": String(done),
+          disabled: iso > todayISO() ? "" : null,
+          title: `${habit.name} · ${range}`,
+          style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines}; --habit: ${habit.color};`,
+        },
+          habitIconEl(habit.icon) || h("i", { class: "habit-dot", "aria-hidden": "true" }),
+          h("span", { class: "item-body" },
+            h("span", { class: "block-time", text: range }),
+            h("span", { class: "block-title", text: habit.name }))));
+        return;
+      }
       if (item.kind === "event") {
         const calendar = calendarById(item.event.calendarId);
         const lines = Math.max(1, Math.floor((height - 19) / 16));
@@ -1307,7 +1344,9 @@
 
   // Habits planned for the day (or already done as an extra) as pills.
   function renderTodayHabits(iso) {
-    const habits = state.habits.filter((habit) => Planner.habitScheduled(habit, iso) || Planner.habitDone(state.habitLog, iso, habit.id));
+    const habits = state.habits
+      .filter((habit) => Planner.habitScheduled(habit, iso) || Planner.habitDone(state.habitLog, iso, habit.id))
+      .sort((a, b) => (a.start || "99") < (b.start || "99") ? -1 : 1);
     els.todayHabits.hidden = habits.length === 0;
     const future = iso > todayISO();
     els.habitPills.replaceChildren(...habits.map((habit) => {
@@ -1320,7 +1359,9 @@
         "data-date": iso,
         "aria-pressed": String(done),
         disabled: future ? "" : null,
-      }, habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }), habit.name);
+      }, habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
+        habit.start ? h("span", { class: "pill-time", text: habit.start }) : null,
+        habit.name);
     }));
   }
 
@@ -1362,6 +1403,12 @@
     }));
     els.habitDaysHint.textContent = !draft.days.length ? t("habitEveryDay")
       : draft.days.length === 1 ? t("habitDaysOne") : t("habitDaysCount", { n: draft.days.length });
+
+    fillSelect(els.habitEditStart, START_OPTIONS, t("habitNoTime"), (value) => value);
+    fillSelect(els.habitEditDuration, DURATION_OPTIONS, "—", formatDuration);
+    els.habitEditStart.value = draft.start || "";
+    els.habitEditDuration.value = draft.start ? String(draft.duration || 60) : "";
+    els.habitEditDuration.disabled = !draft.start;
 
     els.habitColorPicker.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
       type: "button",
@@ -2023,6 +2070,14 @@
     render();
   });
   els.habitEditCancel.addEventListener("click", () => els.habitDialog.close());
+  els.habitEditStart.addEventListener("change", () => {
+    habitDraft.start = els.habitEditStart.value || null;
+    habitDraft.duration = habitDraft.start ? habitDraft.duration || 60 : null;
+    renderHabitEditor();
+  });
+  els.habitEditDuration.addEventListener("change", () => {
+    habitDraft.duration = Number(els.habitEditDuration.value) || 60;
+  });
   els.habitEditDelete.addEventListener("click", () => {
     const habit = habitDraft;
     if (!habit || !window.confirm(t("habitRemoveConfirm", { name: habit.name }))) return;

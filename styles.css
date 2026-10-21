@@ -1351,6 +1351,27 @@ svg.i {
 .habit-ideas { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
 .habit-ideas-title { color: var(--muted); font: 500 10px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
 
+/* Habits with a time: a dashed block on the timeline, filled once done */
+.block.routine {
+  align-items: flex-start;
+  border: 1px dashed color-mix(in srgb, var(--habit) 60%, transparent);
+  border-left: 3px solid var(--habit);
+  background: color-mix(in srgb, var(--habit) 7%, var(--paper));
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.block.routine .habit-icon, .block.routine .habit-dot { margin-top: 2px; }
+.block.routine .habit-icon { width: 15px; height: 15px; }
+.block.routine.is-done { border-style: solid; background: color-mix(in srgb, var(--habit) 18%, var(--paper)); opacity: 1; }
+.block.routine.is-done .block-title { text-decoration: none; }
+.block.routine.is-done .block-title::after { content: " ✓"; color: var(--habit); }
+.block.routine:disabled { cursor: default; opacity: .7; }
+.event-line.routine .habit-icon { width: 13px; height: 13px; align-self: center; stroke: color-mix(in srgb, var(--ink) 40%, transparent); }
+.event-line.routine.is-done .habit-icon { stroke: var(--habit); }
+.pill-time { color: var(--ink-2); font: 500 11px var(--mono); }
+
 /* Habit editor */
 .habit-sheet { width: min(420px, calc(100vw - 32px)); }
 .habit-name-input {

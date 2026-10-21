@@ -189,7 +189,7 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
 
 test("habits: toggling, streaks that survive an unchecked today, monthly progress", () => {
   assert.deepEqual(P.normalizeHabits([{ id: "a", name: " Ler " }, { id: "a", name: "dup" }, { id: "b", name: "" }, null]), [
-    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [] },
+    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [], start: null, duration: null },
   ]);
   let log = {};
   ["2026-10-18", "2026-10-19", "2026-10-20"].forEach((iso) => { log = P.toggleHabit(log, iso, "read"); });
@@ -208,7 +208,10 @@ test("habits: toggling, streaks that survive an unchecked today, monthly progres
 
 test("habits planned for some weekdays: icons, schedule, streaks and month counts", () => {
   const [gym] = P.normalizeHabits([{ id: "gym", name: "Academia", icon: "dumbbell", days: [5, 1, 3, 3, 9] }]);
-  assert.deepEqual([gym.icon, gym.days], ["dumbbell", [1, 3, 5]]);
+  assert.deepEqual([gym.icon, gym.days, gym.start], ["dumbbell", [1, 3, 5], null]);
+  const [timed] = P.normalizeHabits([{ id: "t", name: "Academia", start: "07:00", duration: 75 }]);
+  assert.deepEqual([timed.start, timed.duration], ["07:00", 75]);
+  assert.deepEqual(P.normalizeHabits([{ id: "t", name: "x", start: "25:00", duration: 60 }])[0].duration, null);
   assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", icon: "rocket", days: [0, 1, 2, 3, 4, 5, 6] }])[0].icon, null);
   assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", days: [0, 1, 2, 3, 4, 5, 6] }])[0].days, []);
   // October 2026: the 19th is a Monday, the 21st a Wednesday, the 22nd a Thursday.
