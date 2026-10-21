@@ -921,6 +921,11 @@
   }
 
   // 1250 → "1,25 L" (pt) / "1.25 L" (en).
+  // Under a liter reads better in ml ("750 ml"); from there on, liters.
+  function formatVolume(ml, language = "en") {
+    return ml < 1000 ? `${Math.round(ml / 10) * 10} ml` : formatLiters(ml, language);
+  }
+
   function formatLiters(ml, language = "en") {
     const liters = Math.round(ml / 10) / 100;
     return `${liters.toLocaleString(language === "pt" ? "pt-BR" : "en-GB", { maximumFractionDigits: 2 })} L`;
@@ -1041,6 +1046,7 @@
     waterTarget,
     setWater,
     formatLiters,
+    formatVolume,
     isoWeekKey,
     moonPhase,
     moonPhaseName,

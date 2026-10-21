@@ -434,6 +434,9 @@ test("water: target glasses, per-day counts and liters", () => {
   assert.equal(P.formatLiters(1250, "pt"), "1,25 L");
   assert.equal(P.formatLiters(2000, "en"), "2 L");
   assert.equal(P.formatLiters(1500, "en"), "1.5 L");
+  assert.equal(P.formatVolume(63, "pt"), "60 ml");
+  assert.equal(P.formatVolume(750, "pt"), "750 ml");
+  assert.equal(P.formatVolume(1250, "pt"), "1,25 L");
 });
 
 test("picking a mood sets it, picking it again clears it", () => {

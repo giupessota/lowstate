@@ -1214,14 +1214,14 @@
     const head = [h("span", { class: "hg-corner" }), ...isos.map((iso) => {
       const date = Core.parseISODate(iso);
       const classes = ["hg-day"];
-      if (date.getDay() === 6) classes.push("is-sat");
-      if (date.getDay() === 0 || holidayFor(iso)) classes.push("is-sun");
+      // Only a few day numbers are shown here, so weekend colors would look
+      // random; today is the one that stands out.
       if (iso === today) classes.push("is-today");
       // Sparse day numbers (like the summary axes) so 31 columns stay legible.
       const day = date.getDate();
       const besideToday = Math.abs(day - (isos.indexOf(today) + 1)) === 1 && isos.includes(today);
       const label = iso === today || ((day === 1 || day % 5 === 0) && !besideToday);
-      return h("span", { class: classes.join(" "), text: label ? String(day) : "" });
+      return h("span", { class: classes.join(" "), title: iso === today ? t("goToday") : null, text: label ? String(day) : "" });
     }), h("span", { class: "hg-corner" })];
 
     const visible = state.habits.filter((habit) => Planner.habitActiveBetween(habit, isos[0], isos[isos.length - 1]));
@@ -1259,7 +1259,7 @@
         }),
         h("div", { class: "hg-stat", title: t("habitMonthPct", stats) },
           h("strong", { text: stats.elapsed ? `${pct}%` : "—" }),
-          streak ? h("span", { title: t("habitStreak", { n: streak }), text: `${streak}d` }) : null),
+          streak ? h("span", { title: t("habitStreak", { n: streak }), text: streak === 1 ? t("habitStreakDay") : t("habitStreakDays", { n: streak }) }) : null),
       ];
     });
     els.habitGrid.replaceChildren(...head, ...rows);
@@ -1316,7 +1316,7 @@
       summaryAxis(isos),
       counts.size
         ? h("p", { class: "sum-legend" }, Planner.MOODS.filter((mood) => counts.has(mood)).map((mood) => h("span", { class: "sum-count" },
-          moodEl(mood, "mood-mini"), `${t(`mood-${mood}`)} ${counts.get(mood)}`)))
+          moodEl(mood, "mood-mini"), counts.get(mood) === 1 ? t(`moodDay-${mood}`) : t(`moodDays-${mood}`, { n: counts.get(mood) }))))
         : h("p", { class: "sum-note", text: t("sumMoodNone") }));
 
     // Water: a bar per day against the daily goal line.
@@ -1334,13 +1334,13 @@
         title: t("sumWaterDay", { date: shortDate(iso), n: count, total: target, unit: waterUnit === "liters" ? `(${Planner.formatLiters(count * glassMl, I18n.language)})` : unit }),
       });
     });
-    const average = logged.length ? past.reduce((sum, iso) => sum + (state.water[iso] || 0), 0) * glassMl / past.length : 0;
+    const average = logged.length ? logged.reduce((sum, iso) => sum + state.water[iso], 0) * glassMl / logged.length : 0;
     els.sumWater.replaceChildren(
       summaryTitle("water"),
       h("div", { class: "sum-bars", style: `--days: ${isos.length}; --goal: ${1 / 1.25}` }, bars),
       summaryAxis(isos),
       h("p", { class: "sum-note", text: logged.length
-        ? t("sumWater", { met, days: past.length, avg: Planner.formatLiters(average, I18n.language) })
+        ? t("sumWater", { met, days: past.length, avg: Planner.formatVolume(average, I18n.language) })
         : t("sumWaterNone") }));
 
     // Mental load: your rating where you gave one, otherwise the estimate.
@@ -1362,7 +1362,11 @@
         title: entry ? t("sumLoadDay", { date: shortDate(isos[index]), n: entry.score, source: t(entry.own ? "loadYours" : "loadEstimate") }) : null,
       }))),
       summaryAxis(isos),
-      h("p", { class: "sum-note", text: `${t("sumLoad", { avg: number.format(avg), heavy })} · ${t("sumLoadKey")}` }));
+      h("p", { class: "sum-note" },
+        t("sumLoad", { avg: number.format(avg), heavy }),
+        h("span", { class: "load-legend" },
+          h("i", { class: "is-own", "aria-hidden": "true" }), t("loadLegendOwn"),
+          h("i", { "aria-hidden": "true" }), t("loadLegendEstimate"))));
 
     renderPatterns(today);
   }
