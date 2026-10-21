@@ -3,7 +3,7 @@ const fs = require("fs");
 const https = require("https");
 const path = require("path");
 const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
-const { hideWindowOnClose } = require("./desktop-lifecycle.cjs");
+const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
@@ -189,16 +189,6 @@ function registerShortcuts(map) {
 // (macOS refuses outright; Windows would still trigger SmartScreen on the
 // downloaded installer), so this only checks GitHub for a newer tag and
 // lets the renderer show a "download the new version" nudge.
-function isNewerVersion(candidate, current) {
-  const a = candidate.split(".").map(Number);
-  const b = current.split(".").map(Number);
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const na = a[i] || 0, nb = b[i] || 0;
-    if (na !== nb) return na > nb;
-  }
-  return false;
-}
-
 function checkForUpdate() {
   const options = {
     hostname: "api.github.com",
