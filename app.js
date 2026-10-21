@@ -17,6 +17,7 @@
     moods: "type-todo.planner.moods.v1",
     water: "type-todo.planner.water.v1",
     moodNotes: "type-todo.planner.moodnotes.v1",
+    loads: "type-todo.planner.load.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
@@ -70,6 +71,7 @@
     dayNotes: $("dayNotes"),
     moodPicker: $("moodPicker"),
     moodReason: $("moodReason"),
+    loadMeter: $("loadMeter"),
     waterGoalValue: $("waterGoalValue"),
     waterRow: $("waterRow"),
     waterSum: $("waterSum"),
@@ -265,6 +267,7 @@
     moods: Store.loadObject(KEYS.moods),
     water: Store.loadObject(KEYS.water),
     moodNotes: Store.loadObject(KEYS.moodNotes),
+    loads: Store.loadObject(KEYS.loads),
     editingId: null,
     draft: null,
     dragId: null,
@@ -279,6 +282,7 @@
   const persistMoods = () => Store.save(KEYS.moods, state.moods);
   const persistWater = () => Store.save(KEYS.water, state.water);
   const persistMoodNotes = () => Store.save(KEYS.moodNotes, state.moodNotes);
+  const persistLoads = () => Store.save(KEYS.loads, state.loads);
 
   if (initial.changed) {
     persistItems();
@@ -758,6 +762,7 @@
 
     const items = Planner.itemsForDay(state.items, iso);
     renderDayTasks(iso, items);
+    renderLoad(iso);
     // "Not today" items don't count against the day.
     const counted = items.filter((item) => item.focus !== "later");
     const done = counted.filter((item) => item.done).length;
@@ -767,6 +772,45 @@
     renderMoodPicker(iso);
     renderDayNotes();
     renderMonthTabs(day);
+  }
+
+  // Mental load: the app's estimate as a ghost, the person's own rating
+  // solid. Clicking a tick sets the rating; clicking it again clears it.
+  function renderLoad(iso) {
+    const estimate = Planner.mentalLoad(state.items, iso, { todayISO: todayISO(), moods: state.moods });
+    const own = state.loads[iso];
+    const hasOwn = Number.isInteger(own);
+    const score = hasOwn ? own : estimate.score;
+    const level = Planner.loadLevel(score);
+    const { factors } = estimate;
+    const number = new Intl.NumberFormat(I18n.language === "pt" ? "pt-BR" : "en-GB", { maximumFractionDigits: 1 });
+    const parts = Object.entries(factors).filter(([, value]) => value > 0).map(([key, value]) => t(`loadF-${key}`, { n: number.format(value) }));
+    const why = `${parts.length ? t("loadWhy", { list: parts.join(" · ") }) : t("loadWhyNothing")}\n${t("loadNote")}`;
+
+    const ticks = Array.from({ length: 10 }, (_, index) => {
+      const n = index + 1;
+      return h("button", {
+        type: "button",
+        class: `load-tick${n <= score ? " is-on" : ""}${hasOwn && n === estimate.score ? " is-estimate" : ""}`,
+        "data-load": n,
+        "aria-label": t("loadSet", { n }),
+        "aria-pressed": String(hasOwn && n === own),
+        title: t("loadSet", { n }),
+      });
+    });
+
+    const candidate = score >= 7 && iso >= todayISO() ? Planner.postponeCandidate(state.items, iso) : null;
+    els.loadMeter.className = `load level-${level}${hasOwn ? " is-own" : ""}`;
+    els.loadMeter.replaceChildren(
+      h("div", { class: "load-head", title: why },
+        h("span", { class: "load-title", text: t("load") }),
+        h("span", { class: "load-ticks", role: "group" }, ticks),
+        h("strong", { class: "load-score", text: `${score}/10` }),
+        h("span", { class: "load-label", text: t(`load-${level}`) }),
+        h("span", { class: "load-source", text: hasOwn ? `${t("loadYours")} · ${t("loadEstimateIs", { n: estimate.score })}` : `${t("loadEstimate")} · ${t("loadAdjust")}` })),
+      score >= 5 || candidate ? h("p", { class: "load-text" },
+        t(`loadText-${level}`),
+        candidate ? h("button", { type: "button", class: "load-action", "data-postpone": candidate.id, text: t("loadPostpone", { title: candidate.title }) }) : null) : null);
   }
 
   const FOCUS_LABELS = { must: "focusMust", could: "focusCould", later: "focusLater" };
@@ -1401,6 +1445,27 @@
   els.moodReason.addEventListener("blur", saveMoodReason);
   els.moodReason.addEventListener("keydown", (event) => {
     if (event.key === "Enter") els.moodReason.blur();
+  });
+
+  els.loadMeter.addEventListener("click", (event) => {
+    const tick = event.target.closest("[data-load]");
+    const postpone = event.target.closest("[data-postpone]");
+    const iso = anchorISO();
+    if (tick) {
+      state.loads = Planner.setLoad(state.loads, iso, Number(tick.dataset.load));
+      persistLoads();
+      renderLoad(iso);
+    } else if (postpone) {
+      const tomorrow = Core.toISODate(Planner.addDays(Core.parseISODate(iso), 1));
+      const id = postpone.dataset.postpone;
+      const before = findItem(id);
+      state.items = Planner.moveItem(state.items, id, { date: tomorrow, focus: "could" });
+      commit();
+      toast(t("loadMoved"), t("undo"), () => {
+        state.items = Planner.moveItem(state.items, id, { date: before.date, focus: before.focus });
+        commit();
+      });
+    }
   });
 
   els.dayTasks.addEventListener("click", (event) => {

@@ -168,6 +168,41 @@ test("Easter and the Brazilian holidays derived from it", () => {
   assert.equal(P.brazilHolidays(2023).has("2023-11-20"), false);
 });
 
+test("mental load estimate grows with must-dos, busy hours, overdue and heavy days", () => {
+  const day = "2026-10-21";
+  const item = (fields) => P.normalizeItem({ title: "t", date: day, ...fields });
+  assert.equal(P.mentalLoad([], day).score, 0);
+  const busy = [
+    item({ focus: "must" }), item({ focus: "must" }), item({ focus: "must", priority: "urgent" }),
+    item({ start: "09:00", duration: 120 }), item({ start: "14:00", duration: 120 }),
+    item({ focus: "later" }), item({ focus: "must", done: true }),
+    P.normalizeItem({ title: "old", date: "2026-10-19" }),
+  ];
+  const load = P.mentalLoad(busy, day, { todayISO: day, moods: { "2026-10-20": "stressed" } });
+  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, overdue: 1, heavyDays: 1 });
+  assert.equal(load.score, 8);
+  assert.equal(P.mentalLoad(busy, day, { todayISO: "2026-10-20" }).factors.overdue, 0);
+  assert.equal(P.loadLevel(2), "light");
+  assert.equal(P.loadLevel(7), "heavy");
+  assert.equal(P.loadLevel(10), "veryHeavy");
+});
+
+test("perceived load can be set and cleared; postpone picks the last plain could-do", () => {
+  let loads = P.setLoad({}, "2026-10-21", 6);
+  assert.deepEqual(loads, { "2026-10-21": 6 });
+  assert.deepEqual(P.setLoad(loads, "2026-10-21", 6), {});
+  assert.deepEqual(P.setLoad({}, "2026-10-21", 11), {});
+  const day = "2026-10-21";
+  const items = [
+    P.normalizeItem({ id: "a", title: "a", date: day, order: 1 }),
+    P.normalizeItem({ id: "b", title: "b", date: day, order: 2 }),
+    P.normalizeItem({ id: "c", title: "c", date: day, order: 3, start: "10:00" }),
+    P.normalizeItem({ id: "d", title: "d", date: day, order: 4, focus: "must" }),
+  ];
+  assert.equal(P.postponeCandidate(items, day).id, "b");
+  assert.equal(P.postponeCandidate([], day), null);
+});
+
 test("focus groups: urgent items start as must, moves can change group", () => {
   assert.equal(P.normalizeItem({ title: "a" }).focus, "could");
   assert.equal(P.normalizeItem({ title: "b", priority: "urgent" }).focus, "must");

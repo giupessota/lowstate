@@ -466,6 +466,64 @@
   // ---------- Mood of the day ----------
   const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
+  // ---------- Mental load (perceived, not a stress measure) ----------
+  // A rough 0–10 estimate of how full the day feels, from what the planner
+  // knows: open must-dos and urgent items, busy hours on the timeline,
+  // overdue tasks (today only) and whether the last two days felt heavy.
+  // The person can always override it with their own number.
+  const HEAVY_MOODS = ["tiring", "stressed", "rough"];
+
+  function mentalLoad(items, iso, { todayISO = iso, moods = {} } = {}) {
+    const day = items.filter((item) => item.date === iso);
+    const open = day.filter((item) => !item.done && item.focus !== "later");
+    const must = open.filter((item) => item.focus === "must").length;
+    const could = open.filter((item) => item.focus === "could").length;
+    const urgent = open.filter((item) => item.priority === "urgent").length;
+    const minutes = day
+      .filter((item) => item.start && item.focus !== "later")
+      .reduce((sum, item) => sum + (item.duration || 60), 0);
+    const overdue = iso === todayISO ? overdueItems(items, todayISO).length : 0;
+    const date = parseISODate(iso);
+    const heavyDays = date
+      ? [1, 2].filter((back) => HEAVY_MOODS.includes(moods[toISODate(addDays(date, -back))])).length
+      : 0;
+
+    const raw = Math.min(must * 1.2, 4)
+      + Math.min(could * 0.4, 2)
+      + Math.min(urgent * 0.5, 1.5)
+      + Math.min((minutes / 60) * 0.5, 3)
+      + Math.min(overdue * 0.5, 2)
+      + Math.min(heavyDays * 0.5, 1);
+    return {
+      score: Math.max(0, Math.min(10, Math.round(raw))),
+      factors: { must, could, urgent, hours: Math.round((minutes / 60) * 10) / 10, overdue, heavyDays },
+    };
+  }
+
+  // 0–2 light, 3–4 calm, 5–6 moderate, 7–8 heavy, 9–10 very heavy.
+  function loadLevel(score) {
+    if (score <= 2) return "light";
+    if (score <= 4) return "calm";
+    if (score <= 6) return "moderate";
+    if (score <= 8) return "heavy";
+    return "veryHeavy";
+  }
+
+  // Returns a new { iso: score } map; picking the same score again clears it.
+  function setLoad(loads, iso, score) {
+    const { [iso]: previous, ...rest } = loads || {};
+    const value = Number(score);
+    return Number.isInteger(value) && value >= 0 && value <= 10 && value !== previous ? { ...rest, [iso]: value } : rest;
+  }
+
+  // The could-do it would hurt least to postpone: open, untimed, last in the day.
+  function postponeCandidate(items, iso) {
+    const candidates = items
+      .filter((item) => item.date === iso && !item.done && item.focus === "could" && !item.start && item.priority !== "urgent")
+      .sort(compareInDay);
+    return candidates[candidates.length - 1] || null;
+  }
+
   // ---------- Water ----------
   // Glasses, then the most common bottles: 500 ml, 750 ml squeeze, 1 L and
   // 1.2 L (Stanley Quencher size).
@@ -586,6 +644,10 @@
     QUOTE_STYLES,
     MOODS,
     setMood,
+    mentalLoad,
+    loadLevel,
+    setLoad,
+    postponeCandidate,
     GLASS_SIZES,
     BOTTLE_SIZES,
     CONTAINER_SIZES,

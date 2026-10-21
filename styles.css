@@ -1054,6 +1054,45 @@ svg.i {
 .day-tasks { flex: 0 1 auto; min-height: 0; margin-top: 6px; overflow-y: auto; }
 .day-tasks .line-title { font-size: 14px; }
 
+/* Mental load: one quiet line of ticks, a sentence only when it matters */
+.load { margin: 10px 0 2px; --load: var(--matcha); }
+.load.level-moderate { --load: var(--yamabuki); }
+.load.level-heavy { --load: color-mix(in srgb, var(--vermilion) 55%, var(--yamabuki)); }
+.load.level-veryHeavy { --load: var(--vermilion); }
+.load-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; cursor: help; }
+.load-title { color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.load-ticks { display: flex; gap: 3px; cursor: default; }
+.load-tick {
+  width: 7px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  transition: background .15s, transform .15s;
+}
+.load-tick:hover { transform: scaleY(1.2); }
+.load-tick.is-on { border-color: var(--load); background: color-mix(in srgb, var(--load) 45%, transparent); }
+.load.is-own .load-tick.is-on { background: var(--load); }
+.load-tick.is-estimate { outline: 1.5px dashed color-mix(in srgb, var(--ink) 45%, transparent); outline-offset: 1px; }
+.load-score { font: 600 12px var(--mono); }
+.load-label { color: var(--load); font-size: 12.5px; font-weight: 600; }
+.load-source { color: var(--muted); font: 400 10px var(--mono); }
+.load-text { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin: 5px 0 0; color: var(--ink-2); font-size: 12.5px; font-style: italic; }
+.load-action {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: 500 12.5px var(--sans);
+  font-style: normal;
+  text-decoration: underline;
+  text-decoration-color: var(--load);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 /* Must do / Could do / Not today: quiet headings, no cards */
 .focus-group { padding: 4px 0 6px; }
 .focus-head {
