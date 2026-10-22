@@ -1877,8 +1877,9 @@ dialog.sheet[open] { animation: sheet-in .18s ease; }
   background: linear-gradient(160deg, var(--swatch), var(--swatch-2));
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
 }
-.seg.swatches button.active { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
-.seg.swatches .swatch-custom { background: conic-gradient(#d64a32, #e2a43a, #7c8c4a, #3e9aa8, #34508a, #8b78bd, #e59aa6, #d64a32); }
+/* A chosen swatch keeps its color (the generic .seg active rule paints buttons paper). */
+.seg.swatches button.active { background: linear-gradient(160deg, var(--swatch), var(--swatch-2)); box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+.seg.swatches .swatch-custom, .seg.swatches .swatch-custom.active { background: conic-gradient(#d64a32, #e2a43a, #7c8c4a, #3e9aa8, #34508a, #8b78bd, #e59aa6, #d64a32); }
 .seg.swatches .swatch-custom.has-color.active { background: radial-gradient(circle, var(--chosen) 0 55%, transparent 56%), conic-gradient(#d64a32, #e2a43a, #7c8c4a, #3e9aa8, #34508a, #8b78bd, #e59aa6, #d64a32); }
 /* In-app cover color picker */
 .color-panel { display: flex; flex-direction: column; gap: 10px; margin: 2px 0 8px; padding: 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--paper); }
