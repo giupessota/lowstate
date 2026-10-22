@@ -179,12 +179,265 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
     P.normalizeItem({ title: "old", date: "2026-10-19" }),
   ];
   const load = P.mentalLoad(busy, day, { todayISO: day, moods: { "2026-10-20": "stressed" } });
-  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, overdue: 1, heavyDays: 1 });
+  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, meetings: 0, overdue: 1, heavyDays: 1 });
   assert.equal(load.score, 8);
   assert.equal(P.mentalLoad(busy, day, { todayISO: "2026-10-20" }).factors.overdue, 0);
   assert.equal(P.loadLevel(2), "light");
   assert.equal(P.loadLevel(7), "heavy");
   assert.equal(P.loadLevel(10), "veryHeavy");
+});
+
+test("habits: toggling, streaks that survive an unchecked today, monthly progress", () => {
+  assert.deepEqual(P.normalizeHabits([{ id: "a", name: " Ler " }, { id: "a", name: "dup" }, { id: "b", name: "" }, null]), [
+    { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [], start: null, duration: null, times: {}, since: null, until: null },
+  ]);
+  let log = {};
+  ["2026-10-18", "2026-10-19", "2026-10-20"].forEach((iso) => { log = P.toggleHabit(log, iso, "read"); });
+  log = P.toggleHabit(log, "2026-10-20", "walk");
+  assert.equal(P.habitStreak(log, "read", "2026-10-21"), 3);
+  log = P.toggleHabit(log, "2026-10-21", "read");
+  assert.equal(P.habitStreak(log, "read", "2026-10-21"), 4);
+  assert.equal(P.habitStreak(log, "walk", "2026-10-22"), 0);
+  log = P.toggleHabit(log, "2026-10-21", "read");
+  assert.deepEqual(log["2026-10-21"], undefined);
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 9, "2026-10-21"), { done: 3, little: 0, rest: 0, extra: 0, elapsed: 21, total: 31, score: 3 });
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 8, "2026-10-21"), { done: 0, little: 0, rest: 0, extra: 0, elapsed: 30, total: 30, score: 0 });
+  assert.deepEqual(P.forgetHabit(log, "walk")["2026-10-20"], { read: "done" });
+  assert.equal(P.habitDone(P.forgetHabit(log, "read"), "2026-10-18", "read"), false);
+});
+
+test("gentle habits: a little counts half, rest days are neither missed nor counted", () => {
+  // Older logs ({ iso: [ids] }) read as done.
+  assert.deepEqual(P.normalizeHabitLog({ "2026-10-20": ["gym", 3], "2026-10-19": { gym: "little", x: "nope" }, bad: ["gym"] }),
+    { "2026-10-20": { gym: "done" }, "2026-10-19": { gym: "little" } });
+  assert.equal(P.habitState({ "2026-10-20": ["gym"] }, "2026-10-20", "gym"), "done");
+  const [gym] = P.normalizeHabits([{ id: "gym", name: "Academia", days: [1, 3, 5], since: "2026-10-01" }]);
+  let log = {};
+  log = P.setHabitState(log, "2026-10-19", "gym", "done");   // Mon
+  log = P.setHabitState(log, "2026-10-16", "gym", "rest");   // Fri — on purpose
+  log = P.setHabitState(log, "2026-10-14", "gym", "little"); // Wed
+  log = P.setHabitState(log, "2026-10-12", "gym", "done");   // Mon
+  assert.equal(P.habitDone(log, "2026-10-14", "gym"), true);
+  assert.equal(P.habitDone(log, "2026-10-16", "gym"), false);
+  // Rest doesn't break the streak and isn't counted in it.
+  assert.equal(P.habitStreak(log, gym, "2026-10-20"), 3);
+  // Oct 1–20 planned: 2,5,7,9,12,14,16,19 → 8; one rest → 7 counted; score 1 + 0.5 + 1.
+  assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-20"), { done: 3, little: 1, rest: 1, extra: 0, elapsed: 7, total: 13, score: 2.5 });
+  // Clearing and toggling.
+  assert.equal(P.habitState(P.setHabitState(log, "2026-10-14", "gym", null), "2026-10-14", "gym"), null);
+  assert.equal(P.habitState(P.toggleHabit(log, "2026-10-16", "gym"), "2026-10-16", "gym"), null);
+  assert.equal(P.habitState(P.toggleHabit({}, "2026-10-16", "gym"), "2026-10-16", "gym"), "done");
+});
+
+test("habits planned for some weekdays: icons, schedule, streaks and month counts", () => {
+  const [gym] = P.normalizeHabits([{ id: "gym", name: "Academia", icon: "dumbbell", days: [5, 1, 3, 3, 9] }]);
+  assert.deepEqual([gym.icon, gym.days, gym.start], ["dumbbell", [1, 3, 5], null]);
+  const [timed] = P.normalizeHabits([{ id: "t", name: "Academia", start: "07:00", duration: 75 }]);
+  assert.deepEqual([timed.start, timed.duration], ["07:00", 75]);
+  assert.deepEqual(P.normalizeHabits([{ id: "t", name: "x", start: "25:00", duration: 60 }])[0].duration, null);
+  // Different times per weekday: Mon/Wed 07:00, Fri 18:00 for 90 minutes; Sunday has no time.
+  const [split] = P.normalizeHabits([{ id: "s", name: "Academia", days: [0, 1, 3, 5],
+    times: { 1: { start: "07:00" }, 3: { start: "07:00", duration: 60 }, 5: { start: "18:00", duration: 90 }, 9: { start: "08:00" }, 0: { start: "nope" } } }]);
+  assert.deepEqual(split.times, { 1: { start: "07:00", duration: 60 }, 3: { start: "07:00", duration: 60 }, 5: { start: "18:00", duration: 90 } });
+  assert.deepEqual(P.habitTimeOn(split, "2026-10-19"), { start: "07:00", duration: 60 });
+  assert.deepEqual(P.habitTimeOn(split, "2026-10-23"), { start: "18:00", duration: 90 });
+  assert.equal(P.habitTimeOn(split, "2026-10-25"), null);
+  assert.equal(P.habitTimeOn(split, "2026-10-22"), null);
+  assert.deepEqual(P.habitTimeOn(timed, "2026-10-22"), { start: "07:00", duration: 75 });
+
+  // The editor's rows: days that share a time are one row.
+  assert.deepEqual(P.scheduleRows(split), [
+    { days: [0], start: null, duration: 60 },
+    { days: [1, 3], start: "07:00", duration: 60 },
+    { days: [5], start: "18:00", duration: 90 },
+  ]);
+  assert.deepEqual(P.scheduleRows(timed), [{ days: [], start: "07:00", duration: 75 }]);
+  assert.deepEqual(P.habitFromRows([{ days: [3, 1], start: "07:00", duration: 60 }, { days: [5], start: "18:00", duration: 90 }]), {
+    days: [1, 3, 5], start: null, duration: null,
+    times: { 1: { start: "07:00", duration: 60 }, 3: { start: "07:00", duration: 60 }, 5: { start: "18:00", duration: 90 } },
+  });
+  assert.deepEqual(P.habitFromRows([{ days: [1, 3, 5], start: "07:00", duration: 45 }, { days: [], start: "09:00", duration: 60 }]),
+    { days: [1, 3, 5], start: "07:00", duration: 45, times: {} });
+  assert.deepEqual(P.habitFromRows([{ days: [], start: null, duration: 60 }]), { days: [], start: null, duration: null, times: {} });
+  // Round trip keeps the habit the same.
+  assert.deepEqual(P.normalizeHabits([{ ...split, ...P.habitFromRows(P.scheduleRows(split)) }])[0], split);
+  assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", icon: "rocket", days: [0, 1, 2, 3, 4, 5, 6] }])[0].icon, null);
+  assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", days: [0, 1, 2, 3, 4, 5, 6] }])[0].days, []);
+  // October 2026: the 19th is a Monday, the 21st a Wednesday, the 22nd a Thursday.
+  assert.equal(P.habitScheduled(gym, "2026-10-21"), true);
+  assert.equal(P.habitScheduled(gym, "2026-10-22"), false);
+  let log = {};
+  ["2026-10-16", "2026-10-19", "2026-10-21"].forEach((iso) => { log = P.toggleHabit(log, iso, "gym"); });
+  // Unplanned Thursday today, unplanned Tuesday and weekend skipped, missed Wed 14th stops it.
+  assert.equal(P.habitStreak(log, gym, "2026-10-22"), 3);
+  log = P.toggleHabit(log, "2026-10-20", "gym");
+  assert.equal(P.habitStreak(log, gym, "2026-10-22"), 4);
+  assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-22"), { done: 3, little: 0, rest: 0, extra: 1, elapsed: 9, total: 13, score: 3 });
+});
+
+test("patterns need enough days on both sides and a clear difference", () => {
+  const today = "2026-10-21";
+  const back = (n) => { const d = new Date(2026, 9, 21 - n); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+  // Three days of data say nothing.
+  let moods = { [back(1)]: "great", [back(2)]: "rough", [back(3)]: "good" };
+  let water = { [back(1)]: 8, [back(2)]: 2, [back(3)]: 8 };
+  assert.deepEqual(P.patterns({ moods, water, waterTarget: 8, todayISO: today }).patterns, []);
+  // Twelve days: good moods when the goal is met, low ones when it isn't.
+  moods = {};
+  water = {};
+  for (let n = 1; n <= 12; n++) {
+    const met = n % 2 === 0;
+    moods[back(n)] = met ? "good" : "tiring";
+    water[back(n)] = met ? 8 : 3;
+  }
+  const result = P.patterns({ moods, water, waterTarget: 8, todayISO: today });
+  assert.equal(result.moodDays, 12);
+  assert.equal(result.patterns.length, 1);
+  assert.deepEqual(
+    [result.patterns[0].kind, result.patterns[0].na, result.patterns[0].nb, result.patterns[0].diff],
+    ["mood-water", 6, 6, 2]);
+  // Same mood whatever the water: no pattern.
+  const flat = Object.fromEntries(Object.keys(moods).map((iso) => [iso, "good"]));
+  assert.deepEqual(P.patterns({ moods: flat, water, waterTarget: 8, todayISO: today }).patterns, []);
+  // Reported load lower the day after a walk.
+  const [walk] = P.normalizeHabits([{ id: "walk", name: "Caminhar", since: "2026-08-01" }]);
+  let log = {};
+  const loads = {};
+  for (let n = 2; n <= 17; n++) {
+    if (n % 2 === 0) log = P.toggleHabit(log, back(n), "walk");
+    loads[back(n - 1)] = n % 2 === 0 ? 3 : 7;
+  }
+  const after = P.patterns({ habits: [walk], habitLog: log, loads, todayISO: today }).patterns;
+  assert.equal(after[0].kind, "load-habit");
+  assert.equal(after[0].habitId, "walk");
+  assert.ok(after[0].a < after[0].b);
+});
+
+test("habit insight names the most reliable weekday, or says there isn't enough yet", () => {
+  // Wednesday 21 October 2026; gym planned Mon/Wed/Fri since September.
+  const [gym] = P.normalizeHabits([{ id: "g", name: "Academia", days: [1, 3, 5], since: "2026-09-01" }]);
+  assert.deepEqual(P.habitInsight({}, gym, "2026-10-21"), { kind: "none" });
+  let log = {};
+  // Every Wednesday done, Mondays half, Fridays never (last three weeks).
+  ["2026-10-07", "2026-10-14", "2026-09-30", "2026-10-12", "2026-09-28"].forEach((iso) => { log = P.toggleHabit(log, iso, "g"); });
+  const insight = P.habitInsight(log, gym, "2026-10-21", 3);
+  assert.equal(insight.kind, "best");
+  assert.equal(insight.day, 3);
+  assert.equal(insight.rate, 1);
+  let all = {};
+  ["2026-10-05", "2026-10-07", "2026-10-09", "2026-10-12", "2026-10-14", "2026-10-16", "2026-10-19"].forEach((iso) => { all = P.toggleHabit(all, iso, "g"); });
+  assert.deepEqual(P.habitInsight(all, gym, "2026-10-21", 2), { kind: "perfect" });
+});
+
+test("habits only count between their start and end dates", () => {
+  const [walk] = P.normalizeHabits([{ id: "w", name: "Caminhar", since: "2026-10-12", until: "2026-10-23" }]);
+  assert.deepEqual(P.normalizeHabits([{ id: "x", name: "x", since: "2026-10-12", until: "2026-10-01" }])[0].until, null);
+  assert.equal(P.habitScheduled(walk, "2026-10-11"), false);
+  assert.equal(P.habitScheduled(walk, "2026-10-12"), true);
+  assert.equal(P.habitScheduled(walk, "2026-10-24"), false);
+  assert.equal(P.habitTimeOn({ ...walk, start: "07:00" }, "2026-10-30"), null);
+  assert.equal(P.habitActiveBetween(walk, "2026-09-01", "2026-09-30"), false);
+  assert.equal(P.habitActiveBetween(walk, "2026-10-01", "2026-10-31"), true);
+  assert.equal(P.habitActiveBetween(walk, "2026-11-01", "2026-11-30"), false);
+  // October 2026, today the 25th: planned from the 12th to the 23rd only.
+  let log = {};
+  ["2026-10-12", "2026-10-13", "2026-10-23"].forEach((iso) => { log = P.toggleHabit(log, iso, "w"); });
+  assert.deepEqual(P.habitMonth(log, walk, 2026, 9, "2026-10-25"), { done: 3, little: 0, rest: 0, extra: 0, elapsed: 12, total: 12, score: 3 });
+  const fresh = { ...walk, until: null };
+  log = P.toggleHabit(P.toggleHabit({}, "2026-10-12", "w"), "2026-10-13", "w");
+  assert.equal(P.habitStreak(log, fresh, "2026-10-13"), 2);
+});
+
+test("brain dump splits lines, drops bullets and blanks, and imports old notes", () => {
+  assert.deepEqual(P.parseDump("comprar café\n\n- ligar pra mãe\n  • ideia: app de receitas \n1. revisar contrato #trabalho\n[ ] pagar boleto !urgente\n* 14h dentista"), [
+    "comprar café", "ligar pra mãe", "ideia: app de receitas", "revisar contrato #trabalho", "pagar boleto !urgente", "14h dentista",
+  ]);
+  assert.deepEqual(P.parseDump("   \n  "), []);
+  const notes = P.legacyDumpNotes([
+    { id: "n1", text: "ideia solta", processed: false, createdAt: 5 },
+    { id: "n2", text: "já virou tarefa", processed: true, createdAt: 6 },
+    { id: "n3", text: "  ", processed: false },
+  ]);
+  assert.deepEqual(notes, [{ id: "n1", text: "ideia solta", createdAt: 5 }]);
+});
+
+test("closing a day moves, returns or leaves its unfinished tasks", () => {
+  const day = "2026-10-21";
+  const items = [
+    P.normalizeItem({ id: "a", title: "a", date: day, focus: "must" }),
+    P.normalizeItem({ id: "b", title: "b", date: day, focus: "later" }),
+    P.normalizeItem({ id: "c", title: "c", date: day, done: true }),
+    P.normalizeItem({ id: "d", title: "d", date: day, start: "15:00", duration: 30 }),
+    P.normalizeItem({ id: "e", title: "e", date: "2026-10-22" }),
+  ];
+  const moved = P.closeDay(items, day, "tomorrow", "2026-10-22");
+  const byId = Object.fromEntries(moved.map((item) => [item.id, item]));
+  assert.deepEqual([byId.a.date, byId.a.focus, byId.b.date, byId.b.focus, byId.c.date, byId.d.date], ["2026-10-22", "must", "2026-10-22", "could", day, "2026-10-22"]);
+  const inbox = Object.fromEntries(P.closeDay(items, day, "inbox").map((item) => [item.id, item]));
+  assert.deepEqual([inbox.a.date, inbox.d.date, inbox.d.start, inbox.c.date], [null, null, null, day]);
+  assert.equal(P.closeDay(items, day, "stay"), items);
+});
+
+test("reminders cover timed tasks, habits and meetings today and tomorrow", () => {
+  const now = new Date(2026, 9, 21, 9, 0); // Wednesday 21 October 2026, 09:00
+  const local = (d, h, m = 0) => new Date(2026, 9, d, h, m);
+  const items = [
+    P.normalizeItem({ id: "a", title: "Dentista", date: "2026-10-21", start: "14:30" }),
+    P.normalizeItem({ id: "b", title: "Feita", date: "2026-10-21", start: "15:00", done: true }),
+    P.normalizeItem({ id: "c", title: "Depois", date: "2026-10-21", start: "16:00", focus: "later" }),
+    P.normalizeItem({ id: "d", title: "Amanhã", date: "2026-10-22", start: "08:00" }),
+    P.normalizeItem({ id: "e", title: "Sem hora", date: "2026-10-21" }),
+    P.normalizeItem({ id: "f", title: "Longe", date: "2026-10-25", start: "08:00" }),
+  ];
+  const habits = P.normalizeHabits([{ id: "gym", name: "Academia", days: [3, 5], start: "18:00", duration: 60 }]);
+  const events = [
+    { id: "m1", title: "Daily", allDay: false, start: local(21, 9, 30).toISOString(), end: local(21, 9, 45).toISOString() },
+    { id: "m2", title: "Feriado", allDay: true, start: "2026-10-22", end: "2026-10-23" },
+    { id: "m3", title: "Retro", allDay: false, start: local(24, 16).toISOString(), end: local(24, 17).toISOString() },
+  ];
+  const list = P.reminders({ items, habits, events, now, lead: 10, morningAt: "08:00" });
+  assert.deepEqual(list.map((r) => [r.kind, r.title, r.start, r.iso]), [
+    ["morning", "", "08:00", "2026-10-21"],
+    ["meeting", "Daily", "09:30", "2026-10-21"],
+    ["task", "Dentista", "14:30", "2026-10-21"],
+    ["habit", "Academia", "18:00", "2026-10-21"],
+    ["task", "Amanhã", "08:00", "2026-10-22"],
+  ]);
+  assert.equal(list[1].at, local(21, 9, 20).getTime());
+  assert.equal(new Set(list.map((r) => r.key)).size, list.length);
+  assert.deepEqual(P.reminders({ now, kinds: { tasks: false, habits: false, meetings: false }, closureAt: "21:30" }).map((r) => [r.kind, r.key]),
+    [["closure", "closure:2026-10-21"]]);
+  const quiet = P.reminders({ items, habits, events, now, lead: 5, kinds: { tasks: false, meetings: false } });
+  assert.deepEqual(quiet.map((r) => r.kind), ["habit"]);
+  const doneGym = P.reminders({ habits, habitLog: { "2026-10-21": ["gym"] }, now, kinds: { tasks: false, meetings: false } });
+  assert.deepEqual(doneGym, []);
+});
+
+test("calendar events split into all-day and timed slices of a local day", () => {
+  const local = (y, m, d, h, min = 0) => new Date(y, m - 1, d, h, min).toISOString();
+  const events = [
+    { id: "a", title: "Feriado", allDay: true, start: "2026-11-02", end: "2026-11-03" },
+    { id: "b", title: "Viagem", allDay: true, start: "2026-11-01", end: "2026-11-04" },
+    { id: "c", title: "Reunião", allDay: false, start: local(2026, 11, 2, 9), end: local(2026, 11, 2, 10, 30), busy: true },
+    { id: "d", title: "Plantão", allDay: false, start: local(2026, 11, 1, 22), end: local(2026, 11, 2, 2), busy: true },
+    { id: "e", title: "Ontem", allDay: false, start: local(2026, 11, 1, 9), end: local(2026, 11, 1, 10), busy: true },
+    { id: "f", title: "Lembrete", allDay: false, start: local(2026, 11, 2, 15), end: local(2026, 11, 2, 15), busy: false },
+  ];
+  const day = P.eventsForDay(events, "2026-11-02");
+  assert.deepEqual(day.allDay.map((event) => event.title), ["Feriado", "Viagem"]);
+  assert.deepEqual(day.timed.map((event) => [event.title, event.startMin, event.endMin]), [
+    ["Plantão", 0, 120], ["Reunião", 540, 630], ["Lembrete", 900, 915],
+  ]);
+  assert.deepEqual(P.eventsForDay(events, "2026-11-04").allDay, []);
+  assert.equal(P.busyMinutes(events, "2026-11-02"), 210);
+  const overlapping = [
+    { id: "x", allDay: false, start: local(2026, 11, 3, 9), end: local(2026, 11, 3, 11), busy: true },
+    { id: "y", allDay: false, start: local(2026, 11, 3, 10), end: local(2026, 11, 3, 12), busy: true },
+  ];
+  assert.equal(P.busyMinutes(overlapping, "2026-11-03"), 180);
+  const load = P.mentalLoad([], "2026-11-03", { events: overlapping });
+  assert.equal(load.factors.meetings, 3);
+  assert.equal(load.score, 2);
 });
 
 test("perceived load can be set and cleared; postpone picks the last plain could-do", () => {
@@ -236,6 +489,9 @@ test("water: target glasses, per-day counts and liters", () => {
   assert.equal(P.formatLiters(1250, "pt"), "1,25 L");
   assert.equal(P.formatLiters(2000, "en"), "2 L");
   assert.equal(P.formatLiters(1500, "en"), "1.5 L");
+  assert.equal(P.formatVolume(63, "pt"), "60 ml");
+  assert.equal(P.formatVolume(750, "pt"), "750 ml");
+  assert.equal(P.formatVolume(1250, "pt"), "1,25 L");
 });
 
 test("picking a mood sets it, picking it again clears it", () => {

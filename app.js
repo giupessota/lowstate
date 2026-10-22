@@ -6,6 +6,7 @@
   const Store = window.LowstateStorage;
   const I18n = window.LowstateI18n;
   const desktop = window.desktopGadget || null;
+  const calendarsApi = window.desktopCalendars || null;
 
   const KEYS = {
     items: "type-todo.planner.items.v1",
@@ -18,6 +19,12 @@
     water: "type-todo.planner.water.v1",
     moodNotes: "type-todo.planner.moodnotes.v1",
     loads: "type-todo.planner.load.v1",
+    habits: "type-todo.planner.habits.v1",
+    habitLog: "type-todo.planner.habitlog.v1",
+    closures: "type-todo.planner.closures.v1",
+    dump: "type-todo.planner.dump.v1",
+    dumpMigrated: "type-todo.planner.dump-migrated.v1",
+    legacyBrain: "type-todo.brain-inbox.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
@@ -31,18 +38,13 @@
   const ICON_CHECK = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.2 4.2L19 7"/></svg>';
   const ICON_TODAY = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h12M13 7l5 5-5 5"/></svg>';
   const SVG_NS = "http://www.w3.org/2000/svg";
-  const TAPE_PATTERNS = ["stripes", "dots", "gingham", "waves"];
-  const TAPE_COLORS = ["--sakura", "--asagi", "--yamabuki", "--matcha", "--fuji"];
   const TAB_COLORS = ["--indigo", "--vermilion", "--matcha", "--yamabuki", "--fuji", "--asagi"];
-  const START_OPTIONS = Array.from({ length: 96 }, (_, index) => Planner.minutesToTime(index * 15));
   const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
-  const PLACEHOLDER_TEXT = { habits: "comingHabits" };
-  const VIEWS = ["day", "week", "month", "habits"];
+  const VIEWS = ["day", "week", "month", "habits", "dump"];
 
   const $ = (id) => document.getElementById(id);
   const els = {
     weekGrid: $("weekGrid"),
-    washi: $("washi"),
     monthNum: $("monthNum"),
     monthName: $("monthName"),
     yearMark: $("yearMark"),
@@ -55,7 +57,6 @@
     weekNotes: $("weekNotes"),
     weekView: $("weekView"),
     dayView: $("dayView"),
-    dayWashi: $("dayWashi"),
     dayBig: $("dayBig"),
     dayWeekday: $("dayWeekday"),
     dayMonth: $("dayMonth"),
@@ -72,19 +73,88 @@
     moodPicker: $("moodPicker"),
     moodReason: $("moodReason"),
     loadMeter: $("loadMeter"),
+    dayAllDay: $("dayAllDay"),
+    calWebNote: $("calWebNote"),
+    notifyWebNote: $("notifyWebNote"),
+    notifyKinds: $("notifyKinds"),
+    morningAt: $("morningAt"),
+    notifyTest: $("notifyTest"),
+    calHead: $("calHead"),
+    calSummary: $("calSummary"),
+    calRefresh: $("calRefresh"),
+    calList: $("calList"),
+    calAddForm: $("calAddForm"),
+    calName: $("calName"),
+    calUrl: $("calUrl"),
+    calColors: $("calColors"),
+    calAddBtn: $("calAddBtn"),
+    calStatus: $("calStatus"),
     waterGoalValue: $("waterGoalValue"),
     waterRow: $("waterRow"),
     waterSum: $("waterSum"),
     monthView: $("monthView"),
-    monthWashi: $("monthWashi"),
     mvMonthNum: $("mvMonthNum"),
     mvMonthName: $("mvMonthName"),
     mvYear: $("mvYear"),
     monthWeekdays: $("monthWeekdays"),
     monthGrid: $("monthGrid"),
-    placeholderView: $("placeholderView"),
-    placeholderIcon: $("placeholderIcon"),
-    placeholderText: $("placeholderText"),
+    habitsView: $("habitsView"),
+    hvMonthNum: $("hvMonthNum"),
+    hvMonthName: $("hvMonthName"),
+    hvYear: $("hvYear"),
+    hvRange: $("hvRange"),
+    habitGrid: $("habitGrid"),
+    habitEmpty: $("habitEmpty"),
+    habitForm: $("habitForm"),
+    habitInput: $("habitInput"),
+    habitIdeas: $("habitIdeas"),
+    sumMood: $("sumMood"),
+    sumWater: $("sumWater"),
+    sumLoad: $("sumLoad"),
+    sumPatterns: $("sumPatterns"),
+    todayHabits: $("todayHabits"),
+    habitPills: $("habitPills"),
+    habitDialog: $("habitDialog"),
+    habitDetail: $("habitDetail"),
+    closeDayBtn: $("closeDayBtn"),
+    dumpView: $("dumpView"),
+    dumpCount: $("dumpCount"),
+    dumpForm: $("dumpForm"),
+    dumpInput: $("dumpInput"),
+    dumpSortTitle: $("dumpSortTitle"),
+    dumpAllInbox: $("dumpAllInbox"),
+    dumpList: $("dumpList"),
+    dumpEmpty: $("dumpEmpty"),
+    closedLine: $("closedLine"),
+    closureDialog: $("closureDialog"),
+    closureForm: $("closureForm"),
+    closureRecap: $("closureRecap"),
+    closureGood: $("closureGood"),
+    closureLeft: $("closureLeft"),
+    closureCount: $("closureCount"),
+    closureCancel: $("closureCancel"),
+    closureAt: $("closureAt"),
+    habitDetailIcon: $("habitDetailIcon"),
+    habitDetailTitle: $("habitDetailTitle"),
+    habitDetailMeta: $("habitDetailMeta"),
+    habitDetailMonth: $("habitDetailMonth"),
+    habitDetailStats: $("habitDetailStats"),
+    habitDetailDays: $("habitDetailDays"),
+    habitDetailInsight: $("habitDetailInsight"),
+    habitDetailClose: $("habitDetailClose"),
+    habitDetailEdit: $("habitDetailEdit"),
+    habitEditForm: $("habitEditForm"),
+    habitEditName: $("habitEditName"),
+    habitIconPicker: $("habitIconPicker"),
+    habitRows: $("habitRows"),
+    habitAddRow: $("habitAddRow"),
+    habitSince: $("habitSince"),
+    habitUntil: $("habitUntil"),
+    habitEndToggle: $("habitEndToggle"),
+    habitDaysHint: $("habitDaysHint"),
+    habitColorPicker: $("habitColorPicker"),
+    habitEditDelete: $("habitEditDelete"),
+    habitEditCancel: $("habitEditCancel"),
     rangeTitle: $("rangeTitle"),
     rangeSub: $("rangeSub"),
     weekProgress: $("weekProgress"),
@@ -260,6 +330,13 @@
       waterUnit: savedSettings.waterUnit === "liters" ? "liters" : "glasses",
       glassMl: Planner.CONTAINER_SIZES.includes(savedSettings.glassMl) ? savedSettings.glassMl : 250,
       waterGoal: Planner.clampWaterGoal(savedSettings.waterGoal ?? Planner.WATER_GOAL.fallback),
+      notifyOn: savedSettings.notifyOn !== false,
+      notifyLead: [5, 10, 15, 30].includes(savedSettings.notifyLead) ? savedSettings.notifyLead : 10,
+      notifyKinds: { tasks: true, habits: true, meetings: true, ...(savedSettings.notifyKinds || {}) },
+      morningOn: savedSettings.morningOn !== false,
+      morningAt: Planner.isTime(savedSettings.morningAt) ? savedSettings.morningAt : "08:00",
+      closureOn: savedSettings.closureOn !== false,
+      closureAt: Planner.isTime(savedSettings.closureAt) ? savedSettings.closureAt : "21:30",
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
@@ -268,6 +345,15 @@
     water: Store.loadObject(KEYS.water),
     moodNotes: Store.loadObject(KEYS.moodNotes),
     loads: Store.loadObject(KEYS.loads),
+    habits: Planner.normalizeHabits(Store.loadArray(KEYS.habits)),
+    habitLog: Planner.normalizeHabitLog(Store.loadObject(KEYS.habitLog)),
+    // { iso: { good, closedAt } } — the end-of-day ritual.
+    closures: Store.loadObject(KEYS.closures),
+    // Brain dump: thoughts waiting to be sorted, [{ id, text, createdAt }].
+    dump: Store.loadArray(KEYS.dump).filter((note) => note && typeof note.text === "string" && note.text.trim()),
+    // Read-only events from subscribed calendars (desktop only).
+    calendars: [],
+    events: [],
     editingId: null,
     draft: null,
     dragId: null,
@@ -283,6 +369,32 @@
   const persistWater = () => Store.save(KEYS.water, state.water);
   const persistMoodNotes = () => Store.save(KEYS.moodNotes, state.moodNotes);
   const persistLoads = () => Store.save(KEYS.loads, state.loads);
+  const persistHabits = () => {
+    Store.save(KEYS.habits, state.habits);
+    Store.save(KEYS.habitLog, state.habitLog);
+  };
+
+  const persistDump = () => Store.save(KEYS.dump, state.dump);
+
+  // Unsorted notes from the 1.x Brain Inbox come over once (the old key is
+  // left untouched).
+  if (Store.getRaw(KEYS.dumpMigrated) === null) {
+    const known = new Set(state.dump.map((note) => note.id));
+    const legacy = Planner.legacyDumpNotes(Store.loadArray(KEYS.legacyBrain)).filter((note) => !known.has(note.id));
+    if (legacy.length) {
+      state.dump = [...state.dump, ...legacy];
+      persistDump();
+    }
+    Store.setRaw(KEYS.dumpMigrated, "1");
+  }
+
+  // Habits from before start dates existed begin on their first logged day
+  // (or today), so earlier months don't show them at 0%.
+  if (state.habits.some((habit) => !habit.since)) {
+    const firstLogged = (id) => Object.keys(state.habitLog).filter((iso) => Planner.habitState(state.habitLog, iso, id)).sort()[0];
+    state.habits = state.habits.map((habit) => (habit.since ? habit : { ...habit, since: firstLogged(habit.id) || todayISO() }));
+    Store.save(KEYS.habits, state.habits);
+  }
 
   if (initial.changed) {
     persistItems();
@@ -499,6 +611,7 @@
       class: "mood-btn",
       "data-mood": mood,
       "aria-pressed": String(current === mood),
+      title: `${t(`mood-${mood}`)} — ${t(`moodHint-${mood}`)}`,
     }, moodEl(mood), h("span", { text: t(`mood-${mood}`) }))));
   }
 
@@ -536,9 +649,13 @@
     els.waterRow.replaceChildren(...glasses,
       h("button", { type: "button", class: "water-step", "data-water": "-1", "aria-label": t(word.remove), title: t(word.remove), disabled: count === 0 ? "" : null, text: "−" }),
       h("button", { type: "button", class: "water-step", "data-water": "1", "aria-label": t(word.add), title: t(word.add), text: "+" }));
-    els.waterSum.textContent = waterUnit === "liters"
+    const summary = waterUnit === "liters"
       ? t("waterLiters", { n: Planner.formatLiters(count * glassMl, I18n.language).replace(" L", ""), total: Planner.formatLiters(waterGoal, I18n.language) })
       : t(word.sum, { n: count, total: target });
+    const over = count * glassMl - waterGoal;
+    els.waterSum.replaceChildren(summary, ...(count >= target
+      ? [h("span", { class: "water-met", text: over > 0 ? `✓ ${t("waterGoalMet")} · +${Planner.formatVolume(over, I18n.language)}` : `✓ ${t("waterGoalMet")}` })]
+      : []));
     els.waterSum.classList.toggle("is-done", count >= target);
   }
 
@@ -572,13 +689,18 @@
 
   function renderTopbar() {
     const view = state.view;
-    els.navControls.hidden = view === "habits";
     els.rangeSub.textContent = "";
     els.weekProgress.hidden = true;
+    els.navControls.hidden = view === "dump";
     const now = new Date();
+    if (view === "dump") {
+      els.rangeTitle.textContent = t("dumpTitle");
+      return;
+    }
 
     if (view === "habits") {
-      els.rangeTitle.textContent = t("viewHabits");
+      els.rangeTitle.textContent = `${t("viewHabits")} · ${capitalize(formatDate(state.anchor, { month: "long", year: "numeric" }))}`;
+      els.todayBtn.disabled = state.anchor.getMonth() === now.getMonth() && state.anchor.getFullYear() === now.getFullYear();
     } else if (view === "day") {
       els.rangeTitle.textContent = capitalize(formatDate(state.anchor, { weekday: "long", day: "numeric", month: "long", year: "numeric" }));
       els.todayBtn.disabled = anchorISO() === todayISO();
@@ -597,6 +719,31 @@
     }
   }
 
+  function weekEventsEl(iso) {
+    const { allDay, timed } = dayEvents(iso);
+    const routines = state.habits
+      .map((habit) => ({ habit, time: Planner.habitTimeOn(habit, iso) }))
+      .filter(({ habit, time }) => time && !eventForHabit(timed, habit, time))
+      .sort((a, b) => (a.time.start < b.time.start ? -1 : 1));
+    if (!allDay.length && !timed.length && !routines.length) return null;
+    const routineLines = routines.map(({ habit, time }) => h("li", {
+      class: `event-line routine${stateClass(habit.id, iso)}`,
+      style: `--habit: ${habit.color}`,
+      title: [habit.name, stateLabel(habit.id, iso)].filter(Boolean).join(" · "),
+    },
+      habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
+      h("span", { class: "line-time", text: time.start }),
+      h("span", { class: "event-title", text: habit.name })));
+    return h("ul", { class: "day-events" }, routineLines, [...allDay, ...timed].map((event) => h("li", {
+      class: `event-line${event.allDay ? " is-allday" : ""}`,
+      title: eventTooltip(event),
+      style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
+    },
+      h("i", { "aria-hidden": "true" }),
+      event.allDay ? null : h("span", { class: "line-time", text: clockTime(new Date(event.start)) }),
+      h("span", { class: "event-title", text: eventTitle(event) }))));
+  }
+
   function renderDays(days) {
     els.weekGrid.replaceChildren(...days.map((day) => {
       const iso = Core.toISODate(day);
@@ -610,9 +757,11 @@
         h("div", { class: "day-stamp", "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
           h("span", { class: "date-num", text: String(day.getDate()).padStart(2, "0") }),
           h("span", { class: "dow", text: formatDate(day, { weekday: "short" }) }),
-          h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso]))),
+          h("span", { class: "stamp-icons" }, moonEl(day), moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso])),
+          dayHabitIcons(iso, "stamp-habits")),
         h("div", { class: "day-body" },
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
+          weekEventsEl(iso),
           h("ul", { class: "day-items", "data-date": iso },
             Planner.itemsForDay(state.items, iso).map((item) => itemEl(item, "line"))),
           h("form", { class: "day-add", "data-date": iso },
@@ -637,8 +786,6 @@
       ? formatDate(reference, { month: "long" })
       : `${formatDate(days[0], { month: "short" })} – ${formatDate(days[6], { month: "short" })}`;
     els.yearMark.textContent = String(reference.getFullYear());
-    els.washi.dataset.pattern = TAPE_PATTERNS[weekNumber % TAPE_PATTERNS.length];
-    els.washi.style.setProperty("--tape", `var(${TAPE_COLORS[weekNumber % TAPE_COLORS.length]})`);
 
     renderDays(days);
 
@@ -649,11 +796,6 @@
     renderGoals();
     renderNotes();
     renderMonthTabs(reference);
-  }
-
-  function setWashi(element, seed) {
-    element.dataset.pattern = TAPE_PATTERNS[seed % TAPE_PATTERNS.length];
-    element.style.setProperty("--tape", `var(${TAPE_COLORS[seed % TAPE_COLORS.length]})`);
   }
 
   // ---------- day page (Hobonichi Techo style) ----------
@@ -669,9 +811,65 @@
     return { first: Math.min(TIMELINE_START, earliest), last: 24 };
   }
 
+  // ---------- calendar events ----------
+  // A calendar event that is really a timed habit (same name, overlapping
+  // time — e.g. "Academia" in Google Calendar and the Academia habit) is
+  // shown once: the event, carrying the habit's check.
+  const fold = (text) => String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+  function eventForHabit(timedEvents, habit, time) {
+    const name = fold(habit.name);
+    if (name.length < 3) return null;
+    const start = Planner.timeToMinutes(time.start);
+    const end = start + time.duration;
+    return timedEvents.find((event) => {
+      const title = fold(event.title);
+      const named = title.includes(name) || (title.length >= 3 && name.includes(title));
+      return named && event.startMin < end && event.endMin > start;
+    }) || null;
+  }
+
+  // The small round check used on habit blocks (a span: they're buttons).
+  function habitCheck(habitId, iso) {
+    const svg = svgEl("svg", { class: "i", viewBox: "0 0 24 24", "aria-hidden": "true" });
+    svg.append(svgEl("path", { d: "M5 12.5l4.2 4.2L19 7" }));
+    return h("span", { class: `check habit-check${stateClass(habitId, iso)}`, "aria-hidden": "true" }, svg);
+  }
+  const calendarById = (id) => state.calendars.find((calendar) => calendar.id === id) || null;
+  const clockTime = (date) => `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const eventRange = (event) => (event.allDay ? t("allDay") : `${clockTime(new Date(event.start))}–${clockTime(new Date(event.end))}`);
+  const eventTitle = (event) => event.title || t("untitledEvent");
+
+  function eventTooltip(event) {
+    const calendar = calendarById(event.calendarId);
+    return [eventTitle(event), eventRange(event), event.location, calendar?.name].filter(Boolean).join("\n");
+  }
+
+  function dayEvents(iso) {
+    return Planner.eventsForDay(state.events, iso);
+  }
+
   function renderTimeline(iso) {
     const items = Planner.itemsForDay(state.items, iso);
-    const events = Planner.layoutTimeline(items);
+    // Meetings share the timeline (and its lanes) with tasks, as read-only blocks.
+    const meetings = dayEvents(iso).timed.map((event) => ({
+      id: event.id,
+      kind: "event",
+      event,
+      start: Planner.minutesToTime(Math.min(event.startMin, 1425)),
+      duration: Math.max(15, event.endMin - Math.min(event.startMin, 1425)),
+    }));
+    // Habits with a time sit on the timeline on their planned days.
+    const timedHabits = state.habits
+      .map((habit) => ({ habit, time: Planner.habitTimeOn(habit, iso) }))
+      .filter(({ time }) => time);
+    const routines = [];
+    timedHabits.forEach(({ habit, time }) => {
+      const twin = eventForHabit(meetings.map((meeting) => meeting.event), habit, time);
+      if (twin) meetings.find((meeting) => meeting.event === twin).habit = habit;
+      else routines.push({ id: `habit:${habit.id}`, kind: "habit", habit, start: time.start, duration: time.duration });
+    });
+    const events = Planner.layoutTimeline([...items, ...meetings, ...routines]);
     const { first, last } = timelineRange(events);
     const hour = timelineHourHeight();
     const inner = h("div", { class: "timeline-inner", "data-first-hour": first, style: `height: ${(last - first) * hour}px` });
@@ -685,9 +883,50 @@
 
     events.forEach((event) => {
       const { item } = event;
-      const category = categoryById(item.category);
       const top = ((event.start - first * 60) / 60) * hour;
       const height = Math.max(((event.end - event.start) / 60) * hour - 2, 20);
+      if (item.kind === "habit") {
+        const { habit } = item;
+        const done = Planner.habitDone(state.habitLog, iso, habit.id);
+        const lines = Math.max(1, Math.floor((height - 19) / 16));
+        const range = `${item.start}–${Planner.minutesToTime(Math.min(1439, Planner.timeToMinutes(item.start) + item.duration))}`;
+        inner.append(h("button", {
+          type: "button",
+          class: `block routine${stateClass(habit.id, iso)}${height < 34 ? " short" : ""}`,
+          "data-habit-cell": habit.id,
+          "data-date": iso,
+          "aria-pressed": String(done),
+          disabled: iso > todayISO() ? "" : null,
+          title: `${habit.name} · ${range}`,
+          style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines}; --habit: ${habit.color};`,
+        },
+          habitCheck(habit.id, iso),
+          h("span", { class: "item-body" },
+            h("span", { class: "block-time", text: range }),
+            h("span", { class: "block-title" }, habitIconEl(habit.icon), habit.name))));
+        return;
+      }
+      if (item.kind === "event") {
+        const calendar = calendarById(item.event.calendarId);
+        const lines = Math.max(1, Math.floor((height - 19) / 16));
+        const twin = item.habit || null;
+        inner.append(h(twin ? "button" : "div", {
+          type: twin ? "button" : null,
+          class: `block event${twin ? ` has-habit${stateClass(twin.id, iso)}` : ""}${height < 34 ? " short" : ""}${item.event.busy === false ? " is-free" : ""}`,
+          title: eventTooltip(item.event),
+          "data-habit-cell": twin?.id || null,
+          "data-date": twin ? iso : null,
+          "aria-pressed": twin ? String(Planner.habitDone(state.habitLog, iso, twin.id)) : null,
+          disabled: twin && iso > todayISO() ? "" : null,
+          style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${calendar ? ` --cat: ${calendar.color};` : ""}${twin ? ` --habit: ${twin.color};` : ""}`,
+        },
+          twin ? habitCheck(twin.id, iso) : null,
+          h(twin ? "span" : "div", { class: "item-body", tabindex: twin ? null : "0" },
+            h("span", { class: "block-time", text: eventRange(item.event) }),
+            h("span", { class: "block-title" }, twin ? habitIconEl(twin.icon) : null, eventTitle(item.event)))));
+        return;
+      }
+      const category = categoryById(item.category);
       const classes = ["item", "block"];
       if (item.done) classes.push("is-done");
       if (item.priority === "urgent") classes.push("is-urgent");
@@ -728,8 +967,13 @@
     if (!line || !inner) return;
     const now = new Date();
     const first = Number(inner.dataset.firstHour);
-    line.style.top = `${((now.getHours() * 60 + now.getMinutes() - first * 60) / 60) * timelineHourHeight()}px`;
+    const y = ((now.getHours() * 60 + now.getMinutes() - first * 60) / 60) * timelineHourHeight();
+    line.style.top = `${y}px`;
     line.firstChild.textContent = Planner.minutesToTime(now.getHours() * 60 + now.getMinutes());
+    // The current time takes the place of an hour label it would overlap.
+    inner.querySelectorAll(".hour-row").forEach((row) => {
+      row.classList.toggle("is-covered", Math.abs(parseFloat(row.style.top) + 9 - y) < 15);
+    });
   }
 
   function minutesAtTimelineY(clientY) {
@@ -754,7 +998,13 @@
     els.dayOfYear.textContent = t("dayOfYear", { n: Planner.dayOfYear(day), total: Planner.daysInYear(day.getFullYear()) });
     els.dayHoliday.hidden = !holiday;
     els.dayHoliday.textContent = holiday || "";
-    setWashi(els.dayWashi, Planner.dayOfYear(day));
+    const allDay = dayEvents(iso).allDay;
+    els.dayAllDay.hidden = allDay.length === 0;
+    els.dayAllDay.replaceChildren(...allDay.map((event) => h("span", {
+      class: "allday-chip",
+      title: eventTooltip(event),
+      style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
+    }, eventTitle(event))));
 
     showQuote(els.dayProverb, Planner.dayOfYear(day));
 
@@ -769,15 +1019,17 @@
     els.dayProgress.textContent = counted.length ? t("weekProgress", { done, total: counted.length }) : "";
 
     renderWater(iso);
+    renderTodayHabits(iso);
     renderMoodPicker(iso);
     renderDayNotes();
+    renderClosure(iso);
     renderMonthTabs(day);
   }
 
   // Mental load: the app's estimate as a ghost, the person's own rating
   // solid. Clicking a tick sets the rating; clicking it again clears it.
   function renderLoad(iso) {
-    const estimate = Planner.mentalLoad(state.items, iso, { todayISO: todayISO(), moods: state.moods });
+    const estimate = Planner.mentalLoad(state.items, iso, { todayISO: todayISO(), moods: state.moods, events: state.events });
     const own = state.loads[iso];
     const hasOwn = Number.isInteger(own);
     const score = hasOwn ? own : estimate.score;
@@ -805,10 +1057,12 @@
     els.loadMeter.replaceChildren(...[
       h("div", { class: "load-head", title: why },
         h("span", { class: "load-title", text: t("load") }),
-        h("span", { class: "load-ticks", role: "group" }, ticks),
-        h("strong", { class: "load-score", text: `${score}/10` }),
-        h("span", { class: "load-label", text: t(`load-${level}`) }),
-        h("span", { class: "load-source", text: hasOwn ? `${t("loadYours")} · ${t("loadEstimateIs", { n: estimate.score })}` : `${t("loadEstimate")} · ${t("loadAdjust")}` })),
+        h("span", { class: "load-reading" },
+          h("strong", { class: "load-score", text: String(score) }),
+          h("span", { class: "load-of", text: "/10" }),
+          h("span", { class: "load-label", text: t(`load-${level}`) }))),
+      h("span", { class: "load-ticks", role: "group", title: t("loadAdjust") }, ticks),
+      h("span", { class: "load-source", title: why, text: hasOwn ? t("loadSourceOwn", { n: estimate.score }) : t("loadSourceEstimate") }),
       score >= 5 || candidate ? h("p", { class: "load-text" },
         t(`loadText-${level}`),
         candidate ? h("button", { type: "button", class: "load-action", "data-postpone": candidate.id, text: t("loadPostpone", { title: candidate.title }) }) : null) : null,
@@ -826,8 +1080,19 @@
         h("h3", { class: "focus-head" },
           h("span", { text: t(FOCUS_LABELS[focus]) }),
           group.length ? h("span", { class: "focus-count", text: String(group.length) }) : null,
+          h("button", { type: "button", class: "focus-add", "data-focus-add": focus, title: t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), "aria-label": t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), text: "+" }),
           movable ? h("button", { type: "button", class: "focus-action", "data-later-tomorrow": iso, text: t("allToTomorrow") }) : null),
-        h("ul", { class: "day-items", "data-date": iso, "data-focus": focus }, group.map((item) => itemEl(item, "line"))),
+        h("ul", { class: "day-items", "data-date": iso, "data-focus": focus }, group.map((item) => {
+          const line = itemEl(item, "line");
+          // Hover shortcuts to move the task to the other two groups.
+          line.append(h("span", { class: "focus-move" }, Planner.FOCUS.filter((other) => other !== focus).map((other) => h("button", {
+            type: "button",
+            "data-move-focus": other,
+            title: t("moveToGroup", { group: t(FOCUS_LABELS[other]) }),
+            text: t(`move-${other}`),
+          }))));
+          return line;
+        })),
         group.length ? null : h("p", { class: "focus-hint", text: t(`${FOCUS_LABELS[focus]}Hint`) }));
     }));
   }
@@ -840,6 +1105,13 @@
     if (key === dayNotesKey && document.activeElement === els.dayNotes) return;
     dayNotesKey = key;
     els.dayNotes.value = state.dayNotes[key] || "";
+    fitDayNotes();
+  }
+
+  // The notes field grows with its text (the page scrolls if it must).
+  function fitDayNotes() {
+    els.dayNotes.style.height = "auto";
+    els.dayNotes.style.height = `${els.dayNotes.scrollHeight + 4}px`;
   }
 
   function saveDayNotes() {
@@ -875,7 +1147,6 @@
     els.mvMonthNum.textContent = String(month + 1).padStart(2, "0");
     els.mvMonthName.textContent = formatDate(reference, { month: "long" });
     els.mvYear.textContent = String(year);
-    setWashi(els.monthWashi, month + 3);
 
     const weeks = Planner.monthGrid(year, month, state.settings.weekStart);
     els.monthWeekdays.replaceChildren(...weeks[0].map((day) => h("span", {
@@ -888,14 +1159,29 @@
       const iso = Core.toISODate(day);
       const holiday = holidayFor(iso);
       const items = Planner.itemsForDay(state.items, iso);
+      const { allDay: allDayEvents, timed: timedEvents } = dayEvents(iso);
+      const meetings = [...allDayEvents, ...timedEvents];
       const classes = dayClasses(day, "month-cell") + (day.getMonth() === month ? "" : " is-other");
       return h("div", { class: classes, "data-date": iso, "data-open-day": iso, title: t("openDay", { date: longDate(iso) }) },
         h("div", { class: "cell-head" },
           h("span", { class: "cell-num", text: day.getDate() }),
           holiday ? h("span", { class: "cell-holiday", text: holiday }) : null,
+          dayHabitIcons(iso, "cell-habits"),
           moodEl(state.moods[iso], "mood-mini", state.moodNotes[iso])),
-        h("ul", { class: "month-items", "data-date": iso }, items.slice(0, limit).map((item) => itemEl(item, "mini"))),
-        items.length > limit ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length - limit }) }) : null);
+        h("ul", { class: "month-items", "data-date": iso },
+          meetings.slice(0, limit).map((event) => h("li", {
+            class: "mini event",
+            title: eventTooltip(event),
+            style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
+          },
+            h("i", { "aria-hidden": "true" }),
+            h("span", { class: "item-body" },
+              event.allDay ? null : h("span", { class: "mini-time", text: clockTime(new Date(event.start)) }),
+              eventTitle(event)))),
+          items.slice(0, Math.max(0, limit - meetings.length)).map((item) => itemEl(item, "mini"))),
+        items.length + meetings.length > limit
+          ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length + meetings.length - limit }) })
+          : null);
     }));
     renderMonthTabs(reference);
   }
@@ -966,13 +1252,491 @@
     }));
   }
 
-  function renderPlaceholder() {
-    const navIcon = document.querySelector(`.nav-btn[data-view="${state.view}"] svg`);
-    els.placeholderIcon.replaceChildren(navIcon ? navIcon.cloneNode(true) : "");
-    els.placeholderText.textContent = t(PLACEHOLDER_TEXT[state.view]);
+  // ---------- habits & month summary ----------
+  // Line icons for habits, drawn on a 24×24 grid like the rest of the app.
+  const HABIT_ICON_PATHS = {
+    dumbbell: ["M6.5 7.5v9", "M3.5 10v4", "M17.5 7.5v9", "M20.5 10v4", "M6.5 12h11"],
+    run: ["M14.5 6.2a1.7 1.7 0 1 0 0-.01", "M10.5 20l2.2-5-2.6-2.4 1.6-4.4 3 2.6 3 .4", "M6 12l2.8-3.6 3.1-.5", "M12.7 15l3.3 1.3 1.2 3.7"],
+    bike: ["M2.5 17a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0", "M14.5 17a3.5 3.5 0 1 0 7 0a3.5 3.5 0 1 0-7 0", "M6 17l3.5-7h5l3 7", "M9.5 10l3.5 7", "M13 7h2.5"],
+    swim: ["M3 18c2 0 2.2-1.6 4.5-1.6S10 18 12 18s2.2-1.6 4.5-1.6S19 18 21 18", "M16.5 8.2a1.7 1.7 0 1 0 0-.01", "M6.5 14l4.5-4.5 3 2.5 3-1"],
+    yoga: ["M12 5.2a1.7 1.7 0 1 0 0-.01", "M12 8v5.5", "M5.5 10.5l6.5 2 6.5-2", "M8 20l4-6.5 4 6.5"],
+    book: ["M4 5.5c2.7-1 5.3-1 8 .7 2.7-1.7 5.3-1.7 8-.7v13c-2.7-1-5.3-1-8 .7-2.7-1.7-5.3-1.7-8-.7z", "M12 6.2v13.2"],
+    pen: ["M16.5 3.8l3.7 3.7L8 19.7H4.3V16z", "M14 6.3l3.7 3.7"],
+    lotus: ["M12 19.5c-4.2 0-7.2-2.6-8-6.2 3.1 0 6.2 1.6 8 4.2 1.8-2.6 4.9-4.2 8-4.2-.8 3.6-3.8 6.2-8 6.2z", "M12 17.5c-1.9-2.6-1.9-7.2 0-11 1.9 3.8 1.9 8.4 0 11z"],
+    pill: ["M10.6 20.2a4.9 4.9 0 0 1-6.8-6.8l6.6-6.6a4.9 4.9 0 0 1 6.8 6.8z", "M7.1 10.1l6.8 6.8"],
+    moon: ["M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.2 6.2 0 0 0 10.1 10.1z"],
+    heart: ["M12 19.8s-7.2-4.4-7.2-10.1A4.1 4.1 0 0 1 12 7.1a4.1 4.1 0 0 1 7.2 2.6c0 5.7-7.2 10.1-7.2 10.1z"],
+    leaf: ["M5 19.5C5 11.4 10.6 6 19.5 4.5 18.3 13.6 12.9 19.5 5 19.5z", "M5 19.5l8-8"],
+  };
+
+  // Gentle habit states on a day: "done", "little" or "rest" (or none).
+  const STATE_LABELS = { done: "stateDone", little: "stateLittle", rest: "stateRest" };
+  const habitStateOn = (habitId, iso) => Planner.habitState(state.habitLog, iso, habitId);
+  const stateClass = (habitId, iso) => (habitStateOn(habitId, iso) ? ` is-${habitStateOn(habitId, iso)}` : "");
+  const stateLabel = (habitId, iso) => (habitStateOn(habitId, iso) ? t(STATE_LABELS[habitStateOn(habitId, iso)]) : "");
+
+  function habitIconEl(icon, className = "habit-icon") {
+    const paths = HABIT_ICON_PATHS[icon];
+    if (!paths) return null;
+    const svg = svgEl("svg", { class: className, viewBox: "0 0 24 24", "aria-hidden": "true" });
+    paths.forEach((d) => svg.append(svgEl("path", { d })));
+    return svg;
+  }
+
+  // The habit's mark: its icon, or a small colored square.
+  function habitMark(habit) {
+    return habitIconEl(habit.icon) || h("i", { class: "habit-dot", "aria-hidden": "true" });
+  }
+
+  // Icon habits planned (or done as an extra) on a day, for week and month.
+  function dayHabitIcons(iso, className) {
+    const icons = state.habits
+      .filter((habit) => habit.icon && (Planner.habitScheduled(habit, iso) || (Planner.habitActive(habit, iso) && Planner.habitDone(state.habitLog, iso, habit.id))))
+      .slice(0, 4)
+      .map((habit) => {
+        const svg = habitIconEl(habit.icon, `habit-icon${stateClass(habit.id, iso)}`);
+        svg.style.setProperty("--habit", habit.color);
+        const title = svgEl("title", {});
+        title.textContent = [habit.name, stateLabel(habit.id, iso)].filter(Boolean).join(" · ");
+        svg.prepend(title);
+        svg.setAttribute("role", "img");
+        svg.setAttribute("aria-label", title.textContent);
+        svg.removeAttribute("aria-hidden");
+        return svg;
+      });
+    return icons.length ? h("span", { class: className }, icons) : null;
+  }
+  function monthIsos(year, month) {
+    const total = new Date(year, month + 1, 0).getDate();
+    return Array.from({ length: total }, (_, index) => Core.toISODate(new Date(year, month, index + 1)));
+  }
+
+  function renderHabitsView() {
+    const year = state.anchor.getFullYear();
+    const month = state.anchor.getMonth();
+    const reference = new Date(year, month, 1);
+    const today = todayISO();
+    const isos = monthIsos(year, month);
+    els.hvMonthNum.textContent = String(month + 1).padStart(2, "0");
+    els.hvMonthName.textContent = capitalize(formatDate(reference, { month: "long" }));
+    els.hvYear.textContent = String(year);
+    els.hvRange.textContent = capitalize(formatDate(reference, { month: "long", year: "numeric" }));
+
+    // Grid: habit names, one column per day, then month % and streak.
+    els.habitGrid.style.setProperty("--days", isos.length);
+    const head = [h("span", { class: "hg-corner" }), ...isos.map((iso) => {
+      const date = Core.parseISODate(iso);
+      const classes = ["hg-day"];
+      // Only a few day numbers are shown here, so weekend colors would look
+      // random; today is the one that stands out.
+      if (iso === today) classes.push("is-today");
+      // Sparse day numbers (like the summary axes) so 31 columns stay legible.
+      const day = date.getDate();
+      const besideToday = Math.abs(day - (isos.indexOf(today) + 1)) === 1 && isos.includes(today);
+      const label = iso === today || ((day === 1 || day % 5 === 0) && !besideToday);
+      return h("span", { class: classes.join(" "), title: iso === today ? t("goToday") : null, text: label ? String(day) : "" });
+    }), h("span", { class: "hg-corner" })];
+
+    const visible = state.habits.filter((habit) => Planner.habitActiveBetween(habit, isos[0], isos[isos.length - 1]));
+    const rows = visible.flatMap((habit) => {
+      const stats = Planner.habitMonth(state.habitLog, habit, year, month, today);
+      const streak = Planner.habitStreak(state.habitLog, habit, today);
+      // A little counts half; rest days are left out (see Planner.habitMonth).
+      const pct = stats.elapsed ? Math.round((stats.score / stats.elapsed) * 100) : 0;
+      return [
+        h("div", { class: "hg-name", style: `--habit: ${habit.color}` },
+          h("button", { type: "button", class: "hg-edit", "data-habit-edit": habit.id, title: t("habitEdit"), "aria-label": t("habitEdit") }, habitMark(habit)),
+          h("button", { type: "button", class: "hg-label", "data-habit-edit": habit.id, title: t("habitEdit") },
+            h("span", { class: "hg-title", text: habit.name }),
+            h("span", { class: "hg-meta" }, [
+              ...habitScheduleParts(habit),
+              ...(habit.until ? [t("habitEnded", { date: shortDate(habit.until) })] : []),
+            ].map((part) => h("span", { text: part }))))),
+        ...isos.map((iso) => {
+          if (!Planner.habitActive(habit, iso)) return h("span", { class: "hg-cell is-inactive", "aria-hidden": "true" });
+          const done = Planner.habitDone(state.habitLog, iso, habit.id);
+          const future = iso > today;
+          // Days the habit isn't planned for stay clickable as "extra" days.
+          const off = !Planner.habitScheduled(habit, iso);
+          const label = [t("habitCell", { habit: habit.name, date: shortDate(iso) }), off ? t("habitExtraDay") : "", stateLabel(habit.id, iso)].filter(Boolean).join(" · ");
+          return h("button", {
+            type: "button",
+            class: `hg-cell${stateClass(habit.id, iso)}${off ? " is-off" : ""}${iso === today ? " is-today" : ""}`,
+            style: `--habit: ${habit.color}`,
+            "data-habit-cell": habit.id,
+            "data-date": iso,
+            "aria-pressed": String(done),
+            "aria-label": label,
+            title: label,
+            disabled: future ? "" : null,
+          });
+        }),
+        h("div", { class: "hg-stat", title: t("habitMonthPct", stats) },
+          h("strong", { text: stats.elapsed ? `${pct}%` : "—" }),
+          streak ? h("span", { title: t("habitStreak", { n: streak }), text: streak === 1 ? t("habitStreakDay") : t("habitStreakDays", { n: streak }) }) : null),
+      ];
+    });
+    els.habitGrid.replaceChildren(...head, ...rows);
+    els.habitGrid.hidden = visible.length === 0;
+    els.habitEmpty.hidden = visible.length > 0;
+    els.habitEmpty.textContent = state.habits.length ? t("habitNoneThisMonth") : t("habitEmpty");
+
+    const names = new Set(state.habits.map((habit) => habit.name.toLowerCase()));
+    const ideas = habitIdeas().filter((idea) => !names.has(idea.name.toLowerCase()));
+    els.habitIdeas.replaceChildren(...(ideas.length && state.habits.length < 8
+      ? [h("span", { class: "habit-ideas-title", text: t("habitIdeasTitle") }),
+        ...ideas.map((idea) => h("button", { type: "button", class: "chip habit-idea", "data-habit-idea": idea.name },
+          habitIconEl(idea.icon), idea.name))]
+      : []));
+
+    renderMonthSummary(isos, today);
+    renderMonthTabs(reference);
+  }
+
+  // "Name:icon:1,3,5" entries from the translations.
+  function habitIdeas() {
+    return t("habitIdeas").split("|").map((entry) => {
+      const [name, icon = "", days = ""] = entry.split(":");
+      return { name, icon: icon || null, days: days ? days.split(",").map(Number) : [] };
+    });
+  }
+
+  function summaryTitle(key) {
+    return h("h2", { class: "section-title" }, h("span", { text: t(key) }));
+  }
+
+  // Day numbers under a strip, every few days, aligned to the same columns.
+  function summaryAxis(isos) {
+    return h("div", { class: "sum-axis", style: `--days: ${isos.length}` }, isos.map((iso, index) => {
+      const day = index + 1;
+      return h("span", { text: day === 1 || day % 5 === 0 ? String(day) : "" });
+    }));
+  }
+
+  function renderMonthSummary(isos, today) {
+    const past = isos.filter((iso) => iso <= today);
+
+    // Mood: one face per day, then how often each mood came up.
+    const counts = new Map();
+    const faces = isos.map((iso) => {
+      const mood = state.moods[iso];
+      if (mood) counts.set(mood, (counts.get(mood) || 0) + 1);
+      return h("span", { class: `sum-face${iso > today ? " is-future" : ""}` },
+        mood ? moodEl(mood, "mood-mini", state.moodNotes[iso]) : h("i", { "aria-hidden": "true" }));
+    });
+    els.sumMood.replaceChildren(
+      summaryTitle("dayMood"),
+      h("div", { class: "sum-strip", style: `--days: ${isos.length}` }, faces),
+      summaryAxis(isos),
+      counts.size
+        ? h("p", { class: "sum-legend" }, Planner.MOODS.filter((mood) => counts.has(mood)).map((mood) => h("span", { class: "sum-count" },
+          moodEl(mood, "mood-mini"), counts.get(mood) === 1 ? t(`moodDay-${mood}`) : t(`moodDays-${mood}`, { n: counts.get(mood) }))))
+        : h("p", { class: "sum-note", text: t("sumMoodNone") }));
+
+    // Water: a bar per day against the daily goal line.
+    const { glassMl, waterGoal, waterUnit } = state.settings;
+    const target = Planner.waterTarget(waterGoal, glassMl);
+    const logged = past.filter((iso) => state.water[iso]);
+    const met = past.filter((iso) => (state.water[iso] || 0) >= target).length;
+    const unit = Planner.isBottle(glassMl) ? t("waterUnitBottles").toLowerCase() : t("waterUnitGlasses").toLowerCase();
+    const bars = isos.map((iso) => {
+      const count = state.water[iso] || 0;
+      const ratio = Math.min(count / target, 1.25);
+      return h("span", {
+        class: `sum-bar water${count >= target ? " is-met" : ""}${iso > today ? " is-future" : ""}`,
+        style: `--v: ${ratio / 1.25}`,
+        title: t("sumWaterDay", { date: shortDate(iso), n: count, total: target, unit: waterUnit === "liters" ? `(${Planner.formatLiters(count * glassMl, I18n.language)})` : unit }),
+      });
+    });
+    const average = logged.length ? logged.reduce((sum, iso) => sum + state.water[iso], 0) * glassMl / logged.length : 0;
+    els.sumWater.replaceChildren(
+      summaryTitle("water"),
+      h("div", { class: "sum-bars", style: `--days: ${isos.length}; --goal: ${1 / 1.25}` }, bars),
+      summaryAxis(isos),
+      h("p", { class: "sum-note", text: logged.length
+        ? t("sumWater", { met, days: past.length, avg: Planner.formatVolume(average, I18n.language) })
+        : t("sumWaterNone") }));
+
+    // Mental load: your rating where you gave one, otherwise the estimate.
+    const scores = isos.map((iso) => {
+      if (iso > today) return null;
+      const own = state.loads[iso];
+      const estimate = Planner.mentalLoad(state.items, iso, { todayISO: today, moods: state.moods, events: state.events }).score;
+      return Number.isInteger(own) ? { score: own, own: true } : { score: estimate, own: false };
+    });
+    const known = scores.filter(Boolean);
+    const avg = known.length ? known.reduce((sum, entry) => sum + entry.score, 0) / known.length : 0;
+    const heavy = known.filter((entry) => entry.score >= 7).length;
+    const number = new Intl.NumberFormat(I18n.language === "pt" ? "pt-BR" : "en-GB", { maximumFractionDigits: 1 });
+    els.sumLoad.replaceChildren(
+      summaryTitle("load"),
+      h("div", { class: "sum-bars", style: `--days: ${isos.length}` }, scores.map((entry, index) => h("span", {
+        class: `sum-bar load level-${entry ? Planner.loadLevel(entry.score) : "light"}${entry?.own ? " is-own" : ""}${entry ? "" : " is-future"}`,
+        style: `--v: ${entry ? entry.score / 10 : 0}`,
+        title: entry ? t("sumLoadDay", { date: shortDate(isos[index]), n: entry.score, source: t(entry.own ? "loadYours" : "loadEstimate") }) : null,
+      }))),
+      summaryAxis(isos),
+      h("p", { class: "sum-note" },
+        t("sumLoad", { avg: number.format(avg), heavy }),
+        h("span", { class: "load-legend" },
+          h("i", { class: "is-own", "aria-hidden": "true" }), t("loadLegendOwn"),
+          h("i", { "aria-hidden": "true" }), t("loadLegendEstimate"))));
+
+    renderPatterns(today);
+  }
+
+  const DROP_ICON = "M12 3.5c3 4 5.5 7 5.5 10.2a5.5 5.5 0 0 1-11 0C6.5 10.5 9 7.5 12 3.5z";
+  const LOAD_ICON = ["M6 19v-5", "M12 19V9", "M18 19V5"];
+
+  function patternIcon(pattern) {
+    const habit = state.habits.find((candidate) => candidate.id === pattern.habitId);
+    if (habit) {
+      const icon = habitIconEl(habit.icon, "habit-icon") || h("i", { class: "habit-dot" });
+      if (icon.style) icon.style.setProperty("--habit", habit.color);
+      return icon;
+    }
+    const svg = svgEl("svg", { class: "habit-icon pattern-icon", viewBox: "0 0 24 24", "aria-hidden": "true" });
+    (pattern.kind === "mood-water" ? [DROP_ICON] : LOAD_ICON).forEach((d) => svg.append(svgEl("path", { d })));
+    return svg;
+  }
+
+  // Observations across mood, water, reported load and habits — only with
+  // enough days behind them, always with the counts.
+  function renderPatterns(today) {
+    const target = Planner.waterTarget(state.settings.waterGoal, state.settings.glassMl);
+    const { patterns, moodDays } = Planner.patterns({
+      moods: state.moods,
+      water: state.water,
+      waterTarget: target,
+      loads: state.loads,
+      habits: state.habits,
+      habitLog: state.habitLog,
+      todayISO: today,
+    });
+    const lines = patterns.map((pattern) => {
+      const habit = state.habits.find((candidate) => candidate.id === pattern.habitId);
+      const direction = pattern.kind === "load-habit" || pattern.kind === "mood-load"
+        ? (pattern.diff < 0 ? "down" : "up")
+        : (pattern.diff > 0 ? "up" : "down");
+      return h("li", { class: "pattern" },
+        patternIcon(pattern),
+        h("div", {},
+          h("p", { text: t(`pattern-${pattern.kind}-${direction}`, { habit: habit?.name || "" }) }),
+          h("span", { class: "pattern-basis", text: t(`basis-${pattern.kind}`, { na: pattern.na, nb: pattern.nb }) })));
+    });
+    els.sumPatterns.replaceChildren(
+      summaryTitle("patternsTitle"),
+      lines.length
+        ? h("ul", { class: "pattern-list" }, lines)
+        : h("p", { class: "sum-note", text: moodDays < 10 ? t("patternsNeedMood", { n: moodDays }) : t("patternsNone") }),
+      h("p", { class: "pattern-note", text: t("patternsNote") }));
+  }
+
+  // Habits planned for the day (or already done as an extra) as pills.
+  function renderTodayHabits(iso) {
+    const habits = state.habits
+      // Timed habits are checked on their timeline block; pills are for the rest.
+      .filter((habit) => !Planner.habitTimeOn(habit, iso))
+      .filter((habit) => Planner.habitScheduled(habit, iso) || (Planner.habitActive(habit, iso) && Planner.habitDone(state.habitLog, iso, habit.id)));
+    els.todayHabits.hidden = habits.length === 0;
+    const future = iso > todayISO();
+    els.habitPills.replaceChildren(...habits.map((habit) => {
+      const done = Planner.habitDone(state.habitLog, iso, habit.id);
+      return h("button", {
+        type: "button",
+        class: `habit-pill${stateClass(habit.id, iso)}${habit.icon ? " has-icon" : ""}`,
+        style: `--habit: ${habit.color}`,
+        "data-habit-cell": habit.id,
+        "data-date": iso,
+        "aria-pressed": String(done),
+        disabled: future ? "" : null,
+      }, habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
+        Planner.habitTimeOn(habit, iso) ? h("span", { class: "pill-time", text: Planner.habitTimeOn(habit, iso).start }) : null,
+        habit.name,
+        ["little", "rest"].includes(habitStateOn(habit.id, iso)) ? h("span", { class: "pill-state", text: stateLabel(habit.id, iso).toLowerCase() }) : null);
+    }));
+  }
+
+  // ---------- habit editor ----------
+  let habitDraft = null;
+
+  function weekdayOrder() {
+    return state.settings.weekStart === 0 ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0];
+  }
+
+  function renderHabitEditor() {
+    const draft = habitDraft;
+    els.habitIconPicker.replaceChildren(
+      h("button", { type: "button", class: `icon-choice${draft.icon ? "" : " active"}`, "data-icon": "", "aria-pressed": String(!draft.icon), title: t("habitNoIcon"), "aria-label": t("habitNoIcon") },
+        h("i", { class: "habit-dot", "aria-hidden": "true" })),
+      ...Planner.HABIT_ICONS.map((icon) => h("button", {
+        type: "button",
+        class: `icon-choice${draft.icon === icon ? " active" : ""}`,
+        "data-icon": icon,
+        "aria-pressed": String(draft.icon === icon),
+        title: t(`icon-${icon}`),
+        "aria-label": t(`icon-${icon}`),
+      }, habitIconEl(icon))));
+    els.habitIconPicker.style.setProperty("--habit", draft.color);
+
+    renderHabitRows();
+    els.habitSince.value = draft.since || "";
+    els.habitUntil.value = draft.until || "";
+    els.habitUntil.min = draft.since || "";
+    els.habitEndToggle.textContent = draft.until ? t("habitReactivate") : t("habitEndToday");
+
+    els.habitColorPicker.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
+      type: "button",
+      class: `cal-color${color === draft.color ? " active" : ""}`,
+      "data-color": color,
+      "aria-pressed": String(color === draft.color),
+      "aria-label": color,
+      style: `--cat: ${color}`,
+    })));
+  }
+
+  // "When": rows of days + time + duration. A day belongs to one row at most.
+  function renderHabitRows() {
+    const rows = habitDraft.rows;
+    const sunday = new Date(2026, 0, 4); // a Sunday, only for weekday names
+    els.habitRows.replaceChildren(...rows.map((row, index) => {
+      const duration = h("select", { "data-row-duration": index, "aria-label": t("habitDuration") });
+      fillSelect(duration, DURATION_OPTIONS, "—", formatDuration);
+      duration.value = row.start ? String(row.duration || 60) : "";
+      duration.disabled = !row.start;
+      return h("div", { class: "schedule-row" },
+        h("div", { class: "day-picker" }, weekdayOrder().map((day) => {
+          const on = row.days.includes(day);
+          const name = formatDate(Planner.addDays(sunday, day), { weekday: "long" });
+          return h("button", {
+            type: "button",
+            class: `day-choice${on ? " active" : ""}${day === 0 ? " is-sun" : day === 6 ? " is-sat" : ""}`,
+            "data-row": index,
+            "data-day": day,
+            "aria-pressed": String(on),
+            "aria-label": name,
+            title: capitalize(name),
+            text: formatDate(Planner.addDays(sunday, day), { weekday: "narrow" }),
+          });
+        })),
+        h("div", { class: "schedule-time" },
+          h("input", { type: "time", step: "900", value: row.start || "", "data-row-start": index, "aria-label": t("habitTime") }),
+          duration,
+          rows.length > 1
+            ? h("button", { type: "button", class: "row-remove", "data-row-remove": index, title: t("habitRemoveTime"), "aria-label": t("habitRemoveTime"), text: "×" })
+            : null));
+    }));
+    const days = new Set(rows.flatMap((row) => row.days));
+    els.habitDaysHint.textContent = !days.size ? t("habitNoDaysHint")
+      : days.size === 7 ? t("habitEveryDay")
+        : days.size === 1 ? t("habitDaysOne") : t("habitDaysCount", { n: days.size });
+  }
+
+  // ---------- habit detail ----------
+  let detailHabitId = null;
+
+  function renderHabitDetail() {
+    const habit = state.habits.find((candidate) => candidate.id === detailHabitId);
+    if (!habit) return;
+    const today = todayISO();
+    // The month being looked at in Habits, otherwise this month.
+    const reference = state.view === "habits" ? state.anchor : new Date();
+    const year = reference.getFullYear();
+    const month = reference.getMonth();
+    const stats = Planner.habitMonth(state.habitLog, habit, year, month, today);
+    const streak = Planner.habitStreak(state.habitLog, habit, today);
+
+    els.habitDetail.style.setProperty("--habit", habit.color);
+    els.habitDetailIcon.replaceChildren(habitMark(habit));
+    els.habitDetailTitle.textContent = habit.name;
+    els.habitDetailMeta.replaceChildren(...habitScheduleParts(habit).map((part) => h("span", { text: part })));
+    els.habitDetailMonth.textContent = capitalize(formatDate(new Date(year, month, 1), { month: "long", year: "numeric" }));
+
+    const stat = (value, label) => h("div", { class: "detail-stat" }, h("strong", { text: value }), h("span", { text: label }));
+    els.habitDetailStats.replaceChildren(
+      stat(String(stats.done + stats.extra), t("habitDone")),
+      stat(String(streak), t("habitStreakLabel")),
+      stat(stats.elapsed ? `${Math.round((stats.score / stats.elapsed) * 100)}%` : "—", t("habitConsistency")));
+
+    // Two weeks ending with this one, laid out in weekday columns.
+    const weekStart = Planner.startOfWeek(Core.parseISODate(today), state.settings.weekStart);
+    const days = Array.from({ length: 14 }, (_, index) => Planner.addDays(weekStart, index - 7));
+    els.habitDetailDays.replaceChildren(
+      ...days.slice(0, 7).map((day) => h("span", { class: "dd-head", text: formatDate(day, { weekday: "narrow" }) })),
+      ...days.map((day) => {
+        const iso = Core.toISODate(day);
+        const done = Planner.habitDone(state.habitLog, iso, habit.id);
+        const planned = Planner.habitScheduled(habit, iso);
+        const future = iso > today;
+        const label = [t("habitCell", { habit: habit.name, date: shortDate(iso) }), planned ? "" : t("habitExtraDay"), stateLabel(habit.id, iso)].filter(Boolean).join(" · ");
+        return h("button", {
+          type: "button",
+          class: `dd-cell${stateClass(habit.id, iso)}${planned ? "" : " is-off"}${iso === today ? " is-today" : ""}`,
+          "data-habit-cell": habit.id,
+          "data-date": iso,
+          "aria-pressed": String(done),
+          "aria-label": label,
+          title: label,
+          disabled: future || !Planner.habitActive(habit, iso) ? "" : null,
+        }, h("span", { class: "dd-num", text: day.getDate() }));
+      }));
+
+    const insight = Planner.habitInsight(state.habitLog, habit, today);
+    els.habitDetailInsight.textContent = insight.kind === "best"
+      ? t("insightBest", { day: t("insightDays").split("|")[insight.day] })
+      : insight.kind === "perfect" ? t("insightPerfect") : t("insightNone");
+  }
+
+  function openHabitDetail(id) {
+    detailHabitId = id;
+    renderHabitDetail();
+    if (!els.habitDetail.open) els.habitDetail.showModal();
+  }
+
+  function openHabitEditor(id) {
+    const habit = state.habits.find((candidate) => candidate.id === id);
+    if (!habit) return;
+    habitDraft = { ...habit, rows: Planner.scheduleRows(habit) };
+    els.habitEditName.value = habit.name;
+    renderHabitEditor();
+    els.habitDialog.showModal();
+  }
+
+  function addHabit(name, { icon = null, days = [] } = {}) {
+    const clean = String(name || "").trim().slice(0, 60);
+    if (!clean || state.habits.some((habit) => habit.name.toLowerCase() === clean.toLowerCase())) return;
+    const used = new Set(state.habits.map((habit) => habit.color));
+    const color = Planner.PALETTE.find((candidate) => !used.has(candidate)) || Planner.PALETTE[state.habits.length % Planner.PALETTE.length];
+    const id = Planner.newId();
+    state.habits = Planner.normalizeHabits([...state.habits, { id, name: clean, color, icon, days, since: todayISO() }]);
+    persistHabits();
+    render();
+    // Straight into the editor, so days and a time are set while it's fresh.
+    openHabitEditor(id);
+  }
+
+  const weekdayShort = (day) => formatDate(Planner.addDays(new Date(2026, 0, 4), day), { weekday: "short" }).replace(".", "").toLowerCase();
+
+  // ["07:00 · mon wed fri"], ["mon wed 07:00", "fri 18:00"], ["Every day"], …
+  function habitScheduleParts(habit) {
+    const planned = weekdayOrder().filter((day) => !habit.days.length || habit.days.includes(day));
+    const times = habit.times || {};
+    if (Object.keys(times).length) {
+      const groups = [];
+      planned.forEach((day) => {
+        const start = times[String(day)]?.start || null;
+        const group = groups.find((candidate) => candidate.start === start);
+        if (group) group.days.push(day);
+        else groups.push({ start, days: [day] });
+      });
+      return groups.map((group) => `${group.days.map(weekdayShort).join(" ")}${group.start ? ` ${group.start}` : ""}`);
+    }
+    const days = habit.days.length ? planned.map(weekdayShort).join(" ") : t("habitEveryDay");
+    return [habit.start ? `${habit.start} · ${days}` : days];
   }
 
   function renderSidebar() {
+    els.dumpCount.textContent = state.dump.length || "";
     const overdue = Planner.overdueItems(state.items, todayISO());
     els.overdueSection.hidden = overdue.length === 0;
     els.overdueCount.textContent = overdue.length || "";
@@ -995,12 +1759,14 @@
     els.dayView.hidden = state.view !== "day";
     els.weekView.hidden = state.view !== "week";
     els.monthView.hidden = state.view !== "month";
-    els.placeholderView.hidden = state.view !== "habits";
+    els.habitsView.hidden = state.view !== "habits";
+    els.dumpView.hidden = state.view !== "dump";
     renderTopbar();
     if (state.view === "day") renderDayView();
     else if (state.view === "week") renderSpread();
     else if (state.view === "month") renderMonthView();
-    else renderPlaceholder();
+    else if (state.view === "habits") renderHabitsView();
+    else renderDump();
     renderSidebar();
   }
 
@@ -1021,7 +1787,7 @@
   function shift(direction) {
     if (state.view === "day") state.anchor = Planner.addDays(state.anchor, direction);
     else if (state.view === "week") state.anchor = Planner.addDays(state.anchor, direction * 7);
-    else if (state.view === "month") state.anchor = new Date(state.anchor.getFullYear(), state.anchor.getMonth() + direction, 1);
+    else state.anchor = new Date(state.anchor.getFullYear(), state.anchor.getMonth() + direction, 1);
     render();
   }
 
@@ -1054,7 +1820,6 @@
       chip.classList.toggle("active", quick[chip.dataset.dateQuick] === draft.date);
     });
 
-    fillSelect(els.itemStart, START_OPTIONS, t("noTimeOption"), (value) => value);
     fillSelect(els.itemDuration, DURATION_OPTIONS, "—", formatDuration);
     els.itemStart.value = draft.start || "";
     els.itemDuration.value = draft.duration ? String(draft.duration) : "";
@@ -1224,6 +1989,10 @@
       waterUnit: state.settings.waterUnit,
       glassMl: String(state.settings.glassMl),
       alwaysOnTop: alwaysOnTop() ? "on" : "off",
+      notifyOn: state.settings.notifyOn ? "on" : "off",
+      notifyLead: String(state.settings.notifyLead),
+      morningOn: state.settings.morningOn ? "on" : "off",
+      closureOn: state.settings.closureOn ? "on" : "off",
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
       seg.querySelectorAll("button").forEach((button) => {
@@ -1237,6 +2006,8 @@
     els.settingsDialog.querySelector('[data-step="250"]').disabled = state.settings.waterGoal >= Planner.WATER_GOAL.max;
     const unitButton = els.settingsDialog.querySelector('[data-setting="waterUnit"] [data-value="glasses"]');
     unitButton.textContent = t(Planner.isBottle(state.settings.glassMl) ? "waterUnitBottles" : "waterUnitGlasses");
+    renderCalendarSettings();
+    renderNotifySettings();
     els.windowGroup.hidden = !desktop;
     const count = Store.pruneTrash().length;
     els.trashSummary.textContent = t("trashCount", { count });
@@ -1273,11 +2044,128 @@
       if (setting === "glassMl" && Planner.CONTAINER_SIZES.includes(Number(value))) state.settings.glassMl = Number(value);
       persistSettings();
       render();
+    } else if (setting === "notifyOn" || setting === "morningOn" || setting === "closureOn") {
+      state.settings[setting] = value === "on";
+      persistSettings();
+    } else if (setting === "notifyLead") {
+      state.settings.notifyLead = [5, 10, 15, 30].includes(Number(value)) ? Number(value) : 10;
+      persistSettings();
     } else if (setting === "alwaysOnTop") {
       Store.setRaw(KEYS.alwaysOnTop, value);
       desktop?.setAlwaysOnTop(value === "on");
     }
     renderSettings();
+  }
+
+  // ---------- calendar subscriptions (Settings → Calendars) ----------
+  let calendarColor = null;
+  let calendarBusy = false;
+
+  function timeAgo(timestamp) {
+    const minutes = Math.round((Date.now() - timestamp) / 60000);
+    const format = new Intl.RelativeTimeFormat(I18n.language === "pt" ? "pt-BR" : "en-GB", { numeric: "auto" });
+    if (minutes < 1) return format.format(0, "minute");
+    if (minutes < 60) return format.format(-minutes, "minute");
+    if (minutes < 60 * 24) return format.format(-Math.round(minutes / 60), "hour");
+    return format.format(-Math.round(minutes / 1440), "day");
+  }
+
+  function renderCalendarSettings() {
+    els.calWebNote.hidden = Boolean(calendarsApi);
+    els.calAddForm.hidden = !calendarsApi;
+    els.calHead.hidden = !calendarsApi || state.calendars.length === 0;
+    if (!calendarsApi) {
+      els.calList.replaceChildren();
+      return;
+    }
+    els.calSummary.textContent = t("calEvents", { n: state.events.length });
+    els.calList.replaceChildren(...(state.calendars.length
+      ? state.calendars.map((calendar) => {
+        const status = calendar.error
+          ? t(`calErr-${calendar.error}`)
+          : calendar.lastSync ? t("calSynced", { when: timeAgo(calendar.lastSync) }) : t("calSyncing");
+        return h("li", { class: `cal-row${calendar.enabled ? "" : " is-hidden"}`, style: `--cat: ${calendar.color}` },
+          h("span", { class: "cal-dot", "aria-hidden": "true" }),
+          h("div", { class: "cal-info" },
+            h("strong", { text: calendar.name }),
+            h("span", { class: `cal-meta${calendar.error ? " is-error" : ""}`, text: `${calendar.host} · ${t("calEvents", { n: calendar.count })} · ${status}` })),
+          h("button", {
+            type: "button",
+            class: "cal-toggle",
+            "data-cal-toggle": calendar.id,
+            "aria-pressed": String(calendar.enabled),
+            title: calendar.enabled ? t("calHide") : t("calShow"),
+            text: calendar.enabled ? t("calShown") : t("calHidden"),
+          }),
+          h("button", { type: "button", class: "cal-remove", "data-cal-remove": calendar.id, title: t("calRemove"), "aria-label": t("calRemove"), text: "×" }));
+      })
+      : [h("li", { class: "cal-empty", text: t("calEmpty") })]));
+
+    const used = new Set(state.calendars.map((calendar) => calendar.color));
+    if (!calendarColor) calendarColor = Planner.PALETTE.find((color) => !used.has(color)) || Planner.PALETTE[0];
+    els.calColors.replaceChildren(...Planner.PALETTE.map((color) => h("button", {
+      type: "button",
+      class: `cal-color${color === calendarColor ? " active" : ""}`,
+      "data-cal-color": color,
+      "aria-pressed": String(color === calendarColor),
+      "aria-label": color,
+      style: `--cat: ${color}`,
+    })));
+    els.calAddBtn.disabled = calendarBusy;
+  }
+
+  function applyCalendars(payload) {
+    state.calendars = Array.isArray(payload?.calendars) ? payload.calendars : [];
+    state.events = Array.isArray(payload?.events) ? payload.events : [];
+    render();
+    if (els.settingsDialog.open) renderCalendarSettings();
+  }
+
+  els.calAddForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!calendarsApi || calendarBusy) return;
+    calendarBusy = true;
+    els.calStatus.className = "cal-status";
+    els.calStatus.textContent = t("calAdding");
+    renderCalendarSettings();
+    const result = await calendarsApi.add({ name: els.calName.value, color: calendarColor, url: els.calUrl.value });
+    calendarBusy = false;
+    if (result?.ok) {
+      els.calName.value = "";
+      els.calUrl.value = "";
+      calendarColor = null;
+      els.calStatus.textContent = t("calAdded", { n: result.calendar.count });
+    } else {
+      els.calStatus.className = "cal-status is-error";
+      els.calStatus.textContent = t(`calErr-${result?.error || "network"}`);
+    }
+    renderCalendarSettings();
+  });
+
+  els.settingsDialog.addEventListener("click", async (event) => {
+    const color = event.target.closest("[data-cal-color]");
+    const toggle = event.target.closest("[data-cal-toggle]");
+    const remove = event.target.closest("[data-cal-remove]");
+    if (color) {
+      calendarColor = color.dataset.calColor;
+      renderCalendarSettings();
+    } else if (toggle && calendarsApi) {
+      const calendar = calendarById(toggle.dataset.calToggle);
+      if (calendar) applyCalendars(await calendarsApi.update(calendar.id, { enabled: !calendar.enabled }));
+    } else if (remove && calendarsApi) {
+      const calendar = calendarById(remove.dataset.calRemove);
+      if (calendar && window.confirm(t("calRemoveConfirm", { name: calendar.name }))) {
+        applyCalendars(await calendarsApi.remove(calendar.id));
+      }
+    } else if (event.target.closest("#calRefresh") && calendarsApi) {
+      els.calSummary.textContent = t("calSyncing");
+      applyCalendars(await calendarsApi.refresh());
+    }
+  });
+
+  if (calendarsApi) {
+    calendarsApi.get().then(applyCalendars).catch(() => {});
+    calendarsApi.onUpdate(applyCalendars);
   }
 
   // Settings are split into tabs so the sheet stays short.
@@ -1411,6 +2299,7 @@
   els.weekNotes.addEventListener("blur", saveNotes);
 
   els.dayNotes.addEventListener("input", () => {
+    fitDayNotes();
     clearTimeout(dayNotesTimer);
     dayNotesTimer = setTimeout(saveDayNotes, 500);
   });
@@ -1429,6 +2318,332 @@
     state.water = Planner.setWater(state.water, iso, next);
     persistWater();
     renderWater(iso);
+  });
+
+  // Habit cells (habits page) and pills (day page) share one handler.
+  document.addEventListener("click", (event) => {
+    const option = event.target.closest(".state-menu [data-state]");
+    if (option) {
+      const menu = option.closest(".state-menu");
+      setHabitDay(menu.dataset.habit, menu.dataset.date, option.dataset.state || null);
+      closeStateMenu();
+      return;
+    }
+    if (!event.target.closest(".state-menu")) closeStateMenu();
+    const cell = event.target.closest("[data-habit-cell]");
+    if (cell && !cell.disabled) {
+      if (Planner.habitState(state.habitLog, cell.dataset.date, cell.dataset.habitCell)) openStateMenu(cell);
+      else setHabitDay(cell.dataset.habitCell, cell.dataset.date, "done");
+      return;
+    }
+    const idea = event.target.closest("[data-habit-idea]");
+    if (idea) {
+      const preset = habitIdeas().find((candidate) => candidate.name === idea.dataset.habitIdea);
+      addHabit(idea.dataset.habitIdea, preset || {});
+      return;
+    }
+    const edit = event.target.closest("[data-habit-edit]");
+    if (edit) openHabitDetail(edit.dataset.habitEdit);
+  });
+
+  els.habitDialog.addEventListener("click", (event) => {
+    if (event.target === els.habitDialog) {
+      els.habitDialog.close();
+      return;
+    }
+    const icon = event.target.closest("[data-icon]");
+    const day = event.target.closest("[data-day]");
+    const color = event.target.closest("[data-color]");
+    const remove = event.target.closest("[data-row-remove]");
+    if (icon) habitDraft.icon = icon.dataset.icon || null;
+    else if (color) habitDraft.color = color.dataset.color;
+    else if (day) {
+      const value = Number(day.dataset.day);
+      const row = habitDraft.rows[Number(day.dataset.row)];
+      if (row.days.includes(value)) row.days = row.days.filter((other) => other !== value);
+      else {
+        // A day can only have one time: picking it here takes it from other rows.
+        habitDraft.rows.forEach((other) => { other.days = other.days.filter((candidate) => candidate !== value); });
+        row.days = [...row.days, value].sort((a, b) => a - b);
+      }
+      renderHabitRows();
+      return;
+    } else if (remove) {
+      habitDraft.rows.splice(Number(remove.dataset.rowRemove), 1);
+      renderHabitRows();
+      return;
+    } else return;
+    renderHabitEditor();
+  });
+
+  els.habitEditForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const name = els.habitEditName.value.trim().slice(0, 60) || habitDraft.name;
+    const { rows, ...draft } = habitDraft;
+    const saved = { ...draft, ...Planner.habitFromRows(rows) };
+    state.habits = Planner.normalizeHabits(state.habits.map((habit) => (habit.id === habitDraft.id ? { ...saved, name } : habit)));
+    persistHabits();
+    els.habitDialog.close();
+    render();
+  });
+  els.habitEditCancel.addEventListener("click", () => els.habitDialog.close());
+  els.habitDetailClose.addEventListener("click", () => els.habitDetail.close());
+  els.habitDetailEdit.addEventListener("click", () => {
+    els.habitDetail.close();
+    openHabitEditor(detailHabitId);
+  });
+  els.habitDetail.addEventListener("click", (event) => {
+    if (event.target === els.habitDetail) els.habitDetail.close();
+  });
+  // Times are typed or stepped in a time field; the row isn't redrawn while
+  // typing, only the duration next to it is switched on or off.
+  els.habitRows.addEventListener("input", (event) => {
+    const start = event.target.closest("[data-row-start]");
+    if (!start) return;
+    const row = habitDraft.rows[Number(start.dataset.rowStart)];
+    row.start = Planner.isTime(start.value) ? start.value : null;
+    const duration = els.habitRows.querySelector(`[data-row-duration="${start.dataset.rowStart}"]`);
+    duration.disabled = !row.start;
+    if (row.start && !duration.value) duration.value = String(row.duration || 60);
+  });
+  els.habitRows.addEventListener("change", (event) => {
+    const duration = event.target.closest("[data-row-duration]");
+    if (duration) habitDraft.rows[Number(duration.dataset.rowDuration)].duration = Number(duration.value) || 60;
+  });
+  els.habitSince.addEventListener("change", () => {
+    habitDraft.since = els.habitSince.value || todayISO();
+    if (habitDraft.until && habitDraft.until < habitDraft.since) habitDraft.until = null;
+    renderHabitEditor();
+  });
+  els.habitUntil.addEventListener("change", () => {
+    habitDraft.until = els.habitUntil.value || null;
+    renderHabitEditor();
+  });
+  // Ending keeps the history; reactivating just clears the end date.
+  els.habitEndToggle.addEventListener("click", () => {
+    habitDraft.until = habitDraft.until ? null : todayISO();
+    if (habitDraft.since && habitDraft.until && habitDraft.until < habitDraft.since) habitDraft.since = habitDraft.until;
+    renderHabitEditor();
+  });
+  els.habitAddRow.addEventListener("click", () => {
+    habitDraft.rows.push({ days: [], start: null, duration: 60 });
+    renderHabitRows();
+  });
+  els.habitEditDelete.addEventListener("click", () => {
+    const habit = habitDraft;
+    if (!habit || !window.confirm(t("habitRemoveConfirm", { name: habit.name }))) return;
+    state.habits = state.habits.filter((candidate) => candidate.id !== habit.id);
+    state.habitLog = Planner.forgetHabit(state.habitLog, habit.id);
+    persistHabits();
+    els.habitDialog.close();
+    render();
+  });
+
+  // ---------- brain dump ----------
+  function renderDump() {
+    els.dumpSortTitle.textContent = state.dump.length ? t("dumpSortTitleN", { n: state.dump.length }) : t("dumpSortTitle");
+    els.dumpAllInbox.hidden = state.dump.length < 2;
+    els.dumpEmpty.hidden = state.dump.length > 0;
+    els.dumpList.replaceChildren(...state.dump.map((note) => h("li", { class: "dump-note", "data-dump": note.id },
+      h("span", { class: "dump-when", text: shortDate(Core.toISODate(new Date(note.createdAt))) }),
+      h("span", { class: "dump-text", text: note.text }),
+      h("span", { class: "dump-actions" },
+        ...[["today", "dumpToday"], ["tomorrow", "dumpTomorrow"], ["inbox", "dumpInbox"], ["note", "dumpNote"]].map(([action, key]) => h("button", {
+          type: "button",
+          class: "dump-action",
+          "data-dump-action": action,
+          text: t(key),
+        })),
+        h("button", { type: "button", class: "dump-action discard", "data-dump-action": "discard", title: t("dumpDiscard"), "aria-label": t("dumpDiscard"), text: "×" })))));
+  }
+
+  function openDump() {
+    document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
+    setView("dump");
+    els.dumpInput.focus();
+  }
+
+  // Sorting a thought: a task (today / tomorrow / to schedule, with the
+  // usual #tag, !urgent and time syntax), a line in today's notes, or gone.
+  function sortDumpNote(id, action) {
+    const note = state.dump.find((candidate) => candidate.id === id);
+    if (!note) return;
+    const index = state.dump.indexOf(note);
+    state.dump = state.dump.filter((candidate) => candidate.id !== id);
+    persistDump();
+    const today = todayISO();
+    if (action === "today" || action === "tomorrow" || action === "inbox") {
+      const date = action === "today" ? today : action === "tomorrow" ? Core.toISODate(Planner.addDays(Core.parseISODate(today), 1)) : null;
+      const parsed = Planner.parseCapture(note.text);
+      capture(note.text, parsed.date ? null : date);
+    } else if (action === "note") {
+      const current = state.dayNotes[today] || "";
+      state.dayNotes = { ...state.dayNotes, [today]: `${current}${current && !current.endsWith("\n") ? "\n" : ""}• ${note.text}` };
+      persistDayNotes();
+      dayNotesKey = null;
+      render();
+    } else {
+      render();
+      toast(t("dumpDiscarded"), t("undo"), () => {
+        const list = [...state.dump];
+        list.splice(Math.min(index, list.length), 0, note);
+        state.dump = list;
+        persistDump();
+        render();
+        render();
+      });
+    }
+    renderDump();
+  }
+
+  els.dumpList.addEventListener("click", (event) => {
+    const action = event.target.closest("[data-dump-action]");
+    if (action) sortDumpNote(action.closest("[data-dump]").dataset.dump, action.dataset.dumpAction);
+  });
+  els.dumpForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const lines = Planner.parseDump(els.dumpInput.value);
+    if (!lines.length) return;
+    const now = Date.now();
+    state.dump = [...state.dump, ...lines.map((text, index) => ({ id: Planner.newId(), text, createdAt: now + index }))];
+    persistDump();
+    els.dumpInput.value = "";
+    render();
+    toast(lines.length === 1 ? t("dumpSavedOne") : t("dumpSaved", { n: lines.length }));
+    els.dumpInput.focus();
+  });
+  els.dumpInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      els.dumpForm.requestSubmit();
+    }
+  });
+  els.dumpAllInbox.addEventListener("click", () => {
+    [...state.dump].forEach((note) => sortDumpNote(note.id, "inbox"));
+  });
+
+  // ---------- closing the day ----------
+  // Offered for today and yesterday (closing late counts too).
+  function renderClosure(iso) {
+    const closed = state.closures[iso];
+    const yesterday = Core.toISODate(Planner.addDays(Core.parseISODate(todayISO()), -1));
+    els.closeDayBtn.hidden = Boolean(closed) || (iso !== todayISO() && iso !== yesterday);
+    els.closedLine.hidden = !closed;
+    if (closed) {
+      els.closedLine.replaceChildren(
+        h("span", { class: "closed-mark", text: `✓ ${t("closedLine")}` }),
+        closed.good ? h("span", { class: "closed-good", text: `“${closed.good}”` }) : null,
+        h("button", { type: "button", class: "focus-action", id: "reopenClosure", text: t("closedReopen") }));
+    }
+  }
+
+  function closureRecap(iso) {
+    const items = Planner.itemsForDay(state.items, iso).filter((item) => item.focus !== "later");
+    const parts = [];
+    if (items.length) parts.push(t("closeRecapTasks", { done: items.filter((item) => item.done).length, total: items.length }));
+    const habits = state.habits.filter((habit) => Planner.habitDone(state.habitLog, iso, habit.id)).length;
+    if (habits) parts.push(habits === 1 ? t("closeRecapHabit") : t("closeRecapHabits", { n: habits }));
+    if (state.water[iso]) parts.push(Planner.formatVolume(state.water[iso] * state.settings.glassMl, I18n.language));
+    if (state.moods[iso]) parts.push(t("closeRecapMood", { mood: t(`mood-${state.moods[iso]}`).toLowerCase() }));
+    return parts.join(" · ");
+  }
+
+  let closureISO = null;
+
+  function openClosure(iso = anchorISO()) {
+    closureISO = iso;
+    const left = state.items.filter((item) => item.date === iso && !item.done).length;
+    els.closureRecap.textContent = closureRecap(iso);
+    els.closureRecap.hidden = !els.closureRecap.textContent;
+    els.closureGood.value = state.closures[iso]?.good || "";
+    els.closureLeft.hidden = left === 0;
+    els.closureCount.textContent = left ? `· ${t("closeLeftCount", { n: left })}` : "";
+    els.closureForm.querySelector('input[value="tomorrow"]').checked = true;
+    els.closureDialog.showModal();
+    els.closureGood.focus();
+  }
+
+  els.closeDayBtn.addEventListener("click", () => openClosure());
+  els.closedLine.addEventListener("click", (event) => {
+    if (event.target.closest("#reopenClosure")) openClosure();
+  });
+  els.closureCancel.addEventListener("click", () => els.closureDialog.close());
+  els.closureDialog.addEventListener("click", (event) => {
+    if (event.target === els.closureDialog) els.closureDialog.close();
+  });
+  els.closureForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const iso = closureISO || anchorISO();
+    const choice = els.closureForm.querySelector('input[name="closureChoice"]:checked')?.value || "stay";
+    const tomorrow = Core.toISODate(Planner.addDays(Core.parseISODate(iso), 1));
+    if (!els.closureLeft.hidden) state.items = Planner.closeDay(state.items, iso, choice, tomorrow);
+    state.closures = { ...state.closures, [iso]: { good: els.closureGood.value.trim().slice(0, 500), closedAt: Date.now() } };
+    Store.save(KEYS.closures, state.closures);
+    els.closureDialog.close();
+    commit();
+    toast(t("closeDone"));
+  });
+
+  // ---------- gentle habit states ----------
+  function setHabitDay(habitId, iso, value) {
+    state.habitLog = Planner.setHabitState(state.habitLog, iso, habitId, value);
+    persistHabits();
+    render();
+    if (els.habitDetail.open) renderHabitDetail();
+    if (value === "little") toast(t("littleCounts"));
+    else if (value === "rest") toast(t("restCounts"));
+  }
+
+  // A small menu next to a marked day: done / a little / rest / clear.
+  function openStateMenu(cell) {
+    closeStateMenu();
+    const habitId = cell.dataset.habitCell;
+    const iso = cell.dataset.date;
+    const current = Planner.habitState(state.habitLog, iso, habitId);
+    const habit = state.habits.find((candidate) => candidate.id === habitId);
+    const menu = h("div", { class: "state-menu", role: "menu", "data-habit": habitId, "data-date": iso, style: `--habit: ${habit?.color || "var(--ink)"}` },
+      ...Planner.HABIT_STATES.map((value) => h("button", {
+        type: "button",
+        role: "menuitemradio",
+        "aria-checked": String(current === value),
+        class: `state-option${current === value ? " active" : ""}`,
+        "data-state": value,
+      }, h("i", { class: `state-dot is-${value}`, "aria-hidden": "true" }),
+        h("span", { class: "state-text" }, h("strong", { text: t(STATE_LABELS[value]) }), h("small", { text: t(`${STATE_LABELS[value]}Hint`) })))),
+      h("button", { type: "button", role: "menuitem", class: "state-option clear", "data-state": "" }, t("stateClear")));
+    // Inside a modal dialog the menu has to live in the dialog to be seen.
+    (cell.closest("dialog") || document.body).append(menu);
+    const rect = cell.getBoundingClientRect();
+    const left = Math.min(Math.max(8, rect.left + rect.width / 2 - menu.offsetWidth / 2), innerWidth - menu.offsetWidth - 8);
+    const below = rect.bottom + 6 + menu.offsetHeight < innerHeight;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${below ? rect.bottom + 6 : rect.top - menu.offsetHeight - 6}px`;
+    menu.querySelector(".state-option.active, .state-option")?.focus();
+  }
+
+  function closeStateMenu() {
+    document.querySelectorAll(".state-menu").forEach((menu) => menu.remove());
+  }
+
+  // Right-click (or the context-menu key) opens the choices on any day.
+  document.addEventListener("contextmenu", (event) => {
+    const cell = event.target.closest("[data-habit-cell]");
+    if (!cell || cell.disabled) return;
+    event.preventDefault();
+    openStateMenu(cell);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.querySelector(".state-menu")) {
+      event.stopPropagation();
+      closeStateMenu();
+    }
+  }, true);
+
+  els.habitForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    addHabit(els.habitInput.value);
+    els.habitInput.value = "";
+    els.habitInput.focus();
   });
 
   let moodReasonTimer = null;
@@ -1470,7 +2685,47 @@
     }
   });
 
+  // "+" on a group: a one-line field that adds straight into that group.
+  function openFocusCapture(focus) {
+    els.dayTasks.querySelector(".focus-capture")?.remove();
+    const group = els.dayTasks.querySelector(`.focus-group[data-focus="${focus}"]`);
+    if (!group) return;
+    const input = h("input", { maxlength: "200", autocomplete: "off", placeholder: t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), "aria-label": t("addToGroup", { group: t(FOCUS_LABELS[focus]) }) });
+    const form = h("form", { class: "focus-capture", "data-focus": focus }, input);
+    group.querySelector(".day-items").after(form);
+    group.querySelector(".focus-hint")?.remove();
+    input.focus();
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") form.remove();
+    });
+    input.addEventListener("blur", () => setTimeout(() => { if (!input.value.trim()) form.remove(); }, 150));
+  }
+
+  els.dayTasks.addEventListener("submit", (event) => {
+    const form = event.target.closest(".focus-capture");
+    if (!form) return;
+    event.preventDefault();
+    const focus = form.dataset.focus;
+    const item = capture(form.querySelector("input").value, anchorISO());
+    if (!item) return;
+    state.items = state.items.map((other) => (other.id === item.id ? { ...other, focus } : other));
+    commit();
+    openFocusCapture(focus); // ready for the next one
+  });
+
   els.dayTasks.addEventListener("click", (event) => {
+    const add = event.target.closest("[data-focus-add]");
+    if (add) {
+      openFocusCapture(add.dataset.focusAdd);
+      return;
+    }
+    const move = event.target.closest("[data-move-focus]");
+    if (move) {
+      const id = move.closest(".item").dataset.id;
+      state.items = Planner.moveItem(state.items, id, { date: anchorISO(), focus: move.dataset.moveFocus });
+      commit();
+      return;
+    }
     const button = event.target.closest("[data-later-tomorrow]");
     if (!button) return;
     const iso = button.dataset.laterTomorrow;
@@ -1575,14 +2830,15 @@
       if (event.key === "Escape") event.target.blur();
       return;
     }
-    const views = { 1: "day", 2: "week", 3: "month", 4: "habits" };
+    const views = { 1: "day", 2: "week", 3: "month", 4: "habits", 5: "dump" };
     if (views[event.key]) setView(views[event.key]);
     else if (event.key === "n" || event.key === "N") {
       event.preventDefault();
       (state.view === "day" ? els.dayCaptureInput : els.inboxInput).focus();
     } else if (event.key === "t" || event.key === "T") goToday();
-    else if (state.view !== "habits" && event.key === "ArrowLeft") shift(-1);
-    else if (state.view !== "habits" && event.key === "ArrowRight") shift(1);
+    else if (event.key === "b" || event.key === "B") openDump();
+    else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
+    else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
   });
 
   // ---------- drag & drop ----------
@@ -1679,13 +2935,141 @@
     document.body.classList.remove("is-dragging");
   });
 
+  // ---------- reminders (desktop notifications) ----------
+  // Shown keys live outside the app's data (not backed up) so a restart
+  // doesn't repeat a reminder; entries older than two days are dropped.
+  const NOTIFIED_KEY = "lowstate.notified";
+  let notified = {};
+  try {
+    notified = JSON.parse(localStorage.getItem(NOTIFIED_KEY) || "{}") || {};
+  } catch {
+    notified = {};
+  }
+  const saveNotified = () => {
+    const cutoff = Date.now() - 2 * 86400000;
+    notified = Object.fromEntries(Object.entries(notified).filter(([, at]) => at > cutoff));
+    try {
+      localStorage.setItem(NOTIFIED_KEY, JSON.stringify(notified));
+    } catch {
+      // Private mode or full storage: reminders may repeat after a restart.
+    }
+  };
+
+  function renderNotifySettings() {
+    els.notifyWebNote.textContent = t("notifyDesktopOnly");
+    els.notifyKinds.querySelectorAll("[data-notify-kind]").forEach((chip) => {
+      const on = state.settings.notifyKinds[chip.dataset.notifyKind] !== false;
+      chip.classList.toggle("active", on);
+      chip.setAttribute("aria-pressed", String(on));
+    });
+    if (document.activeElement !== els.morningAt) els.morningAt.value = state.settings.morningAt;
+    if (document.activeElement !== els.closureAt) els.closureAt.value = state.settings.closureAt;
+    els.notifyTest.disabled = !desktop?.notify;
+  }
+
+  // "3 meetings (first at 10:00) · Gym at 18:00 · 2 must-do"
+  function morningBody(iso) {
+    const parts = [];
+    const meetings = Planner.eventsForDay(state.events, iso).timed;
+    if (meetings.length === 1) parts.push(t("morningMeeting", { time: clockTime(new Date(meetings[0].start)) }));
+    else if (meetings.length > 1) parts.push(t("morningMeetings", { n: meetings.length, time: clockTime(new Date(meetings[0].start)) }));
+    state.habits.forEach((habit) => {
+      const time = Planner.habitTimeOn(habit, iso);
+      if (time) parts.push(t("morningHabit", { name: habit.name, time: time.start }));
+    });
+    const must = Planner.itemsForDay(state.items, iso).filter((item) => item.focus === "must" && !item.done).length;
+    if (must) parts.push(t("morningMust", { n: must }));
+    const overdue = Planner.overdueItems(state.items, iso).length;
+    if (overdue) parts.push(t("morningOverdue", { n: overdue }));
+    return parts.length ? parts.join(" · ") : t("morningEmpty");
+  }
+
+  // Checked every 30 seconds: anything whose moment has come in the last ten
+  // minutes and wasn't shown yet becomes a notification. Older ones (the
+  // computer was asleep) are skipped rather than delivered late.
+  function checkReminders() {
+    if (!desktop?.notify || !state.settings.notifyOn) return;
+    const now = Date.now();
+    const due = Planner.reminders({
+      items: state.items,
+      habits: state.habits,
+      habitLog: state.habitLog,
+      events: state.events,
+      now: new Date(now),
+      lead: state.settings.notifyLead,
+      kinds: state.settings.notifyKinds,
+      morningAt: state.settings.morningOn ? state.settings.morningAt : null,
+      closureAt: state.settings.closureOn && !state.closures[todayISO()] ? state.settings.closureAt : null,
+    }).filter((reminder) => reminder.at <= now && now - reminder.at < 10 * 60000 && !notified[reminder.key]);
+    if (!due.length) return;
+    due.forEach((reminder) => {
+      notified[reminder.key] = now;
+      if (reminder.kind === "closure") {
+        desktop.notify({ title: t("closeDay"), body: t("closeNotifyBody"), iso: reminder.iso, action: "closure" });
+        return;
+      }
+      if (reminder.kind === "morning") {
+        desktop.notify({ title: t("morningTitle"), body: morningBody(reminder.iso), iso: reminder.iso });
+        return;
+      }
+      const minutes = Math.max(0, Math.round((reminder.at + state.settings.notifyLead * 60000 - now) / 60000));
+      const when = minutes ? t("remindIn", { time: reminder.start, n: minutes }) : t("remindNow", { time: reminder.start });
+      const extra = reminder.kind === "meeting"
+        ? [reminder.event.location, calendarById(reminder.event.calendarId)?.name].filter(Boolean)
+        : [];
+      desktop.notify({
+        title: reminder.title || t("untitledEvent"),
+        body: [when, ...extra].join(" · "),
+        iso: reminder.iso,
+      });
+    });
+    saveNotified();
+  }
+
+  els.notifyKinds.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-notify-kind]");
+    if (!chip) return;
+    const kind = chip.dataset.notifyKind;
+    state.settings.notifyKinds = { ...state.settings.notifyKinds, [kind]: state.settings.notifyKinds[kind] === false };
+    persistSettings();
+    renderNotifySettings();
+  });
+  els.closureAt.addEventListener("change", () => {
+    if (!Planner.isTime(els.closureAt.value)) return;
+    state.settings.closureAt = els.closureAt.value;
+    persistSettings();
+  });
+  els.morningAt.addEventListener("change", () => {
+    if (!Planner.isTime(els.morningAt.value)) return;
+    state.settings.morningAt = els.morningAt.value;
+    persistSettings();
+  });
+  els.notifyTest.addEventListener("click", () => {
+    desktop?.notify?.({ title: "Lowstate", body: t("notifyTestBody"), iso: todayISO() });
+  });
+
+  if (desktop?.notify) {
+    setInterval(checkReminders, 30000);
+    setTimeout(checkReminders, 5000);
+    desktop.onOpenDay?.((iso, action) => {
+      document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
+      openDay(iso);
+      if (action === "closure") openClosure(iso);
+    });
+  }
+
   // ---------- desktop integration ----------
   if (desktop) {
     desktop.setAlwaysOnTop?.(alwaysOnTop());
     const shortcuts = Store.loadObject(KEYS.shortcuts);
     if (Object.keys(shortcuts).length) desktop.setShortcuts?.(shortcuts);
     // The global capture shortcut opens today's page ready to write.
-    desktop.onQuickCapture?.(() => {
+    desktop.onQuickCapture?.((mode) => {
+      // Cmd/Ctrl+Shift+B is the brain dump; the other shortcut opens today ready to write.
+      if (mode === "brain") {
+        openDump();
+        return;
+      }
       document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
       state.anchor = Core.startOfDay(new Date());
       setView("day");

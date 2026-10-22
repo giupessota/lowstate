@@ -158,6 +158,43 @@
   // Moves an item into a day (or back to the unscheduled list when date is
   // null), placing it before `beforeId` and reindexing that bucket's order.
   // `focus` optionally moves it into a must/could/later group as well.
+  // ---------- Brain dump ----------
+  // One thought per line; list bullets ("- ", "• ", "* ", "1. ", "[ ] ")
+  // are dropped, blank lines ignored.
+  function parseDump(text) {
+    return String(text || "")
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^\s*(?:[-•*·–]|\d+[.)]|\[\s?[xX]?\s?\])\s+/, "").trim())
+      .filter(Boolean)
+      .map((line) => line.slice(0, 280));
+  }
+
+  // 1.x Brain Inbox notes that were never processed, as dump entries.
+  function legacyDumpNotes(notes) {
+    return (Array.isArray(notes) ? notes : [])
+      .filter((note) => note && !note.processed && String(note.text || "").trim())
+      .map((note) => ({
+        id: typeof note.id === "string" && note.id ? note.id : newId(),
+        text: String(note.text).trim().slice(0, 280),
+        createdAt: Number.isFinite(note.createdAt) ? note.createdAt : Date.now(),
+      }));
+  }
+
+  // Closing a day: what happens to its unfinished tasks ("Not today" ones
+  // included). "tomorrow" moves them on (not-today ones come back as could
+  // do), "inbox" returns them to "To schedule", "stay" leaves them.
+  function closeDay(items, iso, choice, tomorrowISO) {
+    const open = items.filter((item) => item.date === iso && !item.done).map((item) => item.id);
+    if (choice === "tomorrow" && parseISODate(tomorrowISO)) {
+      return open.reduce((list, id) => {
+        const item = list.find((candidate) => candidate.id === id);
+        return moveItem(list, id, { date: tomorrowISO, focus: item.focus === "later" ? "could" : item.focus });
+      }, items);
+    }
+    if (choice === "inbox") return open.reduce((list, id) => moveItem(list, id, { date: null }), items);
+    return items;
+  }
+
   function moveItem(items, id, { date = null, beforeId = null, focus = null } = {}) {
     const moving = items.find((item) => item.id === id);
     if (!moving) return items;
@@ -466,6 +503,408 @@
   // ---------- Mood of the day ----------
   const MOODS = ["great", "good", "okay", "tiring", "stressed", "rough"];
 
+  // ---------- Habits ----------
+  // Habits are [{ id, name, color, icon, days }]; the log is
+  // { iso: [habitId, …] }. `days` lists the weekdays (0 = Sunday) a habit is
+  // planned for; an empty list means every day.
+  const HABIT_ICONS = ["dumbbell", "run", "bike", "swim", "yoga", "book", "pen", "lotus", "pill", "moon", "heart", "leaf"];
+
+  function normalizeDays(days) {
+    const list = [...new Set((Array.isArray(days) ? days : []).map(Number))]
+      .filter((day) => Number.isInteger(day) && day >= 0 && day <= 6)
+      .sort((a, b) => a - b);
+    return list.length === 7 ? [] : list;
+  }
+
+  // Per-weekday times: { "1": { start: "07:00", duration: 60 }, … }.
+  function normalizeTimes(raw) {
+    if (!raw || typeof raw !== "object") return {};
+    return Object.fromEntries(Object.entries(raw)
+      .filter(([day, time]) => /^[0-6]$/.test(day) && time && isTime(time.start))
+      .map(([day, time]) => [day, {
+        start: time.start,
+        duration: Number.isFinite(time.duration) && time.duration > 0 ? Math.min(Math.round(time.duration), 720) : 60,
+      }]));
+  }
+
+  function normalizeHabits(raw) {
+    if (!Array.isArray(raw)) return [];
+    const seen = new Set();
+    return raw
+      .filter((habit) => habit && typeof habit.id === "string" && String(habit.name ?? "").trim() && !seen.has(habit.id) && seen.add(habit.id))
+      .map((habit, index) => ({
+        id: habit.id,
+        name: String(habit.name).trim().slice(0, 60),
+        color: PALETTE.includes(habit.color) ? habit.color : PALETTE[index % PALETTE.length],
+        icon: HABIT_ICONS.includes(habit.icon) ? habit.icon : null,
+        days: normalizeDays(habit.days),
+        // Optional time of day, so a habit like the gym sits on the timeline:
+        // one for every planned day, or `times` per weekday.
+        start: isTime(habit.start) ? habit.start : null,
+        duration: isTime(habit.start) && Number.isFinite(habit.duration) && habit.duration > 0
+          ? Math.min(Math.round(habit.duration), 720)
+          : null,
+        times: normalizeTimes(habit.times),
+        // Active period: from `since` (inclusive) until `until` (inclusive,
+        // null = still going). Outside it the habit isn't planned or shown.
+        since: parseISODate(habit.since) ? habit.since : null,
+        until: parseISODate(habit.until) && (!parseISODate(habit.since) || habit.until >= habit.since) ? habit.until : null,
+      }));
+  }
+
+  function habitActive(habit, iso) {
+    return (!habit?.since || iso >= habit.since) && (!habit?.until || iso <= habit.until);
+  }
+
+  // Active in any day between `from` and `to` (ISO dates, inclusive).
+  function habitActiveBetween(habit, from, to) {
+    return (!habit?.since || habit.since <= to) && (!habit?.until || habit.until >= from);
+  }
+
+  function habitScheduled(habit, iso) {
+    if (!habitActive(habit, iso)) return false;
+    const days = habit?.days || [];
+    if (!days.length) return true;
+    const date = parseISODate(iso);
+    return Boolean(date) && days.includes(date.getDay());
+  }
+
+  // The habit's time on a day: that weekday's own time when it has per-day
+  // times, otherwise its single time; null when unplanned or untimed.
+  function habitTimeOn(habit, iso) {
+    if (!habit || !habitScheduled(habit, iso)) return null;
+    const times = habit.times || {};
+    if (Object.keys(times).length) {
+      const date = parseISODate(iso);
+      return (date && times[String(date.getDay())]) || null;
+    }
+    return habit.start ? { start: habit.start, duration: habit.duration || 60 } : null;
+  }
+
+  // The editor shows a habit's schedule as rows of { days, start, duration }:
+  // one row for "these days at this time", more rows for other times.
+  function scheduleRows(habit) {
+    const times = habit?.times || {};
+    if (!Object.keys(times).length) {
+      return [{ days: [...(habit?.days || [])], start: habit?.start || null, duration: habit?.duration || 60 }];
+    }
+    const planned = habit.days.length ? habit.days : [0, 1, 2, 3, 4, 5, 6];
+    const rows = [];
+    planned.forEach((day) => {
+      const time = times[String(day)] || null;
+      const key = time ? `${time.start}|${time.duration}` : "none";
+      let row = rows.find((candidate) => candidate.key === key);
+      if (!row) rows.push(row = { key, days: [], start: time?.start || null, duration: time?.duration || 60 });
+      row.days.push(day);
+    });
+    return rows.map(({ key, ...row }) => row);
+  }
+
+  // Back from rows: one row (or one row with days) keeps a single time;
+  // several become per-weekday times. No days picked at all = every day.
+  function habitFromRows(rows) {
+    const list = Array.isArray(rows) && rows.length ? rows : [{ days: [], start: null, duration: 60 }];
+    const used = list.filter((row) => row.days?.length);
+    if (used.length <= 1) {
+      const row = used[0] || list[0];
+      const start = isTime(row.start) ? row.start : null;
+      return { days: normalizeDays(row.days), start, duration: start ? row.duration || 60 : null, times: {} };
+    }
+    const times = {};
+    used.forEach((row) => {
+      if (isTime(row.start)) row.days.forEach((day) => { times[String(day)] = { start: row.start, duration: row.duration || 60 }; });
+    });
+    return { days: normalizeDays(used.flatMap((row) => row.days)), start: null, duration: null, times: normalizeTimes(times) };
+  }
+
+  const asHabit = (habitOrId) => (typeof habitOrId === "string" ? { id: habitOrId, days: [] } : habitOrId);
+
+  // Gentle habits: a day can be "done", "little" (some progress — still
+  // counts) or "rest" (skipped on purpose — not a miss). The log is
+  // { iso: { habitId: state } }; older logs ({ iso: [habitId] }) read as done.
+  const HABIT_STATES = ["done", "little", "rest"];
+
+  function normalizeHabitLog(raw) {
+    const out = {};
+    Object.entries(raw && typeof raw === "object" ? raw : {}).forEach(([iso, day]) => {
+      if (!parseISODate(iso)) return;
+      const entries = Array.isArray(day)
+        ? day.filter((id) => typeof id === "string").map((id) => [id, "done"])
+        : Object.entries(day && typeof day === "object" ? day : {}).filter(([, state]) => HABIT_STATES.includes(state));
+      if (entries.length) out[iso] = Object.fromEntries(entries);
+    });
+    return out;
+  }
+
+  function habitState(log, iso, id) {
+    const day = log?.[iso];
+    if (Array.isArray(day)) return day.includes(id) ? "done" : null;
+    return HABIT_STATES.includes(day?.[id]) ? day[id] : null;
+  }
+
+  // Did something that day: fully or a little.
+  function habitDone(log, iso, id) {
+    const state = habitState(log, iso, id);
+    return state === "done" || state === "little";
+  }
+
+  // Returns a new log with that day's state set (null clears it).
+  function setHabitState(log, iso, id, state) {
+    const { [iso]: day = {}, ...rest } = normalizeHabitLog(log);
+    const { [id]: _previous, ...others } = day;
+    const next = HABIT_STATES.includes(state) ? { ...others, [id]: state } : others;
+    return Object.keys(next).length ? { ...rest, [iso]: next } : rest;
+  }
+
+  // One tap: mark done, or clear whatever was there.
+  function toggleHabit(log, iso, id) {
+    return setHabitState(log, iso, id, habitState(log, iso, id) ? null : "done");
+  }
+
+  // Drops a removed habit from every day of the log.
+  function forgetHabit(log, id) {
+    return Object.fromEntries(Object.entries(normalizeHabitLog(log))
+      .map(([iso, day]) => {
+        const { [id]: _removed, ...others } = day;
+        return [iso, others];
+      })
+      .filter(([, day]) => Object.keys(day).length));
+  }
+
+  // Times done in a row, ending today — or yesterday, so an unchecked today
+  // doesn't break a streak before the day is over. Only a missed planned day
+  // breaks it; an extra day (done when not planned) adds to it.
+  function habitStreak(log, habitOrId, todayISO) {
+    const habit = asHabit(habitOrId);
+    let day = parseISODate(todayISO);
+    if (!day) return 0;
+    if (!habitDone(log, todayISO, habit.id)) day = addDays(day, -1);
+    let streak = 0;
+    for (let guard = 0; guard < 3660; guard++) {
+      const iso = toISODate(day);
+      if (habit.since && iso < habit.since) break;
+      if (habitDone(log, iso, habit.id)) streak += 1;
+      else if (habitState(log, iso, habit.id) !== "rest" && habitScheduled(habit, iso)) break;
+      day = addDays(day, -1);
+    }
+    return streak;
+  }
+
+  // A pattern from the last few weeks (today excluded, it isn't over):
+  // { kind: "perfect" } when no planned day was missed, { kind: "best", day,
+  // rate } for the weekday done most reliably, or { kind: "none" } when
+  // there isn't enough to say (weekdays need two planned days to count).
+  function habitInsight(log, habitOrId, todayISO, weeks = 8) {
+    const habit = asHabit(habitOrId);
+    const end = parseISODate(todayISO);
+    if (!end) return { kind: "none" };
+    const byDay = Array.from({ length: 7 }, (_, day) => ({ day, planned: 0, done: 0 }));
+    for (let back = 1; back <= weeks * 7; back++) {
+      const date = addDays(end, -back);
+      const iso = toISODate(date);
+      if (!habitScheduled(habit, iso) || habitState(log, iso, habit.id) === "rest") continue;
+      byDay[date.getDay()].planned += 1;
+      if (habitDone(log, iso, habit.id)) byDay[date.getDay()].done += 1;
+    }
+    const counted = byDay.filter((entry) => entry.planned >= 2);
+    const done = counted.reduce((sum, entry) => sum + entry.done, 0);
+    if (!counted.length || !done) return { kind: "none" };
+    if (counted.every((entry) => entry.done === entry.planned)) return { kind: "perfect" };
+    const best = counted
+      .map((entry) => ({ ...entry, rate: entry.done / entry.planned }))
+      .sort((a, b) => b.rate - a.rate || b.planned - a.planned)[0];
+    return { kind: "best", day: best.day, rate: best.rate };
+  }
+
+  // ---------- Patterns across mood, water, load and habits ----------
+  // Observations from the last `days` days (today excluded): days are split
+  // in two groups and only clear differences between groups that are big
+  // enough are reported, with the counts behind them. They describe what
+  // goes together, never what causes what.
+  const MOOD_SCORE = { great: 5, good: 4, okay: 3, tiring: 2, stressed: 2, rough: 1 };
+  const PATTERN_RULES = {
+    mood: { min: 5, diff: 0.5, scale: 4 },
+    load: { min: 4, diff: 1, scale: 10 },
+  };
+
+  const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
+
+  function comparison(a, b, rule) {
+    if (a.length < rule.min || b.length < rule.min) return null;
+    const diff = mean(a) - mean(b);
+    if (Math.abs(diff) < rule.diff) return null;
+    return { a: mean(a), b: mean(b), na: a.length, nb: b.length, diff, strength: Math.abs(diff) / rule.scale };
+  }
+
+  function patterns({ moods = {}, water = {}, waterTarget = 8, loads = {}, habits = [], habitLog = {}, todayISO, days = 56, limit = 3 } = {}) {
+    const today = parseISODate(todayISO);
+    if (!today) return { patterns: [], moodDays: 0 };
+    const isos = Array.from({ length: days }, (_, index) => toISODate(addDays(today, -(index + 1))));
+    const moodOf = (iso) => MOOD_SCORE[moods[iso]];
+    const moodIsos = isos.filter((iso) => moodOf(iso));
+    const loadOf = (iso) => (Number.isInteger(loads[iso]) ? loads[iso] : null);
+    const found = [];
+
+    // Mood on days the water goal was met vs. not (only when water is tracked).
+    if (isos.filter((iso) => water[iso] > 0).length >= PATTERN_RULES.mood.min) {
+      const met = moodIsos.filter((iso) => (water[iso] || 0) >= waterTarget).map(moodOf);
+      const missed = moodIsos.filter((iso) => (water[iso] || 0) < waterTarget).map(moodOf);
+      const result = comparison(met, missed, PATTERN_RULES.mood);
+      if (result) found.push({ kind: "mood-water", ...result });
+    }
+
+    habits.forEach((habit) => {
+      // Mood on planned days the habit was done vs. skipped.
+      const planned = moodIsos.filter((iso) => habitScheduled(habit, iso) && habitState(habitLog, iso, habit.id) !== "rest");
+      const withHabit = comparison(
+        planned.filter((iso) => habitDone(habitLog, iso, habit.id)).map(moodOf),
+        planned.filter((iso) => !habitDone(habitLog, iso, habit.id)).map(moodOf),
+        PATTERN_RULES.mood);
+      if (withHabit) found.push({ kind: "mood-habit", habitId: habit.id, ...withHabit });
+
+      // Reported load the day after a planned day, done vs. skipped.
+      const after = isos.filter((iso) => habitScheduled(habit, iso) && habitState(habitLog, iso, habit.id) !== "rest")
+        .map((iso) => ({ iso, next: toISODate(addDays(parseISODate(iso), 1)) }))
+        .filter(({ next }) => next < todayISO && loadOf(next) !== null);
+      const nextDay = comparison(
+        after.filter(({ iso }) => habitDone(habitLog, iso, habit.id)).map(({ next }) => loadOf(next)),
+        after.filter(({ iso }) => !habitDone(habitLog, iso, habit.id)).map(({ next }) => loadOf(next)),
+        PATTERN_RULES.load);
+      if (nextDay) found.push({ kind: "load-habit", habitId: habit.id, ...nextDay });
+    });
+
+    // Mood on days you reported a heavy load (7+) vs. a light one (up to 4).
+    const rated = moodIsos.filter((iso) => loadOf(iso) !== null);
+    const heavy = comparison(
+      rated.filter((iso) => loadOf(iso) >= 7).map(moodOf),
+      rated.filter((iso) => loadOf(iso) <= 4).map(moodOf),
+      { ...PATTERN_RULES.mood, min: 4 });
+    if (heavy) found.push({ kind: "mood-load", ...heavy });
+
+    return {
+      patterns: found.sort((a, b) => b.strength - a.strength).slice(0, limit),
+      moodDays: moodIsos.length,
+    };
+  }
+
+  // A month for one habit. Of the planned days so far: `done` did something
+  // (fully or `little`), `rest` were skipped on purpose; `elapsed` is the
+  // planned days minus rest days. `score` counts a little as half, and
+  // consistency is score / elapsed. `extra` is days done that weren't planned.
+  function habitMonth(log, habitOrId, year, month, todayISO) {
+    const habit = asHabit(habitOrId);
+    const days = new Date(year, month + 1, 0).getDate();
+    const out = { done: 0, little: 0, rest: 0, extra: 0, elapsed: 0, total: 0, score: 0 };
+    for (let date = 1; date <= days; date++) {
+      const iso = toISODate(new Date(year, month, date));
+      const planned = habitScheduled(habit, iso);
+      const state = habitState(log, iso, habit.id);
+      if (planned) out.total += 1;
+      if (iso > todayISO) continue;
+      if (!planned) {
+        if (state === "done" || state === "little") out.extra += 1;
+        continue;
+      }
+      if (state === "rest") {
+        out.rest += 1;
+        continue;
+      }
+      out.elapsed += 1;
+      if (state === "done") {
+        out.done += 1;
+        out.score += 1;
+      } else if (state === "little") {
+        out.done += 1;
+        out.little += 1;
+        out.score += 0.5;
+      }
+    }
+    return out;
+  }
+
+  // ---------- Reminders ----------
+  // Everything worth a heads-up today and tomorrow, each with the moment to
+  // fire (`at`, ms) and a stable `key` so it's only shown once. The caller
+  // decides which are due and builds the words.
+  function reminders({ items = [], habits = [], habitLog = {}, events = [], now = new Date(), lead = 10, kinds = {}, morningAt = null, closureAt = null } = {}) {
+    const today = startOfDay(now);
+    const days = [toISODate(today), toISODate(addDays(today, 1))];
+    const at = (iso, time) => parseISODate(iso).getTime() + timeToMinutes(time) * 60000;
+    const out = [];
+    if (kinds.tasks !== false) {
+      items.filter((item) => days.includes(item.date) && item.start && !item.done && item.focus !== "later").forEach((item) => {
+        out.push({ key: `task:${item.id}:${item.date}T${item.start}`, kind: "task", at: at(item.date, item.start) - lead * 60000, iso: item.date, start: item.start, title: item.title });
+      });
+    }
+    if (kinds.habits !== false) {
+      days.forEach((iso) => habits.forEach((habit) => {
+        const time = habitTimeOn(habit, iso);
+        if (!time || habitState(habitLog, iso, habit.id)) return;
+        out.push({ key: `habit:${habit.id}:${iso}`, kind: "habit", at: at(iso, time.start) - lead * 60000, iso, start: time.start, title: habit.name });
+      }));
+    }
+    if (kinds.meetings !== false) {
+      const until = addDays(today, 2).getTime();
+      events.filter((event) => !event.allDay).forEach((event) => {
+        const start = new Date(event.start);
+        if (start.getTime() < today.getTime() || start.getTime() >= until) return;
+        out.push({
+          key: `event:${event.id}`,
+          kind: "meeting",
+          at: start.getTime() - lead * 60000,
+          iso: toISODate(start),
+          start: minutesToTime(start.getHours() * 60 + start.getMinutes()),
+          title: event.title,
+          event,
+        });
+      });
+    }
+    if (isTime(morningAt)) out.push({ key: `morning:${days[0]}`, kind: "morning", at: at(days[0], morningAt), iso: days[0], start: morningAt, title: "" });
+    if (isTime(closureAt)) out.push({ key: `closure:${days[0]}`, kind: "closure", at: at(days[0], closureAt), iso: days[0], start: closureAt, title: "" });
+    return out.sort((a, b) => a.at - b.at);
+  }
+
+  // ---------- Calendar events (read-only, from subscribed calendars) ----------
+  // Events come from the desktop app: all-day ones carry ISO dates with an
+  // exclusive end, timed ones absolute instants. This splits them for one
+  // local day, clipping timed events to that day's minutes.
+  function eventsForDay(events, iso) {
+    const dayStart = parseISODate(iso);
+    if (!dayStart) return { allDay: [], timed: [] };
+    const dayEnd = addDays(dayStart, 1);
+    const allDay = [];
+    const timed = [];
+    (events || []).forEach((event) => {
+      if (event.allDay) {
+        if (event.start <= iso && iso < event.end) allDay.push(event);
+        return;
+      }
+      const start = new Date(event.start);
+      const end = new Date(event.end);
+      if (!(end > dayStart && start < dayEnd) && !(+start === +end && start >= dayStart && start < dayEnd)) return;
+      const startMin = Math.max(0, Math.round((start - dayStart) / 60000));
+      const endMin = Math.min(1440, Math.round((end - dayStart) / 60000));
+      timed.push({ ...event, startMin, endMin: Math.max(endMin, startMin + 15) });
+    });
+    timed.sort((a, b) => a.startMin - b.startMin || a.endMin - b.endMin);
+    allDay.sort((a, b) => a.title.localeCompare(b.title));
+    return { allDay, timed };
+  }
+
+  // Minutes of busy meetings in a day, overlapping ones counted once.
+  function busyMinutes(events, iso) {
+    const spans = eventsForDay(events, iso).timed.filter((event) => event.busy !== false)
+      .map((event) => [event.startMin, Math.min(1440, event.endMin)]);
+    let total = 0;
+    let reach = -1;
+    spans.forEach(([start, end]) => {
+      if (end <= reach) return;
+      total += end - Math.max(start, reach);
+      reach = end;
+    });
+    return total;
+  }
+
   // ---------- Mental load (perceived, not a stress measure) ----------
   // A rough 0–10 estimate of how full the day feels, from what the planner
   // knows: open must-dos and urgent items, busy hours on the timeline,
@@ -473,7 +912,7 @@
   // The person can always override it with their own number.
   const HEAVY_MOODS = ["tiring", "stressed", "rough"];
 
-  function mentalLoad(items, iso, { todayISO = iso, moods = {} } = {}) {
+  function mentalLoad(items, iso, { todayISO = iso, moods = {}, events = [] } = {}) {
     const day = items.filter((item) => item.date === iso);
     const open = day.filter((item) => !item.done && item.focus !== "later");
     const must = open.filter((item) => item.focus === "must").length;
@@ -482,6 +921,7 @@
     const minutes = day
       .filter((item) => item.start && item.focus !== "later")
       .reduce((sum, item) => sum + (item.duration || 60), 0);
+    const meetingMinutes = busyMinutes(events, iso);
     const overdue = iso === todayISO ? overdueItems(items, todayISO).length : 0;
     const date = parseISODate(iso);
     const heavyDays = date
@@ -491,12 +931,20 @@
     const raw = Math.min(must * 1.2, 4)
       + Math.min(could * 0.4, 2)
       + Math.min(urgent * 0.5, 1.5)
-      + Math.min((minutes / 60) * 0.5, 3)
+      + Math.min(((minutes + meetingMinutes) / 60) * 0.5, 3)
       + Math.min(overdue * 0.5, 2)
       + Math.min(heavyDays * 0.5, 1);
     return {
       score: Math.max(0, Math.min(10, Math.round(raw))),
-      factors: { must, could, urgent, hours: Math.round((minutes / 60) * 10) / 10, overdue, heavyDays },
+      factors: {
+        must,
+        could,
+        urgent,
+        hours: Math.round((minutes / 60) * 10) / 10,
+        meetings: Math.round((meetingMinutes / 60) * 10) / 10,
+        overdue,
+        heavyDays,
+      },
     };
   }
 
@@ -555,6 +1003,11 @@
   }
 
   // 1250 → "1,25 L" (pt) / "1.25 L" (en).
+  // Under a liter reads better in ml ("750 ml"); from there on, liters.
+  function formatVolume(ml, language = "en") {
+    return ml < 1000 ? `${Math.round(ml / 10) * 10} ml` : formatLiters(ml, language);
+  }
+
   function formatLiters(ml, language = "en") {
     const liters = Math.round(ml / 10) / 100;
     return `${liters.toLocaleString(language === "pt" ? "pt-BR" : "en-GB", { maximumFractionDigits: 2 })} L`;
@@ -645,6 +1098,28 @@
     MOODS,
     setMood,
     mentalLoad,
+    reminders,
+    HABIT_ICONS,
+    normalizeHabits,
+    habitScheduled,
+    habitInsight,
+    patterns,
+    habitActive,
+    habitActiveBetween,
+    habitTimeOn,
+    scheduleRows,
+    habitFromRows,
+    HABIT_STATES,
+    normalizeHabitLog,
+    habitState,
+    setHabitState,
+    habitDone,
+    toggleHabit,
+    forgetHabit,
+    habitStreak,
+    habitMonth,
+    eventsForDay,
+    busyMinutes,
     loadLevel,
     setLoad,
     postponeCandidate,
@@ -657,6 +1132,7 @@
     waterTarget,
     setWater,
     formatLiters,
+    formatVolume,
     isoWeekKey,
     moonPhase,
     moonPhaseName,
@@ -690,6 +1166,9 @@
     nextOrder,
     createItem,
     moveItem,
+    closeDay,
+    parseDump,
+    legacyDumpNotes,
     toggleDone,
     weekStats,
     parseCapture,

@@ -39,9 +39,31 @@ switches to the week or the month when you want the bigger picture.
   day; click a day to open it
 - Month index tabs on the page edge
 
+**Calendars** (desktop app)
+
+- Connect Google, Outlook and iCloud calendars by pasting each one's secret
+  iCal link (Settings → Calendars). Meetings show up read-only on the
+  timeline, all-day events above it, and both in the week and month views;
+  busy meeting time counts toward the mental load
+- Recurring events, moved or cancelled occurrences and time zones are handled
+  by [ical.js](https://github.com/kewisch/ical.js); calendars refresh every
+  15 minutes and when you come back to the window
+- The links work like passwords, so they stay in the desktop app's main
+  process, encrypted with the OS keychain (macOS Keychain / Windows DPAPI),
+  in `calendars.json` next to the data snapshot. They never reach the page,
+  aren't part of backups, and only the host is shown. Browsers can't read
+  these links (no CORS), so the web app doesn't offer calendars
+- Work accounts (Google Workspace, Microsoft 365) may have the secret link
+  turned off by an administrator
+
 **Everything else**
 
 - "To schedule" list for things without a date, plus an Overdue list
+- Brain dump page: write everything on your mind on the left page, one line
+  each, then sort each thought on the right page into today, tomorrow,
+  "To schedule" or the day's notes
+- Close the day: a short evening ritual — what went well, and what happens
+  to unfinished tasks
 - Quick capture syntax: `#work`, `!urgent`, `@tomorrow`, and times like
   `14:30`, `14h` or `9h30`
 - Categories as ink stamps, urgent seal, 30-day Trash with undo
@@ -162,8 +184,8 @@ npm run check
 **Global (desktop app — work from anywhere, even when the app is hidden):**
 
 - `Ctrl/Cmd + Shift + Space`: show / hide Lowstate
-- `Ctrl/Cmd + Shift + N` or `Ctrl/Cmd + Shift + B`: open today's page ready to
-  capture
+- `Ctrl/Cmd + Shift + N`: open today's page ready to capture
+- `Ctrl/Cmd + Shift + B`: brain dump — empty your head, sort it later
 
 On Windows, clicking the window's **X** hides Lowstate in the system tray so
 these shortcuts remain active. Use the tray menu's **Quit** command to exit it
@@ -171,9 +193,10 @@ completely.
 
 **In-app (while the window is focused):**
 
-- `1` `2` `3` `4`: Day, Week, Month, Habits
+- `1` `2` `3` `4` `5`: Day, Week, Month, Habits, Brain dump
 - `←` `→`: previous / next day, week or month
 - `T`: back to today
+- `B`: brain dump
 - `N`: jump to the capture field
 - `Enter`: add the task
 - `Esc`: leave the field / close a dialog

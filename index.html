@@ -20,7 +20,6 @@
     <div class="app">
       <aside class="sidebar">
         <div class="brand">
-          <img class="brand-mark" src="assets/icon.svg" alt="" width="32" height="32" />
           <div class="brand-text">
             <strong>Lowstate</strong>
             <span>lower your mental entropy</span>
@@ -45,6 +44,10 @@
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 0 1 12.9-5.2M19.5 12a7.5 7.5 0 0 1-12.9 5.2"/><path d="M18 3.5v4h-4M6 20.5v-4h4"/></svg>
             <span data-i18n="viewHabits">Habits</span><kbd>4</kbd>
           </button>
+          <button type="button" class="nav-btn" data-view="dump">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.5c-3.6 0-6.5 2.6-6.5 5.9 0 1.9 1 3.6 2.5 4.6V18a1.5 1.5 0 0 0 1.5 1.5h5a1.5 1.5 0 0 0 1.5-1.5v-3c1.5-1 2.5-2.7 2.5-4.6 0-3.3-2.9-5.9-6.5-5.9z"/><path d="M10 12.5h4M12 10.5v4"/></svg>
+            <span data-i18n="viewDump">Brain dump</span><span class="count" id="dumpCount"></span><kbd>5</kbd>
+          </button>
         </nav>
 
         <section class="side-section overdue" id="overdueSection" hidden>
@@ -63,7 +66,7 @@
           </div>
           <form class="capture" id="inboxForm">
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-            <input id="inboxInput" autocomplete="off" maxlength="200" data-i18n-placeholder="inboxPlaceholder" data-i18n-aria="newTask" />
+            <input id="inboxInput" autocomplete="off" maxlength="200" data-i18n-placeholder="inboxPlaceholder" data-i18n-aria="newTask" data-i18n-title="inboxHint" />
           </form>
           <ul class="side-list" id="inboxList"></ul>
           <p class="side-empty" id="inboxEmpty" data-i18n="inboxEmpty"></p>
@@ -103,7 +106,6 @@
           <div class="spread">
             <article class="page page-left">
               <header class="page-head day-head">
-                <span class="washi" id="dayWashi" aria-hidden="true"></span>
                 <div class="day-date">
                   <span class="day-big" id="dayBig"></span>
                   <div class="day-meta">
@@ -117,6 +119,7 @@
                 </div>
               </header>
               <p class="holiday day-holiday" id="dayHoliday" hidden></p>
+              <div class="allday" id="dayAllDay" hidden></div>
               <div class="timeline" id="timeline" data-i18n-aria="timeline" role="region" aria-label="Timeline"></div>
               <footer class="proverb">
                 <span class="proverb-tr" id="dayProverb"></span>
@@ -128,17 +131,28 @@
                 <div class="week-mark">
                   <strong data-i18n="todayTasks">For this day</strong>
                 </div>
-                <span class="range-mark" id="dayProgress"></span>
+                <span class="day-head-side">
+                  <span class="range-mark" id="dayProgress"></span>
+                  <button type="button" class="close-day-btn" id="closeDayBtn" hidden>
+                    <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.2 6.2 0 0 0 10.1 10.1z"/></svg>
+                    <span data-i18n="closeDay">Close the day</span>
+                  </button>
+                </span>
               </header>
+              <p class="closed-line" id="closedLine" hidden></p>
               <section class="load" id="loadMeter" data-i18n-aria="load"></section>
               <form class="day-capture" id="dayCaptureForm">
                 <span class="day-capture-mark" aria-hidden="true">✎</span>
-                <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" />
+                <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" data-i18n-title="dayCaptureHint" />
               </form>
               <div class="day-tasks focus-groups" id="dayTasks"></div>
               <section class="water">
                 <h2 class="section-title"><span data-i18n="water">Water</span><span class="water-sum" id="waterSum"></span></h2>
                 <div class="water-row" id="waterRow" role="group" data-i18n-aria="water"></div>
+              </section>
+              <section class="today-habits" id="todayHabits" hidden>
+                <h2 class="section-title"><span data-i18n="viewHabits">Habits</span></h2>
+                <div class="habit-pills" id="habitPills"></div>
               </section>
               <section class="mood">
                 <h2 class="section-title"><span data-i18n="dayMood">Mood of the day</span></h2>
@@ -159,7 +173,6 @@
           <div class="spread month-spread">
             <article class="page month-page">
               <header class="page-head">
-                <span class="washi" id="monthWashi" aria-hidden="true"></span>
                 <div class="month-mark">
                   <span class="month-num" id="mvMonthNum"></span>
                   <div class="month-text">
@@ -179,7 +192,6 @@
           <div class="spread">
             <article class="page page-left">
               <header class="page-head">
-                <span class="washi" id="washi" aria-hidden="true"></span>
                 <div class="month-mark">
                   <span class="month-num" id="monthNum"></span>
                   <div class="month-text">
@@ -218,11 +230,69 @@
           </div>
         </section>
 
-        <section class="view placeholder-view" id="placeholderView" hidden>
-          <div class="placeholder-card">
-            <div class="placeholder-icon" id="placeholderIcon"></div>
-            <h2 data-i18n="comingTitle">Coming in the next step</h2>
-            <p id="placeholderText"></p>
+        <section class="view habits-view" id="habitsView" hidden>
+          <div class="spread">
+            <article class="page page-left">
+              <header class="page-head">
+                <div class="month-mark">
+                  <span class="month-num" id="hvMonthNum"></span>
+                  <div class="month-text">
+                    <strong data-i18n="viewHabits">Habits</strong>
+                    <span class="day-month" id="hvMonthName"></span>
+                  </div>
+                </div>
+                <span class="year-mark" id="hvYear"></span>
+              </header>
+              <div class="habit-grid" id="habitGrid" role="grid"></div>
+              <p class="focus-hint habit-empty" id="habitEmpty" data-i18n="habitEmpty"></p>
+              <form class="habit-add" id="habitForm">
+                <span class="day-capture-mark" aria-hidden="true">+</span>
+                <input id="habitInput" maxlength="60" autocomplete="off" data-i18n-placeholder="habitPlaceholder" data-i18n-aria="habitPlaceholder" />
+              </form>
+              <div class="habit-ideas" id="habitIdeas"></div>
+              <section class="summary patterns" id="sumPatterns"></section>
+            </article>
+
+            <article class="page page-right">
+              <header class="page-head">
+                <div class="week-mark"><strong data-i18n="thisMonth">This month</strong></div>
+                <span class="range-mark" id="hvRange"></span>
+              </header>
+              <section class="summary" id="sumMood"></section>
+              <section class="summary" id="sumWater"></section>
+              <section class="summary" id="sumLoad"></section>
+            </article>
+
+            <nav class="month-tabs" data-i18n-aria="months" aria-label="Months"></nav>
+          </div>
+        </section>
+
+        <section class="view dump-view" id="dumpView" hidden>
+          <div class="spread dump-spread">
+            <article class="page page-left">
+              <header class="page-head">
+                <div class="week-mark">
+                  <strong data-i18n="dumpTitle">Brain dump</strong>
+                </div>
+                <span class="range-mark" data-i18n="dumpSubtitleShort">empty your head</span>
+              </header>
+              <form class="dump-form" id="dumpForm">
+                <textarea id="dumpInput" data-i18n-placeholder="dumpPlaceholder" data-i18n-aria="dumpTitle"></textarea>
+                <div class="dump-form-foot">
+                  <span class="field-hint" data-i18n="dumpShortcut">⌘↵ to save</span>
+                  <button type="submit" class="btn primary" data-i18n="dumpSave">Save</button>
+                </div>
+              </form>
+            </article>
+
+            <article class="page page-right">
+              <header class="page-head">
+                <div class="week-mark"><strong id="dumpSortTitle"></strong></div>
+                <button type="button" class="focus-action" id="dumpAllInbox" data-i18n="dumpAllInbox">All to “To schedule”</button>
+              </header>
+              <ul class="dump-list" id="dumpList"></ul>
+              <p class="focus-hint dump-empty" id="dumpEmpty" data-i18n="dumpEmpty"></p>
+            </article>
           </div>
         </section>
       </main>
@@ -259,7 +329,7 @@
         <div class="field-grid">
           <label class="field">
             <span class="field-label" data-i18n="fieldTime">Time</span>
-            <select id="itemStart"></select>
+            <input type="time" id="itemStart" step="900" />
           </label>
           <label class="field">
             <span class="field-label" data-i18n="fieldDuration">Duration</span>
@@ -304,6 +374,101 @@
       </form>
     </dialog>
 
+    <dialog class="sheet closure-sheet" id="closureDialog" aria-labelledby="closureTitle">
+      <form class="sheet-body" id="closureForm" method="dialog">
+        <header class="sheet-head">
+          <svg class="i closure-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.2 6.2 0 0 0 10.1 10.1z"/></svg>
+          <div class="detail-name">
+            <h2 id="closureTitle" data-i18n="closeDay">Close the day</h2>
+            <span class="field-hint" data-i18n="closeSubtitle">A little space before tomorrow.</span>
+          </div>
+        </header>
+        <p class="closure-recap" id="closureRecap"></p>
+        <label class="field">
+          <span class="field-label" data-i18n="closeGood">What went well today?</span>
+          <textarea id="closureGood" rows="3" maxlength="500" data-i18n-placeholder="closeGoodPlaceholder"></textarea>
+        </label>
+        <fieldset class="field closure-left" id="closureLeft">
+          <legend class="field-label"><span data-i18n="closeLeft">And what was left?</span> <span class="closure-count" id="closureCount"></span></legend>
+          <label class="closure-choice"><input type="radio" name="closureChoice" value="tomorrow" checked /> <span data-i18n="closeTomorrow">Move to tomorrow</span></label>
+          <label class="closure-choice"><input type="radio" name="closureChoice" value="inbox" /> <span data-i18n="closeInbox">Back to “To schedule”</span></label>
+          <label class="closure-choice"><input type="radio" name="closureChoice" value="stay" /> <span><span data-i18n="closeStay">Leave them where they are</span> <small data-i18n="closeStayHint"></small></span></label>
+        </fieldset>
+        <footer class="sheet-foot">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="closureCancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="closeButton">Close the day</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet detail-sheet" id="habitDetail" aria-labelledby="habitDetailTitle">
+      <div class="sheet-body">
+        <header class="sheet-head detail-head">
+          <span class="detail-icon" id="habitDetailIcon" aria-hidden="true"></span>
+          <div class="detail-name">
+            <h2 id="habitDetailTitle"></h2>
+            <span class="hg-meta" id="habitDetailMeta"></span>
+          </div>
+          <span class="range-mark" id="habitDetailMonth"></span>
+        </header>
+        <div class="detail-stats" id="habitDetailStats"></div>
+        <section>
+          <h3 class="field-label" data-i18n="habitLast14">Last 14 days</h3>
+          <div class="detail-days" id="habitDetailDays"></div>
+          <p class="field-hint detail-hint" data-i18n="habitStateHint"></p>
+        </section>
+        <p class="detail-insight" id="habitDetailInsight"></p>
+        <footer class="sheet-foot">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="habitDetailClose" data-i18n="close">Close</button>
+          <button type="button" class="btn primary" id="habitDetailEdit" data-i18n="habitEditButton">Edit</button>
+        </footer>
+      </div>
+    </dialog>
+
+    <dialog class="sheet habit-sheet" id="habitDialog" aria-labelledby="habitDialogTitle">
+      <form class="sheet-body" id="habitEditForm" method="dialog">
+        <header class="sheet-head">
+          <h2 id="habitDialogTitle" data-i18n="habitEdit">Edit habit</h2>
+        </header>
+        <label class="field">
+          <span class="field-label" data-i18n="habitName">Name</span>
+          <input class="habit-name-input" id="habitEditName" maxlength="60" autocomplete="off" required />
+        </label>
+        <div class="field">
+          <span class="field-label" data-i18n="habitIcon">Icon</span>
+          <div class="icon-picker" id="habitIconPicker"></div>
+        </div>
+        <div class="field">
+          <span class="field-label" data-i18n="habitWhen">When</span>
+          <div class="schedule-rows" id="habitRows"></div>
+          <div class="schedule-foot">
+            <button type="button" class="focus-action" id="habitAddRow" data-i18n="habitAddTime">+ Another time</button>
+            <span class="field-hint" id="habitDaysHint"></span>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label" data-i18n="habitPeriod">Period</span>
+          <div class="period-row">
+            <label class="period-field"><span data-i18n="habitSince">From</span><input type="date" id="habitSince" /></label>
+            <label class="period-field"><span data-i18n="habitUntil">Until</span><input type="date" id="habitUntil" /></label>
+            <button type="button" class="focus-action" id="habitEndToggle"></button>
+          </div>
+        </div>
+        <div class="field">
+          <span class="field-label" data-i18n="habitColor">Color</span>
+          <div class="cal-colors" id="habitColorPicker"></div>
+        </div>
+        <footer class="sheet-foot">
+          <button type="button" class="btn ghost danger" id="habitEditDelete" data-i18n="habitRemove">Remove habit</button>
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="habitEditCancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="save">Save</button>
+        </footer>
+      </form>
+    </dialog>
+
     <dialog class="sheet settings-sheet" id="settingsDialog" aria-labelledby="settingsTitle">
       <div class="sheet-body">
         <header class="sheet-head">
@@ -317,6 +482,8 @@
           <button type="button" role="tab" data-tab="look" data-i18n="appearance">Appearance</button>
           <button type="button" role="tab" data-tab="planner" data-i18n="tabPlanner">Planner</button>
           <button type="button" role="tab" data-tab="water" data-i18n="water">Water</button>
+          <button type="button" role="tab" data-tab="calendars" data-i18n="tabCalendars">Calendars</button>
+          <button type="button" role="tab" data-tab="notify" data-i18n="tabNotify">Reminders</button>
           <button type="button" role="tab" data-tab="general" data-i18n="tabGeneral">General</button>
         </nav>
 
@@ -407,6 +574,83 @@
               <output id="waterGoalValue"></output>
               <button type="button" data-step="250" aria-label="+250 ml">+</button>
             </div>
+          </div>
+        </section>
+
+        <section class="set-group cal-group" data-tab="calendars">
+          <p class="cal-note" id="calWebNote" data-i18n="calDesktopOnly" hidden></p>
+          <div class="cal-head" id="calHead" hidden>
+            <span class="cal-summary" id="calSummary"></span>
+            <button type="button" class="focus-action" id="calRefresh" data-i18n="calRefresh">Refresh now</button>
+          </div>
+          <ul class="cal-list" id="calList"></ul>
+          <form class="cal-add" id="calAddForm" hidden>
+            <input id="calName" maxlength="60" autocomplete="off" data-i18n-placeholder="calNamePlaceholder" data-i18n-aria="calNamePlaceholder" />
+            <input id="calUrl" type="url" autocomplete="off" spellcheck="false" data-i18n-placeholder="calUrlPlaceholder" data-i18n-aria="calUrlPlaceholder" required />
+            <div class="cal-add-row">
+              <div class="cal-colors" id="calColors"></div>
+              <button type="submit" class="btn primary" id="calAddBtn" data-i18n="calAdd">ADD</button>
+            </div>
+            <p class="cal-status" id="calStatus" role="status"></p>
+          </form>
+          <details class="cal-help">
+            <summary data-i18n="calHelpTitle">Where do I find the link?</summary>
+            <p data-i18n="calHelpGoogle"></p>
+            <p data-i18n="calHelpOutlook"></p>
+            <p data-i18n="calHelpIcloud"></p>
+            <p class="cal-privacy" data-i18n="calHelpPrivacy"></p>
+          </details>
+        </section>
+
+        <section class="set-group" data-tab="notify">
+          <p class="cal-note" id="notifyWebNote" data-i18n="notifyDesktopOnly"></p>
+          <div class="set-row">
+            <span data-i18n="notifyOn">Reminders</span>
+            <div class="seg" data-setting="notifyOn">
+              <button type="button" data-value="on" data-i18n="on">ON</button>
+              <button type="button" data-value="off" data-i18n="off">OFF</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="notifyLead">Remind me</span>
+            <div class="seg" data-setting="notifyLead">
+              <button type="button" data-value="5">5 MIN</button>
+              <button type="button" data-value="10">10 MIN</button>
+              <button type="button" data-value="15">15 MIN</button>
+              <button type="button" data-value="30">30 MIN</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="notifyKinds">About</span>
+            <div class="chip-row notify-kinds" id="notifyKinds">
+              <button type="button" class="chip" data-notify-kind="tasks" data-i18n="notifyTasks">Tasks</button>
+              <button type="button" class="chip" data-notify-kind="habits" data-i18n="notifyHabits">Habits</button>
+              <button type="button" class="chip" data-notify-kind="meetings" data-i18n="notifyMeetings">Meetings</button>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="morningOn">Morning summary</span>
+            <div class="morning-row">
+              <input type="time" id="morningAt" step="900" data-i18n-aria="morningAt" />
+              <div class="seg" data-setting="morningOn">
+                <button type="button" data-value="on" data-i18n="on">ON</button>
+                <button type="button" data-value="off" data-i18n="off">OFF</button>
+              </div>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="closeReminder">Close the day</span>
+            <div class="morning-row">
+              <input type="time" id="closureAt" step="900" data-i18n-aria="closeReminder" />
+              <div class="seg" data-setting="closureOn">
+                <button type="button" data-value="on" data-i18n="on">ON</button>
+                <button type="button" data-value="off" data-i18n="off">OFF</button>
+              </div>
+            </div>
+          </div>
+          <div class="set-row">
+            <span></span>
+            <button type="button" class="btn" id="notifyTest" data-i18n="notifyTest">Send a test</button>
           </div>
         </section>
 
