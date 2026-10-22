@@ -106,6 +106,24 @@
     return names.map((name, index) => ({ id: slug(DEFAULT_CATEGORY_NAMES.en[index]), name, color: PALETTE[index] }));
   }
 
+  // A cover color picked freely, darkened just enough for the cover's light
+  // text to stay readable (contrast with #efe8d8 of at least 4.5:1).
+  function readableCover(hex) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+    if (!match) return null;
+    const rgb = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16));
+    const channel = (value) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (color) => 0.2126 * channel(color[0]) + 0.7152 * channel(color[1]) + 0.0722 * channel(color[2]);
+    let color = rgb;
+    for (let step = 1; step <= 20 && luminance(color) > 0.139; step++) {
+      color = rgb.map((value) => Math.round(value * (1 - step * 0.05)));
+    }
+    return `#${color.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+  }
+
   function nextColor(categories) {
     const used = new Set(categories.map((category) => category.color));
     return PALETTE.find((color) => !used.has(color)) || PALETTE[categories.length % PALETTE.length];
@@ -1092,6 +1110,7 @@
 
   return {
     PALETTE,
+    readableCover,
     FOCUS,
     QUOTES,
     QUOTE_STYLES,

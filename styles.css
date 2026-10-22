@@ -21,8 +21,8 @@
   --asagi: #3e9aa8;
   --sakura: #e59aa6;
   --highlight: rgba(244, 205, 82, .55);
-  --cover: #2c4a3c;
-  --cover-2: #23392f;
+  --cover: #2b3d63;
+  --cover-2: #22304f;
   --cover-ink: #efe8d8;
   --cover-muted: rgba(239, 232, 216, .62);
   --button: #2b2a27;
@@ -53,8 +53,8 @@
   --asagi: #6cc6d2;
   --sakura: #eab2ba;
   --highlight: rgba(233, 189, 102, .3);
-  --cover: #1a2a22;
-  --cover-2: #15221c;
+  --cover: #1a2338;
+  --cover-2: #151c2e;
   --cover-ink: #e6e0d0;
   --cover-muted: rgba(230, 224, 208, .55);
   --button: #e9e4d8;
@@ -64,14 +64,18 @@
 
 /* Cover colors (Settings → Cover color); green is the default above. The
    swatch buttons show the light version of each cloth. */
+:root[data-cover="green"] { --cover: #2c4a3c; --cover-2: #23392f; }
 :root[data-cover="navy"] { --cover: #2b3d63; --cover-2: #22304f; }
+:root[data-cover="custom"] { --cover: var(--cover-custom, #2b3d63); --cover-2: color-mix(in srgb, var(--cover-custom, #2b3d63) 80%, #000); }
 :root[data-cover="wine"] { --cover: #6a2a35; --cover-2: #55212b; }
 :root[data-cover="black"] { --cover: #2e2d2b; --cover-2: #222120; }
 :root[data-cover="pink"] { --cover: #a35a6b; --cover-2: #8a4a5a; }
 :root[data-cover="mustard"] { --cover: #93661f; --cover-2: #7b5419; }
 :root[data-cover="lavender"] { --cover: #5d4f8a; --cover-2: #4c4073; }
 :root[data-cover="teal"] { --cover: #2f6b73; --cover-2: #25575e; }
+:root[data-theme="dark"][data-cover="green"] { --cover: #1a2a22; --cover-2: #15221c; }
 :root[data-theme="dark"][data-cover="navy"] { --cover: #1a2338; --cover-2: #151c2e; }
+:root[data-theme="dark"][data-cover="custom"] { --cover: color-mix(in srgb, var(--cover-custom, #2b3d63) 55%, #0c0c0c); --cover-2: color-mix(in srgb, var(--cover-custom, #2b3d63) 45%, #080808); }
 :root[data-theme="dark"][data-cover="wine"] { --cover: #3a1a20; --cover-2: #2e151a; }
 :root[data-theme="dark"][data-cover="black"] { --cover: #1a1a19; --cover-2: #131312; }
 :root[data-theme="dark"][data-cover="pink"] { --cover: #4a2a32; --cover-2: #3b2128; }
@@ -1874,6 +1878,9 @@ dialog.sheet[open] { animation: sheet-in .18s ease; }
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12);
 }
 .seg.swatches button.active { box-shadow: 0 0 0 2px var(--paper), 0 0 0 4px var(--ink); }
+.seg.swatches .swatch-custom { background: conic-gradient(#d64a32, #e2a43a, #7c8c4a, #3e9aa8, #34508a, #8b78bd, #e59aa6, #d64a32); }
+.seg.swatches .swatch-custom.has-color.active { background: radial-gradient(circle, var(--chosen) 0 55%, transparent 56%), conic-gradient(#d64a32, #e2a43a, #7c8c4a, #3e9aa8, #34508a, #8b78bd, #e59aa6, #d64a32); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; opacity: 0; }
 .set-row.stacked { flex-direction: column; align-items: stretch; gap: 8px; }
 .set-row.stacked .seg button { flex: 1; padding-inline: 6px; }
 .btn-row { display: flex; gap: 6px; }

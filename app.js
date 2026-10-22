@@ -28,6 +28,7 @@
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
+    coverColor: "type-todo.cover-color.v1",
     alwaysOnTop: "type-todo.always-on-top.v1",
     shortcuts: "type-todo.shortcuts.v1",
     legacyTodos: "quest-log.todos.v1",
@@ -1966,8 +1967,20 @@
 
   // ---------- settings ----------
   const currentTheme = () => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-  const COVERS = ["green", "navy", "wine", "black", "pink", "mustard", "lavender", "teal"];
-  const currentCover = () => (COVERS.includes(document.documentElement.dataset.cover) ? document.documentElement.dataset.cover : "green");
+  const COVERS = ["green", "navy", "wine", "black", "pink", "mustard", "lavender", "teal", "custom"];
+  // Blue (navy) is the default cover, also for older values like 1.x's "mono".
+  const currentCover = () => (COVERS.includes(document.documentElement.dataset.cover) ? document.documentElement.dataset.cover : "navy");
+  const coverColorInput = document.getElementById("coverColorInput");
+
+  function applyCustomCover(hex) {
+    const color = Planner.readableCover(hex);
+    if (!color) return;
+    Store.setRaw(KEYS.coverColor, color);
+    Store.setRaw(KEYS.cover, "custom");
+    document.documentElement.style.setProperty("--cover-custom", color);
+    document.documentElement.dataset.cover = "custom";
+    renderSettings();
+  }
   const alwaysOnTop = () => Store.getRaw(KEYS.alwaysOnTop) === "on";
 
   function entryToItem(entry) {
@@ -1978,7 +1991,14 @@
     return null;
   }
 
+  coverColorInput.addEventListener("input", () => applyCustomCover(coverColorInput.value));
+  coverColorInput.addEventListener("change", () => applyCustomCover(coverColorInput.value));
+
   function renderSettings() {
+    const customSwatch = els.settingsDialog.querySelector(".swatch-custom");
+    const customColor = Store.getRaw(KEYS.coverColor);
+    if (customColor) customSwatch.style.setProperty("--chosen", customColor);
+    customSwatch.classList.toggle("has-color", Boolean(customColor));
     const values = {
       theme: currentTheme(),
       cover: currentCover(),
@@ -2020,7 +2040,13 @@
       Store.setRaw(KEYS.theme, value);
       document.documentElement.dataset.theme = value === "dark" ? "dark" : "light";
     } else if (setting === "cover") {
-      const cover = COVERS.includes(value) ? value : "green";
+      if (value === "custom") {
+        // Any color: the system color picker, starting from the current cover.
+        coverColorInput.value = Store.getRaw(KEYS.coverColor) || getComputedStyle(document.documentElement).getPropertyValue("--cover").trim() || "#2b3d63";
+        coverColorInput.click();
+        return;
+      }
+      const cover = COVERS.includes(value) ? value : "navy";
       Store.setRaw(KEYS.cover, cover);
       document.documentElement.dataset.cover = cover;
     } else if (setting === "language") {
