@@ -179,7 +179,7 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
     P.normalizeItem({ title: "old", date: "2026-10-19" }),
   ];
   const load = P.mentalLoad(busy, day, { todayISO: day, moods: { "2026-10-20": "stressed" } });
-  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, meetings: 0, overdue: 1, heavyDays: 1 });
+  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, meetings: 0, calls: 0, backToBack: 0, overdue: 1, heavyDays: 1 });
   assert.equal(load.score, 8);
   assert.equal(P.mentalLoad(busy, day, { todayISO: "2026-10-20" }).factors.overdue, 0);
   assert.equal(P.loadLevel(2), "light");
@@ -531,6 +531,28 @@ test("calendar events split into all-day and timed slices of a local day", () =>
   const load = P.mentalLoad([], "2026-11-03", { events: overlapping });
   assert.equal(load.factors.meetings, 3);
   assert.equal(load.score, 2);
+});
+
+test("a day chopped into many calls weighs more than one long meeting", () => {
+  const at = (hour, minute = 0) => new Date(2026, 10, 4, hour, minute).toISOString();
+  const call = (id, [h1, m1], [h2, m2], busy = true) => ({ id, allDay: false, start: at(h1, m1), end: at(h2, m2), busy });
+  const chopped = [
+    call("a", [9, 0], [9, 30]), call("b", [9, 40], [10, 10]), call("c", [10, 15], [10, 45]),
+    call("d", [13, 0], [13, 30]), call("e", [15, 0], [15, 30]), call("f", [16, 0], [16, 30]),
+    call("free", [17, 0], [18, 0], false),
+  ];
+  const workshop = [call("w", [9, 0], [12, 0])];
+  assert.deepEqual(P.callStats(chopped, "2026-11-04"), { count: 6, streak: 3 });
+  assert.deepEqual(P.callStats([call("x", [9, 0], [10, 0]), call("y", [10, 20], [11, 0])], "2026-11-04"), { count: 2, streak: 1 });
+  const choppedLoad = P.mentalLoad([], "2026-11-04", { events: chopped });
+  const workshopLoad = P.mentalLoad([], "2026-11-04", { events: workshop });
+  assert.equal(choppedLoad.factors.meetings, workshopLoad.factors.meetings);
+  assert.deepEqual([choppedLoad.factors.calls, choppedLoad.factors.backToBack], [6, 3]);
+  assert.deepEqual([workshopLoad.factors.calls, workshopLoad.factors.backToBack], [1, 0]);
+  assert.ok(choppedLoad.score > workshopLoad.score);
+  // 1.5 (hours) + 0.9 (three calls past the third) + 0.5 (back to back) → 3 (rounded)
+  assert.equal(choppedLoad.score, 3);
+  assert.equal(workshopLoad.score, 2);
 });
 
 test("perceived load can be set and cleared; postpone picks the last plain could-do", () => {

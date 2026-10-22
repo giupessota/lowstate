@@ -1106,10 +1106,27 @@
     return total;
   }
 
+  // How many busy calls a day has, and the longest run of them back to back
+  // (less than 15 minutes between one ending and the next starting).
+  function callStats(events, iso) {
+    const calls = eventsForDay(events, iso).timed.filter((event) => event.busy !== false);
+    let streak = 0;
+    let run = 0;
+    let reach = -Infinity;
+    calls.forEach((event) => {
+      run = event.startMin - reach < 15 ? run + 1 : 1;
+      reach = Math.max(reach, event.endMin);
+      streak = Math.max(streak, run);
+    });
+    return { count: calls.length, streak };
+  }
+
   // ---------- Mental load (perceived, not a stress measure) ----------
   // A rough 0–10 estimate of how full the day feels, from what the planner
   // knows: open must-dos and urgent items, busy hours on the timeline,
   // overdue tasks (today only) and whether the last two days felt heavy.
+  // Meetings count twice over: by the hours they take and by how chopped up
+  // they leave the day (many calls, or three or more back to back).
   // The person can always override it with their own number.
   const HEAVY_MOODS = ["tiring", "stressed", "rough"];
 
@@ -1123,6 +1140,8 @@
       .filter((item) => item.start && item.focus !== "later")
       .reduce((sum, item) => sum + (item.duration || 60), 0);
     const meetingMinutes = busyMinutes(events, iso);
+    const { count: calls, streak } = callStats(events, iso);
+    const backToBack = streak >= 3 ? streak : 0;
     const overdue = iso === todayISO ? overdueItems(items, todayISO).length : 0;
     const date = parseISODate(iso);
     const heavyDays = date
@@ -1133,6 +1152,8 @@
       + Math.min(could * 0.4, 2)
       + Math.min(urgent * 0.5, 1.5)
       + Math.min(((minutes + meetingMinutes) / 60) * 0.5, 3)
+      + Math.min(Math.max(0, calls - 3) * 0.3, 1.5)
+      + (backToBack ? 0.5 : 0)
       + Math.min(overdue * 0.5, 2)
       + Math.min(heavyDays * 0.5, 1);
     return {
@@ -1143,6 +1164,8 @@
         urgent,
         hours: Math.round((minutes / 60) * 10) / 10,
         meetings: Math.round((meetingMinutes / 60) * 10) / 10,
+        calls,
+        backToBack,
         overdue,
         heavyDays,
       },
@@ -1371,6 +1394,7 @@
     createItem,
     moveItem,
     REPEATS,
+    callStats,
     search,
     weekKeyToDate,
     nextOccurrence,
