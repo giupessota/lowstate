@@ -3366,13 +3366,17 @@
     return parts.length ? parts.join(" · ") : t("morningEmpty");
   }
 
-  // Checked every 30 seconds: anything whose moment has come in the last ten
-  // minutes and wasn't shown yet becomes a notification. Older ones (the
-  // computer was asleep) are skipped rather than delivered late.
-  function checkReminders() {
-    if (!desktop?.notify || !state.settings.notifyOn) return;
-    const now = Date.now();
-    const due = Planner.reminders({
+  // Snoozed reminders come back ten minutes later ({ key: when }), unless
+  // the task was done or the habit checked in the meantime.
+  const SNOOZE_MS = 10 * 60000;
+  const snoozed = {};
+  function snoozeReminder(key) {
+    snoozed[key] = Date.now() + SNOOZE_MS;
+    toast(t("snoozed"));
+  }
+
+  function currentReminders(now = Date.now()) {
+    return Planner.reminders({
       items: state.items,
       habits: state.habits,
       habitLog: state.habitLog,
@@ -3382,7 +3386,23 @@
       kinds: state.settings.notifyKinds,
       morningAt: state.settings.morningOn ? state.settings.morningAt : null,
       closureAt: state.settings.closureOn && !state.closures[todayISO()] ? state.settings.closureAt : null,
-    }).filter((reminder) => reminder.at <= now && now - reminder.at < 10 * 60000 && !notified[reminder.key]);
+    });
+  }
+
+  // Checked every 30 seconds: anything whose moment has come in the last ten
+  // minutes and wasn't shown yet becomes a notification. Older ones (the
+  // computer was asleep) are skipped rather than delivered late.
+  function checkReminders() {
+    if (!desktop?.notify || !state.settings.notifyOn) return;
+    const now = Date.now();
+    const all = currentReminders(now);
+    const due = all.filter((reminder) => reminder.at <= now && now - reminder.at < 10 * 60000 && !notified[reminder.key]);
+    Object.entries(snoozed).forEach(([key, at]) => {
+      if (at > now) return;
+      delete snoozed[key];
+      const reminder = all.find((candidate) => candidate.key === key);
+      if (reminder && !due.includes(reminder)) due.push(reminder);
+    });
     if (!due.length) return;
     due.forEach((reminder) => {
       notified[reminder.key] = now;
@@ -3394,8 +3414,9 @@
         desktop.notify({ title: t("morningTitle"), body: morningBody(reminder.iso), iso: reminder.iso });
         return;
       }
-      const minutes = Math.max(0, Math.round((reminder.at + state.settings.notifyLead * 60000 - now) / 60000));
-      const when = minutes ? t("remindIn", { time: reminder.start, n: minutes }) : t("remindNow", { time: reminder.start });
+      const minutes = Math.round((reminder.at + state.settings.notifyLead * 60000 - now) / 60000);
+      const when = minutes > 0 ? t("remindIn", { time: reminder.start, n: minutes })
+        : minutes < 0 ? t("remindStarted", { time: reminder.start }) : t("remindNow", { time: reminder.start });
       const extra = reminder.kind === "meeting"
         ? [reminder.event.location, calendarById(reminder.event.calendarId)?.name].filter(Boolean)
         : [];
@@ -3403,6 +3424,8 @@
         title: reminder.title || t("untitledEvent"),
         body: [when, ...extra].join(" · "),
         iso: reminder.iso,
+        snooze: reminder.key,
+        snoozeLabel: t("snooze10"),
       });
     });
     saveNotified();
@@ -3433,11 +3456,16 @@
   if (desktop?.notify) {
     setInterval(checkReminders, 30000);
     setTimeout(checkReminders, 5000);
-    desktop.onOpenDay?.((iso, action) => {
+    desktop.onOpenDay?.((iso, action, key) => {
       document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
       openDay(iso);
       if (action === "closure") openClosure(iso);
+      // Opened from a reminder: offer the snooze here too (Windows has no
+      // button on the notification itself).
+      const reminder = key && currentReminders().find((candidate) => candidate.key === key);
+      if (reminder) toast(`${reminder.title || t("untitledEvent")} · ${reminder.start}`, t("snooze10"), () => snoozeReminder(key));
     });
+    desktop.onSnoozeReminder?.(snoozeReminder);
   }
 
   // ---------- desktop integration ----------

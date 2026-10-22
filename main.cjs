@@ -315,8 +315,9 @@ ipcMain.handle("calendars-refresh", async () => {
 });
 
 // Native notifications for reminders. Clicking one brings the window up on
-// that day. References are kept so they aren't garbage-collected (which
-// would drop the click handler).
+// that day; reminders carry a key so they can be snoozed (a button on macOS,
+// a prompt in the app after the click everywhere). References are kept so
+// they aren't garbage-collected (which would drop the click handler).
 const liveNotifications = new Set();
 ipcMain.on("notify", (_event, payload) => {
   if (!Notification.isSupported() || !payload || typeof payload !== "object") return;
@@ -324,13 +325,21 @@ ipcMain.on("notify", (_event, payload) => {
   const body = String(payload.body || "").slice(0, 240);
   const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.iso || "")) ? payload.iso : null;
   const action = payload.action === "closure" ? "closure" : null;
-  const notification = new Notification({ title, body });
+  const snooze = typeof payload.snooze === "string" && payload.snooze.length <= 200 ? payload.snooze : null;
+  const actions = snooze && process.platform === "darwin"
+    ? [{ type: "button", text: String(payload.snoozeLabel || "Snooze 10 min").slice(0, 40) }]
+    : [];
+  const notification = new Notification({ title, body, actions });
   liveNotifications.add(notification);
   const release = () => liveNotifications.delete(notification);
   notification.on("click", () => {
     release();
     focusWindow();
-    if (iso && window) window.webContents.send("open-day", iso, action);
+    if (iso && window) window.webContents.send("open-day", iso, action, snooze);
+  });
+  notification.on("action", () => {
+    release();
+    if (snooze && window) window.webContents.send("snooze-reminder", snooze);
   });
   notification.on("close", release);
   notification.show();
