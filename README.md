@@ -59,8 +59,9 @@ switches to the week or the month when you want the bigger picture.
 **Everything else**
 
 - "To schedule" list for things without a date, plus an Overdue list
-- Brain dump: pour out everything on your mind, one line each, then sort
-  each thought into today, tomorrow, "To schedule" or the day's notes
+- Brain dump page: write everything on your mind on the left page, one line
+  each, then sort each thought on the right page into today, tomorrow,
+  "To schedule" or the day's notes
 - Close the day: a short evening ritual — what went well, and what happens
   to unfinished tasks
 - Quick capture syntax: `#work`, `!urgent`, `@tomorrow`, and times like
@@ -192,7 +193,7 @@ completely.
 
 **In-app (while the window is focused):**
 
-- `1` `2` `3` `4`: Day, Week, Month, Habits
+- `1` `2` `3` `4` `5`: Day, Week, Month, Habits, Brain dump
 - `←` `→`: previous / next day, week or month
 - `T`: back to today
 - `B`: brain dump

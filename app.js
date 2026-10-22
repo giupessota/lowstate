@@ -40,7 +40,7 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   const TAB_COLORS = ["--indigo", "--vermilion", "--matcha", "--yamabuki", "--fuji", "--asagi"];
   const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
-  const VIEWS = ["day", "week", "month", "habits"];
+  const VIEWS = ["day", "week", "month", "habits", "dump"];
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -117,10 +117,8 @@
     habitDialog: $("habitDialog"),
     habitDetail: $("habitDetail"),
     closeDayBtn: $("closeDayBtn"),
-    dumpBtn: $("dumpBtn"),
+    dumpView: $("dumpView"),
     dumpCount: $("dumpCount"),
-    dumpDialog: $("dumpDialog"),
-    dumpClose: $("dumpClose"),
     dumpForm: $("dumpForm"),
     dumpInput: $("dumpInput"),
     dumpSortTitle: $("dumpSortTitle"),
@@ -693,7 +691,12 @@
     const view = state.view;
     els.rangeSub.textContent = "";
     els.weekProgress.hidden = true;
+    els.navControls.hidden = view === "dump";
     const now = new Date();
+    if (view === "dump") {
+      els.rangeTitle.textContent = t("dumpTitle");
+      return;
+    }
 
     if (view === "habits") {
       els.rangeTitle.textContent = `${t("viewHabits")} · ${capitalize(formatDate(state.anchor, { month: "long", year: "numeric" }))}`;
@@ -1757,11 +1760,13 @@
     els.weekView.hidden = state.view !== "week";
     els.monthView.hidden = state.view !== "month";
     els.habitsView.hidden = state.view !== "habits";
+    els.dumpView.hidden = state.view !== "dump";
     renderTopbar();
     if (state.view === "day") renderDayView();
     else if (state.view === "week") renderSpread();
     else if (state.view === "month") renderMonthView();
-    else renderHabitsView();
+    else if (state.view === "habits") renderHabitsView();
+    else renderDump();
     renderSidebar();
   }
 
@@ -2436,10 +2441,11 @@
 
   // ---------- brain dump ----------
   function renderDump() {
-    els.dumpSortTitle.textContent = t("dumpSortTitle", { n: state.dump.length });
+    els.dumpSortTitle.textContent = state.dump.length ? t("dumpSortTitleN", { n: state.dump.length }) : t("dumpSortTitle");
     els.dumpAllInbox.hidden = state.dump.length < 2;
     els.dumpEmpty.hidden = state.dump.length > 0;
     els.dumpList.replaceChildren(...state.dump.map((note) => h("li", { class: "dump-note", "data-dump": note.id },
+      h("span", { class: "dump-when", text: shortDate(Core.toISODate(new Date(note.createdAt))) }),
       h("span", { class: "dump-text", text: note.text }),
       h("span", { class: "dump-actions" },
         ...[["today", "dumpToday"], ["tomorrow", "dumpTomorrow"], ["inbox", "dumpInbox"], ["note", "dumpNote"]].map(([action, key]) => h("button", {
@@ -2453,8 +2459,7 @@
 
   function openDump() {
     document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
-    renderDump();
-    els.dumpDialog.showModal();
+    setView("dump");
     els.dumpInput.focus();
   }
 
@@ -2485,19 +2490,13 @@
         state.dump = list;
         persistDump();
         render();
-        if (els.dumpDialog.open) renderDump();
+        render();
       });
     }
     renderDump();
   }
 
-  els.dumpBtn.addEventListener("click", openDump);
-  els.dumpClose.addEventListener("click", () => els.dumpDialog.close());
-  els.dumpDialog.addEventListener("click", (event) => {
-    if (event.target === els.dumpDialog) {
-      els.dumpDialog.close();
-      return;
-    }
+  els.dumpList.addEventListener("click", (event) => {
     const action = event.target.closest("[data-dump-action]");
     if (action) sortDumpNote(action.closest("[data-dump]").dataset.dump, action.dataset.dumpAction);
   });
@@ -2509,7 +2508,6 @@
     state.dump = [...state.dump, ...lines.map((text, index) => ({ id: Planner.newId(), text, createdAt: now + index }))];
     persistDump();
     els.dumpInput.value = "";
-    renderDump();
     render();
     toast(lines.length === 1 ? t("dumpSavedOne") : t("dumpSaved", { n: lines.length }));
     els.dumpInput.focus();
@@ -2832,15 +2830,15 @@
       if (event.key === "Escape") event.target.blur();
       return;
     }
-    const views = { 1: "day", 2: "week", 3: "month", 4: "habits" };
+    const views = { 1: "day", 2: "week", 3: "month", 4: "habits", 5: "dump" };
     if (views[event.key]) setView(views[event.key]);
     else if (event.key === "n" || event.key === "N") {
       event.preventDefault();
       (state.view === "day" ? els.dayCaptureInput : els.inboxInput).focus();
     } else if (event.key === "t" || event.key === "T") goToday();
     else if (event.key === "b" || event.key === "B") openDump();
-    else if (event.key === "ArrowLeft") shift(-1);
-    else if (event.key === "ArrowRight") shift(1);
+    else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
+    else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
   });
 
   // ---------- drag & drop ----------
