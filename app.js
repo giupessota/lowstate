@@ -569,6 +569,7 @@
       class: "mood-btn",
       "data-mood": mood,
       "aria-pressed": String(current === mood),
+      title: `${t(`mood-${mood}`)} — ${t(`moodHint-${mood}`)}`,
     }, moodEl(mood), h("span", { text: t(`mood-${mood}`) }))));
   }
 
@@ -606,9 +607,13 @@
     els.waterRow.replaceChildren(...glasses,
       h("button", { type: "button", class: "water-step", "data-water": "-1", "aria-label": t(word.remove), title: t(word.remove), disabled: count === 0 ? "" : null, text: "−" }),
       h("button", { type: "button", class: "water-step", "data-water": "1", "aria-label": t(word.add), title: t(word.add), text: "+" }));
-    els.waterSum.textContent = waterUnit === "liters"
+    const summary = waterUnit === "liters"
       ? t("waterLiters", { n: Planner.formatLiters(count * glassMl, I18n.language).replace(" L", ""), total: Planner.formatLiters(waterGoal, I18n.language) })
       : t(word.sum, { n: count, total: target });
+    const over = count * glassMl - waterGoal;
+    els.waterSum.replaceChildren(summary, ...(count >= target
+      ? [h("span", { class: "water-met", text: over > 0 ? `✓ ${t("waterGoalMet")} · +${Planner.formatVolume(over, I18n.language)}` : `✓ ${t("waterGoalMet")}` })]
+      : []));
     els.waterSum.classList.toggle("is-done", count >= target);
   }
 
@@ -671,7 +676,7 @@
     const { allDay, timed } = dayEvents(iso);
     const routines = state.habits
       .map((habit) => ({ habit, time: Planner.habitTimeOn(habit, iso) }))
-      .filter(({ time }) => time)
+      .filter(({ habit, time }) => time && !eventForHabit(timed, habit, time))
       .sort((a, b) => (a.time.start < b.time.start ? -1 : 1));
     if (!allDay.length && !timed.length && !routines.length) return null;
     const routineLines = routines.map(({ habit, time }) => h("li", {
@@ -760,6 +765,29 @@
   }
 
   // ---------- calendar events ----------
+  // A calendar event that is really a timed habit (same name, overlapping
+  // time — e.g. "Academia" in Google Calendar and the Academia habit) is
+  // shown once: the event, carrying the habit's check.
+  const fold = (text) => String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+  function eventForHabit(timedEvents, habit, time) {
+    const name = fold(habit.name);
+    if (name.length < 3) return null;
+    const start = Planner.timeToMinutes(time.start);
+    const end = start + time.duration;
+    return timedEvents.find((event) => {
+      const title = fold(event.title);
+      const named = title.includes(name) || (title.length >= 3 && name.includes(title));
+      return named && event.startMin < end && event.endMin > start;
+    }) || null;
+  }
+
+  // The small round check used on habit blocks (a span: they're buttons).
+  function habitCheck(habitId, iso) {
+    const svg = svgEl("svg", { class: "i", viewBox: "0 0 24 24", "aria-hidden": "true" });
+    svg.append(svgEl("path", { d: "M5 12.5l4.2 4.2L19 7" }));
+    return h("span", { class: `check habit-check${stateClass(habitId, iso)}`, "aria-hidden": "true" }, svg);
+  }
   const calendarById = (id) => state.calendars.find((calendar) => calendar.id === id) || null;
   const clockTime = (date) => `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   const eventRange = (event) => (event.allDay ? t("allDay") : `${clockTime(new Date(event.start))}–${clockTime(new Date(event.end))}`);
@@ -785,10 +813,15 @@
       duration: Math.max(15, event.endMin - Math.min(event.startMin, 1425)),
     }));
     // Habits with a time sit on the timeline on their planned days.
-    const routines = state.habits
+    const timedHabits = state.habits
       .map((habit) => ({ habit, time: Planner.habitTimeOn(habit, iso) }))
-      .filter(({ time }) => time)
-      .map(({ habit, time }) => ({ id: `habit:${habit.id}`, kind: "habit", habit, start: time.start, duration: time.duration }));
+      .filter(({ time }) => time);
+    const routines = [];
+    timedHabits.forEach(({ habit, time }) => {
+      const twin = eventForHabit(meetings.map((meeting) => meeting.event), habit, time);
+      if (twin) meetings.find((meeting) => meeting.event === twin).habit = habit;
+      else routines.push({ id: `habit:${habit.id}`, kind: "habit", habit, start: time.start, duration: time.duration });
+    });
     const events = Planner.layoutTimeline([...items, ...meetings, ...routines]);
     const { first, last } = timelineRange(events);
     const hour = timelineHourHeight();
@@ -820,23 +853,30 @@
           title: `${habit.name} · ${range}`,
           style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines}; --habit: ${habit.color};`,
         },
-          habitIconEl(habit.icon) || h("i", { class: "habit-dot", "aria-hidden": "true" }),
+          habitCheck(habit.id, iso),
           h("span", { class: "item-body" },
             h("span", { class: "block-time", text: range }),
-            h("span", { class: "block-title", text: habit.name }))));
+            h("span", { class: "block-title" }, habitIconEl(habit.icon), habit.name))));
         return;
       }
       if (item.kind === "event") {
         const calendar = calendarById(item.event.calendarId);
         const lines = Math.max(1, Math.floor((height - 19) / 16));
-        inner.append(h("div", {
-          class: `block event${height < 34 ? " short" : ""}${item.event.busy === false ? " is-free" : ""}`,
+        const twin = item.habit || null;
+        inner.append(h(twin ? "button" : "div", {
+          type: twin ? "button" : null,
+          class: `block event${twin ? ` has-habit${stateClass(twin.id, iso)}` : ""}${height < 34 ? " short" : ""}${item.event.busy === false ? " is-free" : ""}`,
           title: eventTooltip(item.event),
-          style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${calendar ? ` --cat: ${calendar.color};` : ""}`,
+          "data-habit-cell": twin?.id || null,
+          "data-date": twin ? iso : null,
+          "aria-pressed": twin ? String(Planner.habitDone(state.habitLog, iso, twin.id)) : null,
+          disabled: twin && iso > todayISO() ? "" : null,
+          style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${calendar ? ` --cat: ${calendar.color};` : ""}${twin ? ` --habit: ${twin.color};` : ""}`,
         },
-          h("div", { class: "item-body", tabindex: "0" },
+          twin ? habitCheck(twin.id, iso) : null,
+          h(twin ? "span" : "div", { class: "item-body", tabindex: twin ? null : "0" },
             h("span", { class: "block-time", text: eventRange(item.event) }),
-            h("span", { class: "block-title", text: eventTitle(item.event) }))));
+            h("span", { class: "block-title" }, twin ? habitIconEl(twin.icon) : null, eventTitle(item.event)))));
         return;
       }
       const category = categoryById(item.category);
@@ -969,10 +1009,12 @@
     els.loadMeter.replaceChildren(...[
       h("div", { class: "load-head", title: why },
         h("span", { class: "load-title", text: t("load") }),
-        h("span", { class: "load-ticks", role: "group" }, ticks),
-        h("strong", { class: "load-score", text: `${score}/10` }),
-        h("span", { class: "load-label", text: t(`load-${level}`) }),
-        h("span", { class: "load-source", text: hasOwn ? `${t("loadYours")} · ${t("loadEstimateIs", { n: estimate.score })}` : `${t("loadEstimate")} · ${t("loadAdjust")}` })),
+        h("span", { class: "load-reading" },
+          h("strong", { class: "load-score", text: String(score) }),
+          h("span", { class: "load-of", text: "/10" }),
+          h("span", { class: "load-label", text: t(`load-${level}`) }))),
+      h("span", { class: "load-ticks", role: "group", title: t("loadAdjust") }, ticks),
+      h("span", { class: "load-source", title: why, text: hasOwn ? t("loadSourceOwn", { n: estimate.score }) : t("loadSourceEstimate") }),
       score >= 5 || candidate ? h("p", { class: "load-text" },
         t(`loadText-${level}`),
         candidate ? h("button", { type: "button", class: "load-action", "data-postpone": candidate.id, text: t("loadPostpone", { title: candidate.title }) }) : null) : null,
@@ -990,8 +1032,19 @@
         h("h3", { class: "focus-head" },
           h("span", { text: t(FOCUS_LABELS[focus]) }),
           group.length ? h("span", { class: "focus-count", text: String(group.length) }) : null,
+          h("button", { type: "button", class: "focus-add", "data-focus-add": focus, title: t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), "aria-label": t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), text: "+" }),
           movable ? h("button", { type: "button", class: "focus-action", "data-later-tomorrow": iso, text: t("allToTomorrow") }) : null),
-        h("ul", { class: "day-items", "data-date": iso, "data-focus": focus }, group.map((item) => itemEl(item, "line"))),
+        h("ul", { class: "day-items", "data-date": iso, "data-focus": focus }, group.map((item) => {
+          const line = itemEl(item, "line");
+          // Hover shortcuts to move the task to the other two groups.
+          line.append(h("span", { class: "focus-move" }, Planner.FOCUS.filter((other) => other !== focus).map((other) => h("button", {
+            type: "button",
+            "data-move-focus": other,
+            title: t("moveToGroup", { group: t(FOCUS_LABELS[other]) }),
+            text: t(`move-${other}`),
+          }))));
+          return line;
+        })),
         group.length ? null : h("p", { class: "focus-hint", text: t(`${FOCUS_LABELS[focus]}Hint`) }));
     }));
   }
@@ -1004,6 +1057,13 @@
     if (key === dayNotesKey && document.activeElement === els.dayNotes) return;
     dayNotesKey = key;
     els.dayNotes.value = state.dayNotes[key] || "";
+    fitDayNotes();
+  }
+
+  // The notes field grows with its text (the page scrolls if it must).
+  function fitDayNotes() {
+    els.dayNotes.style.height = "auto";
+    els.dayNotes.style.height = `${els.dayNotes.scrollHeight + 4}px`;
   }
 
   function saveDayNotes() {
@@ -1427,8 +1487,9 @@
   // Habits planned for the day (or already done as an extra) as pills.
   function renderTodayHabits(iso) {
     const habits = state.habits
-      .filter((habit) => Planner.habitScheduled(habit, iso) || (Planner.habitActive(habit, iso) && Planner.habitDone(state.habitLog, iso, habit.id)))
-      .sort((a, b) => ((Planner.habitTimeOn(a, iso)?.start || "99") < (Planner.habitTimeOn(b, iso)?.start || "99") ? -1 : 1));
+      // Timed habits are checked on their timeline block; pills are for the rest.
+      .filter((habit) => !Planner.habitTimeOn(habit, iso))
+      .filter((habit) => Planner.habitScheduled(habit, iso) || (Planner.habitActive(habit, iso) && Planner.habitDone(state.habitLog, iso, habit.id)));
     els.todayHabits.hidden = habits.length === 0;
     const future = iso > todayISO();
     els.habitPills.replaceChildren(...habits.map((habit) => {
@@ -2186,6 +2247,7 @@
   els.weekNotes.addEventListener("blur", saveNotes);
 
   els.dayNotes.addEventListener("input", () => {
+    fitDayNotes();
     clearTimeout(dayNotesTimer);
     dayNotesTimer = setTimeout(saveDayNotes, 500);
   });
@@ -2426,7 +2488,47 @@
     }
   });
 
+  // "+" on a group: a one-line field that adds straight into that group.
+  function openFocusCapture(focus) {
+    els.dayTasks.querySelector(".focus-capture")?.remove();
+    const group = els.dayTasks.querySelector(`.focus-group[data-focus="${focus}"]`);
+    if (!group) return;
+    const input = h("input", { maxlength: "200", autocomplete: "off", placeholder: t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), "aria-label": t("addToGroup", { group: t(FOCUS_LABELS[focus]) }) });
+    const form = h("form", { class: "focus-capture", "data-focus": focus }, input);
+    group.querySelector(".day-items").after(form);
+    group.querySelector(".focus-hint")?.remove();
+    input.focus();
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") form.remove();
+    });
+    input.addEventListener("blur", () => setTimeout(() => { if (!input.value.trim()) form.remove(); }, 150));
+  }
+
+  els.dayTasks.addEventListener("submit", (event) => {
+    const form = event.target.closest(".focus-capture");
+    if (!form) return;
+    event.preventDefault();
+    const focus = form.dataset.focus;
+    const item = capture(form.querySelector("input").value, anchorISO());
+    if (!item) return;
+    state.items = state.items.map((other) => (other.id === item.id ? { ...other, focus } : other));
+    commit();
+    openFocusCapture(focus); // ready for the next one
+  });
+
   els.dayTasks.addEventListener("click", (event) => {
+    const add = event.target.closest("[data-focus-add]");
+    if (add) {
+      openFocusCapture(add.dataset.focusAdd);
+      return;
+    }
+    const move = event.target.closest("[data-move-focus]");
+    if (move) {
+      const id = move.closest(".item").dataset.id;
+      state.items = Planner.moveItem(state.items, id, { date: anchorISO(), focus: move.dataset.moveFocus });
+      commit();
+      return;
+    }
     const button = event.target.closest("[data-later-tomorrow]");
     if (!button) return;
     const iso = button.dataset.laterTomorrow;
