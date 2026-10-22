@@ -17,8 +17,9 @@ switches to the week or the month when you want the bigger picture.
 **Day page** (what the app opens on)
 
 - Hourly timeline: click an empty slot to add something at that time, drag
-  tasks onto it to schedule them, overlapping items sit side by side, and a
-  line marks the current time
+  tasks onto it to schedule them, drag a block's bottom edge to change how
+  long it takes, overlapping items sit side by side, and a line marks the
+  current time
 - "For this day" split into **Must do / Could do / Not today**, with "All to
   tomorrow" for what can wait
 - **Mental load** meter: the app estimates how full the day feels (0–10) from
@@ -45,6 +46,8 @@ switches to the week or the month when you want the bigger picture.
   iCal link (Settings → Calendars). Meetings show up read-only on the
   timeline, all-day events above it, and both in the week and month views;
   busy meeting time counts toward the mental load
+- Click a meeting to see its details (place, notes, video-call link) and to
+  create a "Prepare: …" task for that day
 - Recurring events, moved or cancelled occurrences and time zones are handled
   by [ical.js](https://github.com/kewisch/ical.js); calendars refresh every
   15 minutes and when you come back to the window
@@ -56,7 +59,21 @@ switches to the week or the month when you want the bigger picture.
 - Work accounts (Google Workspace, Microsoft 365) may have the secret link
   turned off by an administrator
 
+**Habits**
+
+- Habits with an icon, the days they happen and an optional time (different
+  times for different days), shown on the day page and timeline
+- A monthly page of dots with gentle states — done, a little, rest — plus a
+  detail panel with streaks and patterns
+
 **Everything else**
+
+- Search everything you wrote (⌘K or `/`): tasks, day notes, brain dump,
+  what went well, habits and week notes
+- Repeating tasks (daily, weekdays, weekly, every two weeks, monthly,
+  yearly); the next one appears when you finish the current one
+- Desktop reminders for tasks, habits and meetings, with a 10-minute snooze,
+  a morning summary and an evening nudge to close the day
 
 - "To schedule" list for things without a date, plus an Overdue list
 - Brain dump page: write everything on your mind on the left page, one line

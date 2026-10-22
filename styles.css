@@ -1586,6 +1586,44 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 .closed-mark { color: var(--indigo); font-weight: 600; }
 .closed-good { font-style: italic; }
 .closed-line .focus-action { margin-left: auto; }
+/* ===== Meeting details ===== */
+[data-event] { cursor: pointer; }
+.event-card {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(320px, calc(100vw - 16px));
+  padding: 14px 16px 12px;
+  border: 1px solid var(--rule);
+  border-top: 4px solid var(--cat, var(--indigo));
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: 0 14px 34px rgba(30, 24, 12, .24);
+  animation: sheet-in .14s ease;
+}
+.event-card-cal { display: flex; align-items: center; gap: 6px; color: var(--muted); font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.event-card-cal i { width: 8px; height: 8px; border-radius: 50%; background: var(--cat, var(--indigo)); }
+.event-card-title { margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.event-card-when, .event-card-where { margin: 0; color: var(--ink-2); font-size: 12.5px; overflow-wrap: anywhere; }
+.event-card-when { font-family: var(--mono); font-size: 11.5px; }
+.event-card-notes {
+  max-height: 140px;
+  margin: 2px 0 0;
+  padding: 8px 10px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.event-card-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 6px; }
+
 /* ===== Search ===== */
 .search-btn { margin-left: auto; }
 .progress:not([hidden]) ~ .search-btn { margin-left: 0; }

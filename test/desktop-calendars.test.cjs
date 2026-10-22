@@ -7,6 +7,7 @@ const {
   CalendarError,
   normalizeCalendarUrl,
   maskUrl,
+  isMeetingUrl,
   eventsFromCalendar,
   createCalendarStore,
 } = require("../desktop-calendars.cjs");
@@ -54,6 +55,26 @@ test("timed events keep their real instant across time zones (Google and Outlook
   assert.equal(events[0].location, "Sala 2");
   assert.equal(events[0].calendarId, "c1");
   assert.equal(events[0].allDay, false);
+});
+
+test("descriptions become plain text and video-call links are found", () => {
+  const [google, outlook, plain] = eventsFromCalendar(ics(
+    "BEGIN:VEVENT", "UID:g", "SUMMARY:Sync", "DTSTART:20261021T130000Z", "DTEND:20261021T140000Z",
+    "X-GOOGLE-CONFERENCE:https://meet.google.com/abc-defg-hij",
+    "DESCRIPTION:<b>Pauta</b><br>1. Roadmap &amp; prazos<br><br><br>2. Dúvidas", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:o", "SUMMARY:Cliente", "DTSTART:20261021T150000Z", "DTEND:20261021T160000Z",
+    "LOCATION:Microsoft Teams Meeting",
+    "DESCRIPTION:Join: https://teams.microsoft.com/l/meetup-join/19%3ameeting_x/0?context=1 or call", "END:VEVENT",
+    "BEGIN:VEVENT", "UID:p", "SUMMARY:Almoço", "DTSTART:20261021T170000Z", "DTEND:20261021T180000Z",
+    "DESCRIPTION:Menu at https://example.com/menu", "END:VEVENT",
+  ), WINDOW);
+  assert.equal(google.description, "Pauta\n1. Roadmap & prazos\n\n2. Dúvidas");
+  assert.equal(google.link, "https://meet.google.com/abc-defg-hij");
+  assert.equal(outlook.link, "https://teams.microsoft.com/l/meetup-join/19%3ameeting_x/0?context=1");
+  assert.equal(plain.link, null);
+  assert.ok(isMeetingUrl("https://us02web.zoom.us/j/123"));
+  assert.ok(!isMeetingUrl("https://zoom.us.evil.com/j/1"));
+  assert.ok(!isMeetingUrl("http://meet.google.com/x"));
 });
 
 test("all-day events use dates with an exclusive end", () => {

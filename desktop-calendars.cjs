@@ -100,12 +100,63 @@ function isCancelled(component) {
   return String(component.getFirstPropertyValue("status") || "").toUpperCase() === "CANCELLED";
 }
 
+// Google and Outlook put HTML in descriptions; the app shows plain text.
+const MAX_DESCRIPTION = 1000;
+function plainDescription(text) {
+  return String(text || "")
+    .replace(/<br\s*\/?>|<\/p>|<\/div>|<\/li>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
+    .slice(0, MAX_DESCRIPTION);
+}
+
+// Video-call links, so a meeting can be joined from its details. Only these
+// hosts are ever opened by the app.
+const VIDEO_HOSTS = [
+  "meet.google.com", "zoom.us", "teams.microsoft.com", "teams.live.com",
+  "webex.com", "whereby.com", "meet.jit.si", "chime.aws", "meet.goto.com", "gotomeeting.com",
+];
+function isMeetingUrl(text) {
+  try {
+    const url = new URL(text);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:" && VIDEO_HOSTS.some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+  } catch {
+    return false;
+  }
+}
+function meetingLink(item) {
+  const component = item.component;
+  const candidates = [
+    component.getFirstPropertyValue("x-google-conference"),
+    component.getFirstPropertyValue("url"),
+    item.location,
+    item.description,
+  ];
+  for (const text of candidates) {
+    const found = String(text || "").match(/https:\/\/[^\s<>"')]+/g) || [];
+    const link = found.find(isMeetingUrl);
+    if (link) return link;
+  }
+  return null;
+}
+
 function toEvent(calendarId, item, start, end) {
   const allDay = start.isDate;
   const base = {
     calendarId,
     title: String(item.summary || "").trim(),
     location: String(item.location || "").trim(),
+    description: plainDescription(item.description),
+    link: meetingLink(item),
     busy: String(item.component.getFirstPropertyValue("transp") || "").toUpperCase() !== "TRANSPARENT",
     allDay,
   };
@@ -336,6 +387,7 @@ module.exports = {
   CalendarError,
   normalizeCalendarUrl,
   maskUrl,
+  isMeetingUrl,
   fetchCalendar,
   eventsFromCalendar,
   expansionWindow,

@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("desktopGadget", {
   setAlwaysOnTop: (on) => ipcRenderer.send("set-always-on-top", on),
   setShortcuts: (map) => ipcRenderer.invoke("update-shortcuts", map),
   openExternal: (url) => ipcRenderer.send("open-external", url),
+  openMeeting: (url) => ipcRenderer.send("open-meeting", url),
   onQuickCapture: (cb) => ipcRenderer.on("quick-capture", (_e, mode) => cb(mode)),
   onUpdateAvailable: (cb) => ipcRenderer.on("update-available", (_e, info) => cb(info)),
   notify: (payload) => ipcRenderer.send("notify", payload),

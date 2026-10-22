@@ -775,6 +775,9 @@
     return h("ul", { class: "day-events" }, routineLines, [...allDay, ...timed].map((event) => h("li", {
       class: `event-line${event.allDay ? " is-allday" : ""}`,
       title: eventTooltip(event),
+      tabindex: "0",
+      "data-event": event.id,
+      "data-event-day": iso,
       style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
     },
       h("i", { "aria-hidden": "true" }),
@@ -956,6 +959,8 @@
           type: twin ? "button" : null,
           class: `block event${twin ? ` has-habit${stateClass(twin.id, iso)}` : ""}${height < 34 ? " short" : ""}${item.event.busy === false ? " is-free" : ""}`,
           title: eventTooltip(item.event),
+          "data-event": twin ? null : item.event.id,
+          "data-event-day": twin ? null : iso,
           "data-habit-cell": twin?.id || null,
           "data-date": twin ? iso : null,
           "aria-pressed": twin ? String(Planner.habitDone(state.habitLog, iso, twin.id)) : null,
@@ -1046,6 +1051,9 @@
     els.dayAllDay.replaceChildren(...allDay.map((event) => h("span", {
       class: "allday-chip",
       title: eventTooltip(event),
+      tabindex: "0",
+      "data-event": event.id,
+      "data-event-day": iso,
       style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
     }, eventTitle(event))));
 
@@ -1219,6 +1227,8 @@
           meetings.slice(0, limit).map((event) => h("li", {
             class: "mini event",
             title: eventTooltip(event),
+            "data-event": event.id,
+            "data-event-day": iso,
             style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
           },
             h("i", { "aria-hidden": "true" }),
@@ -2671,6 +2681,95 @@
     els.dumpInput.focus();
   }
 
+  // ---------- meeting details ----------
+  // Clicking a meeting shows what the calendar knows about it, with a way
+  // to join the call and to turn it into a task for the day.
+  function closeEventCard() {
+    document.querySelectorAll(".event-card").forEach((card) => card.remove());
+  }
+
+  function openEventCard(target) {
+    closeEventCard();
+    const event = state.events.find((candidate) => candidate.id === target.dataset.event);
+    const iso = target.dataset.eventDay;
+    if (!event || !Core.parseISODate(iso)) return;
+    const calendar = calendarById(event.calendarId);
+    const day = capitalize(formatDate(Core.parseISODate(iso), { weekday: "long", day: "numeric", month: "long" }));
+    const card = h("div", {
+      class: "event-card",
+      role: "dialog",
+      "aria-label": eventTitle(event),
+      "data-event-id": event.id,
+      "data-event-day": iso,
+      style: calendar ? `--cat: ${calendar.color}` : null,
+    },
+      calendar ? h("span", { class: "event-card-cal" }, h("i", { "aria-hidden": "true" }), calendar.name) : null,
+      h("h3", { class: "event-card-title", text: eventTitle(event) }),
+      h("p", { class: "event-card-when", text: `${day} · ${eventRange(event)}` }),
+      event.location ? h("p", { class: "event-card-where", text: event.location }) : null,
+      event.description ? h("p", { class: "event-card-notes", text: event.description }) : null,
+      h("div", { class: "event-card-actions" },
+        event.link ? h("button", { type: "button", class: "btn", "data-event-join": event.link, text: t("eventJoin") }) : null,
+        h("button", { type: "button", class: "btn primary", "data-event-task": "", text: t("eventPrep") })));
+    (target.closest("dialog") || document.body).append(card);
+    const rect = target.getBoundingClientRect();
+    const width = card.offsetWidth;
+    const height = card.offsetHeight;
+    // Beside a timeline block (it can be tall), under or over anything else.
+    const beside = target.classList.contains("block") && rect.right + 10 + width < innerWidth;
+    const left = beside ? rect.right + 10 : Math.min(Math.max(8, rect.left), innerWidth - width - 8);
+    const top = beside
+      ? Math.min(Math.max(8, rect.top), innerHeight - height - 8)
+      : rect.bottom + 6 + height < innerHeight ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+    card.querySelector("[data-event-task]").focus();
+  }
+
+  function openMeeting(url) {
+    if (desktop?.openMeeting) desktop.openMeeting(url);
+    else window.open(url, "_blank", "noopener");
+  }
+
+  // "Prepare: …" as a must-do on the meeting's day, straight into the editor.
+  function taskFromEvent(card) {
+    const event = state.events.find((candidate) => candidate.id === card.dataset.eventId);
+    closeEventCard();
+    if (!event) return;
+    const item = addItem({ title: t("eventPrepTitle", { title: eventTitle(event) }).slice(0, 200), date: card.dataset.eventDay, focus: "must" });
+    openEditor(item.id);
+  }
+
+  document.addEventListener("click", (event) => {
+    const card = event.target.closest(".event-card");
+    if (card) {
+      const join = event.target.closest("[data-event-join]");
+      if (join) {
+        openMeeting(join.dataset.eventJoin);
+        closeEventCard();
+      } else if (event.target.closest("[data-event-task]")) {
+        taskFromEvent(card);
+      }
+      return;
+    }
+    const target = event.target.closest("[data-event]");
+    if (target) openEventCard(target);
+    else closeEventCard();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.querySelector(".event-card")) {
+      event.stopPropagation();
+      event.preventDefault();
+      const opener = document.querySelector(`[data-event="${CSS.escape(document.querySelector(".event-card").dataset.eventId)}"]`);
+      closeEventCard();
+      opener?.focus();
+    }
+  }, true);
+  document.addEventListener("scroll", (event) => {
+    if (!event.target.closest?.(".event-card")) closeEventCard();
+  }, true);
+  window.addEventListener("resize", closeEventCard);
+
   // ---------- search ----------
   const SEARCH_LABELS = {
     task: "searchTasks", habit: "searchHabits", dump: "viewDump", dayNote: "searchDayNotes",
@@ -3117,7 +3216,7 @@
 
   // Dates in the week and month views open that day's page.
   document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-action], .month-tabs, [data-ghost-source]")) return;
+    if (event.target.closest("[data-action], .month-tabs, [data-ghost-source], [data-event], .event-card")) return;
     const opener = event.target.closest("[data-open-day]");
     if (opener) openDay(opener.dataset.openDay);
   });
@@ -3148,7 +3247,13 @@
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.target.matches?.(".item-body") && (event.key === "Enter" || event.key === " ")) {
+    const eventTarget = event.target.closest?.("[data-event]");
+    if (eventTarget && (event.key === "Enter" || event.key === " ") && !event.target.closest(".event-card")) {
+      event.preventDefault();
+      openEventCard(eventTarget);
+      return;
+    }
+    if (event.target.matches?.(".item-body") && event.target.closest(".item") && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
       openEditor(event.target.closest(".item").dataset.id);
       return;

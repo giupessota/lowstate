@@ -4,7 +4,7 @@ const https = require("https");
 const path = require("path");
 const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
-const { createCalendarStore } = require("./desktop-calendars.cjs");
+const { createCalendarStore, isMeetingUrl } = require("./desktop-calendars.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
@@ -347,6 +347,10 @@ ipcMain.on("notify", (_event, payload) => {
 
 ipcMain.on("hide-window", () => { if (window) window.hide(); });
 ipcMain.on("set-always-on-top", (_event, on) => { if (window) window.setAlwaysOnTop(!!on, "floating"); });
+// "Join call" in a meeting's details: only known video-call hosts.
+ipcMain.on("open-meeting", (_event, url) => {
+  if (typeof url === "string" && isMeetingUrl(url)) shell.openExternal(url);
+});
 ipcMain.on("open-external", (_event, url) => {
   if (typeof url === "string" && url.startsWith("https://github.com/")) shell.openExternal(url);
 });
