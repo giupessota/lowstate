@@ -98,7 +98,96 @@
       notes: String(item.notes ?? ""),
       createdAt: Number.isFinite(item.createdAt) ? item.createdAt : now,
       order: Number.isFinite(item.order) ? item.order : 0,
+      // Repeating tasks: the rule, the date the rule counts from (so a
+      // monthly "31st" comes back to the 31st), and — once done — the id of
+      // the next occurrence it created.
+      repeat: date && REPEATS.includes(item.repeat) ? item.repeat : null,
+      repeatAnchor: date && REPEATS.includes(item.repeat) ? (parseISODate(item.repeatAnchor) ? item.repeatAnchor : date) : null,
+      spawned: typeof item.spawned === "string" && item.spawned ? item.spawned : null,
     };
+  }
+
+  // ---------- Repeating tasks ----------
+  const REPEATS = ["daily", "weekdays", "weekly", "biweekly", "monthly", "yearly"];
+
+  // The occurrence right after `iso` for a rule; monthly and yearly keep the
+  // anchor's day (clamped to shorter months).
+  function nextOccurrence(repeat, iso, anchorISO = iso) {
+    const date = parseISODate(iso);
+    const anchor = parseISODate(anchorISO) || date;
+    if (!date || !REPEATS.includes(repeat)) return null;
+    if (repeat === "daily") return toISODate(addDays(date, 1));
+    if (repeat === "weekly") return toISODate(addDays(date, 7));
+    if (repeat === "biweekly") return toISODate(addDays(date, 14));
+    if (repeat === "weekdays") {
+      let next = addDays(date, 1);
+      while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);
+      return toISODate(next);
+    }
+    const months = repeat === "monthly" ? 1 : 12;
+    const year = date.getFullYear();
+    const month = date.getMonth() + months;
+    const targetMonth = repeat === "yearly" ? anchor.getMonth() : ((month % 12) + 12) % 12;
+    const targetYear = repeat === "yearly" ? year + 1 : year + Math.floor(month / 12);
+    const last = new Date(targetYear, targetMonth + 1, 0).getDate();
+    return toISODate(new Date(targetYear, targetMonth, Math.min(anchor.getDate(), last)));
+  }
+
+  // First occurrence after the item's date that isn't in the past, so a task
+  // finished late doesn't leave a trail of overdue copies.
+  function nextUpcoming(item, todayISO) {
+    let next = nextOccurrence(item.repeat, item.date, item.repeatAnchor);
+    for (let guard = 0; next && next < todayISO && guard < 1000; guard++) next = nextOccurrence(item.repeat, next, item.repeatAnchor);
+    return next;
+  }
+
+  // Ticking a task. A repeating one, when done, creates its next occurrence
+  // (unticking it again takes that copy back if it's still untouched).
+  function completeItem(items, id, todayISO, now = Date.now()) {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item) return items;
+    if (item.done) {
+      const spawned = item.spawned ? items.find((candidate) => candidate.id === item.spawned) : null;
+      const keep = items.filter((candidate) => !(spawned && candidate.id === spawned.id && !spawned.done));
+      return keep.map((candidate) => (candidate.id === id ? { ...toggleDone(candidate, todayISO, now), spawned: null } : candidate));
+    }
+    const done = toggleDone(item, todayISO, now);
+    if (!item.repeat || !item.date) return items.map((candidate) => (candidate.id === id ? done : candidate));
+    const date = nextUpcoming(item, todayISO);
+    const others = items.filter((candidate) => candidate.id !== id);
+    const next = normalizeItem({
+      ...item,
+      id: newId(),
+      date,
+      done: false,
+      doneAt: null,
+      spawned: null,
+      createdAt: now,
+      order: nextOrder(others, date),
+    }, now);
+    return [...items.map((candidate) => (candidate.id === id ? { ...done, spawned: next.id } : candidate)), next];
+  }
+
+  // "Skip this one": the task moves to its next occurrence.
+  function skipOccurrence(items, id, todayISO) {
+    return items.map((item) => {
+      if (item.id !== id || !item.repeat || item.done) return item;
+      return { ...item, date: nextUpcoming({ ...item, date: item.date < todayISO ? todayISO : item.date }, todayISO) };
+    });
+  }
+
+  // Future occurrences of open repeating tasks between two dates, as light
+  // read-only copies for the week and month pages.
+  function upcomingOccurrences(items, fromISO, toISO) {
+    const out = [];
+    items.filter((item) => item.repeat && item.date && !item.done).forEach((item) => {
+      let date = nextOccurrence(item.repeat, item.date, item.repeatAnchor);
+      for (let guard = 0; date && date <= toISO && guard < 400; guard++) {
+        if (date >= fromISO) out.push({ ...item, id: `${item.id}@${date}`, sourceId: item.id, date, ghost: true });
+        date = nextOccurrence(item.repeat, date, item.repeatAnchor);
+      }
+    });
+    return out;
   }
 
   function defaultCategories(language = "en") {
@@ -1216,6 +1305,11 @@
     nextOrder,
     createItem,
     moveItem,
+    REPEATS,
+    nextOccurrence,
+    completeItem,
+    skipOccurrence,
+    upcomingOccurrences,
     closeDay,
     parseDump,
     legacyDumpNotes,

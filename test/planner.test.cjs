@@ -388,6 +388,48 @@ test("brain dump splits lines, drops bullets and blanks, and imports old notes",
   assert.deepEqual(notes, [{ id: "n1", text: "ideia solta", createdAt: 5 }]);
 });
 
+test("repeat rules find the next date, keeping the day of month", () => {
+  assert.equal(P.nextOccurrence("daily", "2026-10-21"), "2026-10-22");
+  assert.equal(P.nextOccurrence("weekly", "2026-10-21"), "2026-10-28");
+  assert.equal(P.nextOccurrence("biweekly", "2026-10-21"), "2026-11-04");
+  assert.equal(P.nextOccurrence("weekdays", "2026-10-23"), "2026-10-26"); // Fri → Mon
+  assert.equal(P.nextOccurrence("monthly", "2026-01-31", "2026-01-31"), "2026-02-28");
+  assert.equal(P.nextOccurrence("monthly", "2026-02-28", "2026-01-31"), "2026-03-31");
+  assert.equal(P.nextOccurrence("monthly", "2026-12-05"), "2027-01-05");
+  assert.equal(P.nextOccurrence("yearly", "2028-02-29", "2028-02-29"), "2029-02-28");
+  assert.equal(P.nextOccurrence("nope", "2026-10-21"), null);
+  assert.equal(P.normalizeItem({ title: "x", repeat: "monthly" }).repeat, null); // needs a date
+  const rent = P.normalizeItem({ title: "Aluguel", date: "2026-10-05", repeat: "monthly" });
+  assert.deepEqual([rent.repeat, rent.repeatAnchor], ["monthly", "2026-10-05"]);
+});
+
+test("completing a repeating task creates the next one; unticking takes it back", () => {
+  const rent = P.normalizeItem({ id: "rent", title: "Pagar aluguel", date: "2026-10-05", repeat: "monthly", focus: "must" });
+  // Paid late, on the 21st: the next is November 5th (not an overdue copy).
+  let items = P.completeItem([rent], "rent", "2026-10-21", 1);
+  assert.equal(items.length, 2);
+  const next = items.find((item) => item.id !== "rent");
+  assert.deepEqual([next.date, next.done, next.repeat, next.focus, next.title], ["2026-11-05", false, "monthly", "must", "Pagar aluguel"]);
+  assert.equal(items.find((item) => item.id === "rent").spawned, next.id);
+  items = P.completeItem(items, "rent", "2026-10-21");
+  assert.deepEqual(items.map((item) => [item.id, item.done]), [["rent", false]]);
+  // A daily task overdue for days jumps to today.
+  const water = P.normalizeItem({ id: "w", title: "Regar plantas", date: "2026-10-15", repeat: "daily" });
+  assert.equal(P.completeItem([water], "w", "2026-10-21").find((item) => item.id !== "w").date, "2026-10-21");
+  // Plain tasks just toggle.
+  assert.equal(P.completeItem([P.normalizeItem({ id: "p", title: "p", date: "2026-10-21" })], "p", "2026-10-21").length, 1);
+  // Skipping moves the open task to its next date.
+  assert.equal(P.skipOccurrence([rent], "rent", "2026-10-01")[0].date, "2026-11-05");
+});
+
+test("upcoming occurrences fill the calendar ahead, read-only", () => {
+  const gym = P.normalizeItem({ id: "g", title: "Pilates", date: "2026-10-20", repeat: "weekly" });
+  const ghosts = P.upcomingOccurrences([gym], "2026-10-01", "2026-11-30");
+  assert.deepEqual(ghosts.map((ghost) => ghost.date), ["2026-10-27", "2026-11-03", "2026-11-10", "2026-11-17", "2026-11-24"]);
+  assert.ok(ghosts.every((ghost) => ghost.ghost && ghost.sourceId === "g" && ghost.id.startsWith("g@")));
+  assert.deepEqual(P.upcomingOccurrences([{ ...gym, done: true }], "2026-10-01", "2026-11-30"), []);
+});
+
 test("closing a day moves, returns or leaves its unfinished tasks", () => {
   const day = "2026-10-21";
   const items = [

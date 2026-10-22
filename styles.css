@@ -1529,6 +1529,17 @@ svg.i {
 .dump-empty { margin-top: 12px; padding-left: 2px; }
 .dump-spread { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 0; }
 
+/* Repeating tasks */
+.repeat-mark { color: var(--muted); font-size: 12px; }
+.repeat-row { display: flex; align-items: center; gap: 10px; }
+.repeat-row select { flex: 1; }
+.item.is-ghost { opacity: .5; cursor: pointer; }
+.item.is-ghost:hover { opacity: .8; }
+.line.is-ghost { padding-left: 7px; gap: 8px; }
+.line.is-ghost .ghost-mark { width: 15px; text-align: center; }
+.line.is-ghost .line-title { font-style: italic; }
+.mini.is-ghost .item-body { font-style: italic; }
+
 /* Closing the day */
 .day-head-side { display: flex; align-items: center; gap: 10px; }
 .close-day-btn {

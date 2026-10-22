@@ -185,6 +185,8 @@
     itemDateLabel: $("itemDateLabel"),
     dateChips: $("dateChips"),
     itemStart: $("itemStart"),
+    itemRepeat: $("itemRepeat"),
+    itemSkip: $("itemSkip"),
     itemDuration: $("itemDuration"),
     categoryChips: $("categoryChips"),
     newCategoryInput: $("newCategoryInput"),
@@ -423,9 +425,38 @@
   }
 
   function toggleItem(id) {
-    const item = findItem(id);
-    if (item) updateItem(Planner.toggleDone(item, todayISO()));
+    if (!findItem(id)) return;
+    state.items = Planner.completeItem(state.items, id, todayISO());
+    commit();
   }
+
+  // "Every month on the 5th", "Toda semana (terça-feira)"…
+  function repeatLabel(rule, iso) {
+    const date = Core.parseISODate(iso);
+    if (!rule || !date) return "";
+    return t(`repeat-${rule}`, {
+      day: formatDate(date, { weekday: "long" }),
+      n: date.getDate(),
+      date: formatDate(date, { day: "numeric", month: "long" }),
+    });
+  }
+
+  // A future occurrence of a repeating task: shown light, opens its series.
+  function ghostEl(ghost, variant) {
+    const category = categoryById(ghost.category);
+    return h("li", {
+      class: `item ${variant} is-ghost`,
+      "data-ghost-source": ghost.sourceId,
+      title: `${ghost.title} · ${repeatLabel(ghost.repeat, ghost.repeatAnchor)}`,
+      style: category ? `--cat: ${category.color}` : null,
+    },
+      variant === "mini" ? h("i", { "aria-hidden": "true" }) : h("span", { class: "repeat-mark ghost-mark", "aria-hidden": "true", text: "↻" }),
+      h("span", { class: variant === "mini" ? "item-body" : "line-title" },
+        ghost.start ? h("span", { class: variant === "mini" ? "mini-time" : "line-time", text: ghost.start }) : null,
+        ghost.title));
+  }
+
+  const ghostsOn = (ghosts, iso) => ghosts.filter((ghost) => ghost.date === iso);
 
   function moveToToday(ids) {
     const today = todayISO();
@@ -511,6 +542,7 @@
         h("i", { "aria-hidden": "true" }),
         h("span", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
           item.start ? h("span", { class: "mini-time", text: item.start }) : null,
+          item.repeat ? "↻ " : null,
           item.title));
     }
     const classes = ["item", variant === "line" ? "line" : "slip"];
@@ -531,6 +563,7 @@
       body = h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0" },
         item.start ? h("span", { class: "line-time", text: timeRange(item) }) : null,
         h("span", { class: "line-title", text: item.title }),
+        item.repeat ? h("span", { class: "repeat-mark", title: repeatLabel(item.repeat, item.repeatAnchor), text: "↻" }) : null,
         stamp, seal, notesMark);
     } else {
       const meta = [
@@ -745,7 +778,10 @@
       h("span", { class: "event-title", text: eventTitle(event) }))));
   }
 
+  let weekGhosts = [];
+
   function renderDays(days) {
+    weekGhosts = Planner.upcomingOccurrences(state.items, Core.toISODate(days[0]), Core.toISODate(days[days.length - 1]));
     els.weekGrid.replaceChildren(...days.map((day) => {
       const iso = Core.toISODate(day);
       const holiday = holidayFor(iso);
@@ -764,7 +800,8 @@
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
           weekEventsEl(iso),
           h("ul", { class: "day-items", "data-date": iso },
-            Planner.itemsForDay(state.items, iso).map((item) => itemEl(item, "line"))),
+            Planner.itemsForDay(state.items, iso).map((item) => itemEl(item, "line")),
+            ghostsOn(weekGhosts, iso).map((ghost) => ghostEl(ghost, "line"))),
           h("form", { class: "day-add", "data-date": iso },
             h("input", {
               name: "title",
@@ -1076,6 +1113,7 @@
     els.dayTasks.dataset.date = iso;
     els.dayTasks.replaceChildren(...Planner.FOCUS.map((focus) => {
       const group = items.filter((item) => item.focus === focus);
+      const ghosts = Planner.upcomingOccurrences(state.items, iso, iso).filter((ghost) => ghost.focus === focus);
       const movable = focus === "later" && group.some((item) => !item.done);
       return h("section", { class: `focus-group focus-${focus}`, "data-focus": focus },
         h("h3", { class: "focus-head" },
@@ -1093,8 +1131,8 @@
             text: t(`move-${other}`),
           }))));
           return line;
-        })),
-        group.length ? null : h("p", { class: "focus-hint", text: t(`${FOCUS_LABELS[focus]}Hint`) }));
+        }), ghosts.map((ghost) => ghostEl(ghost, "line"))),
+        group.length || ghosts.length ? null : h("p", { class: "focus-hint", text: t(`${FOCUS_LABELS[focus]}Hint`) }));
     }));
   }
 
@@ -1156,10 +1194,13 @@
 
     const limit = weeks.length > 5 ? 3 : 4;
     els.monthGrid.style.gridTemplateRows = `repeat(${weeks.length}, minmax(0, 1fr))`;
+    // Daily and weekday repeats would fill every cell; the month shows the rarer ones.
+    const monthGhosts = Planner.upcomingOccurrences(state.items, Core.toISODate(weeks[0][0]), Core.toISODate(weeks[weeks.length - 1][6]))
+      .filter((ghost) => ghost.repeat !== "daily" && ghost.repeat !== "weekdays");
     els.monthGrid.replaceChildren(...weeks.flat().map((day) => {
       const iso = Core.toISODate(day);
       const holiday = holidayFor(iso);
-      const items = Planner.itemsForDay(state.items, iso);
+      const items = [...Planner.itemsForDay(state.items, iso), ...ghostsOn(monthGhosts, iso)];
       const { allDay: allDayEvents, timed: timedEvents } = dayEvents(iso);
       const meetings = [...allDayEvents, ...timedEvents];
       const classes = dayClasses(day, "month-cell") + (day.getMonth() === month ? "" : " is-other");
@@ -1179,7 +1220,7 @@
             h("span", { class: "item-body" },
               event.allDay ? null : h("span", { class: "mini-time", text: clockTime(new Date(event.start)) }),
               eventTitle(event)))),
-          items.slice(0, Math.max(0, limit - meetings.length)).map((item) => itemEl(item, "mini"))),
+          items.slice(0, Math.max(0, limit - meetings.length)).map((item) => (item.ghost ? ghostEl(item, "mini") : itemEl(item, "mini")))),
         items.length + meetings.length > limit
           ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length + meetings.length - limit }) })
           : null);
@@ -1840,6 +1881,12 @@
       style: `--cat: ${category.color}`,
     }, h("i"), category.name)));
 
+    fillSelect(els.itemRepeat, Planner.REPEATS, draft.date ? t("repeatNone") : t("repeatNeedsDate"), (rule) => repeatLabel(rule, draft.date));
+    els.itemRepeat.value = draft.repeat || "";
+    els.itemRepeat.disabled = !draft.date;
+    const saved = findItem(state.editingId);
+    els.itemSkip.hidden = !(saved?.repeat && !saved.done);
+
     els.itemUrgent.setAttribute("aria-pressed", String(draft.priority === "urgent"));
     els.itemFocus.querySelectorAll("[data-focus]").forEach((button) => {
       const active = button.dataset.focus === draft.focus;
@@ -1885,8 +1932,16 @@
       draft.order = Planner.nextOrder(state.items.filter((item) => item.id !== original.id), draft.date);
     }
     if (draft.done && !original.done) draft.doneAt = Date.now();
+    // A new date restarts the repeat from it; no date, no repeat.
+    if (draft.repeat && draft.date !== original.date) draft.repeatAnchor = draft.date;
+    if (!draft.date) draft.repeat = null;
     els.itemDialog.close();
-    updateItem(Planner.normalizeItem(draft));
+    // Finishing a repeating task from the editor also creates its next one.
+    const finishing = draft.done && !original.done && draft.repeat;
+    const saved = Planner.normalizeItem(finishing ? { ...draft, done: false, doneAt: null } : draft);
+    state.items = state.items.map((item) => (item.id === saved.id ? saved : item));
+    if (finishing) state.items = Planner.completeItem(state.items, saved.id, todayISO());
+    commit();
   }
 
   function addCategoryFromEditor() {
@@ -1917,6 +1972,18 @@
     if (!button) return;
     state.draft.focus = button.dataset.focus;
     renderEditor();
+  });
+  els.itemRepeat.addEventListener("change", () => {
+    state.draft.repeat = els.itemRepeat.value || null;
+    state.draft.repeatAnchor = state.draft.repeat ? state.draft.date : null;
+  });
+  els.itemSkip.addEventListener("click", () => {
+    const id = state.editingId;
+    els.itemDialog.close();
+    state.items = Planner.skipOccurrence(state.items, id, todayISO());
+    commit();
+    const moved = findItem(id);
+    if (moved) toast(t("repeatSkipped", { date: shortDate(moved.date) }));
   });
   els.itemUrgent.addEventListener("click", () => {
     state.draft.priority = state.draft.priority === "urgent" ? "normal" : "urgent";
@@ -2452,6 +2519,12 @@
 
   // Habit cells (habits page) and pills (day page) share one handler.
   document.addEventListener("click", (event) => {
+    const ghost = event.target.closest("[data-ghost-source]");
+    if (ghost) {
+      event.stopPropagation();
+      openEditor(ghost.dataset.ghostSource);
+      return;
+    }
     const option = event.target.closest(".state-menu [data-state]");
     if (option) {
       const menu = option.closest(".state-menu");
@@ -2919,7 +2992,7 @@
 
   // Dates in the week and month views open that day's page.
   document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-action], .month-tabs")) return;
+    if (event.target.closest("[data-action], .month-tabs, [data-ghost-source]")) return;
     const opener = event.target.closest("[data-open-day]");
     if (opener) openDay(opener.dataset.openDay);
   });
