@@ -323,13 +323,14 @@ ipcMain.on("notify", (_event, payload) => {
   const title = String(payload.title || "Lowstate").slice(0, 120);
   const body = String(payload.body || "").slice(0, 240);
   const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.iso || "")) ? payload.iso : null;
+  const action = payload.action === "closure" ? "closure" : null;
   const notification = new Notification({ title, body });
   liveNotifications.add(notification);
   const release = () => liveNotifications.delete(notification);
   notification.on("click", () => {
     release();
     focusWindow();
-    if (iso && window) window.webContents.send("open-day", iso);
+    if (iso && window) window.webContents.send("open-day", iso, action);
   });
   notification.on("close", release);
   notification.show();

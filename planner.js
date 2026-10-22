@@ -158,6 +158,21 @@
   // Moves an item into a day (or back to the unscheduled list when date is
   // null), placing it before `beforeId` and reindexing that bucket's order.
   // `focus` optionally moves it into a must/could/later group as well.
+  // Closing a day: what happens to its unfinished tasks ("Not today" ones
+  // included). "tomorrow" moves them on (not-today ones come back as could
+  // do), "inbox" returns them to "To schedule", "stay" leaves them.
+  function closeDay(items, iso, choice, tomorrowISO) {
+    const open = items.filter((item) => item.date === iso && !item.done).map((item) => item.id);
+    if (choice === "tomorrow" && parseISODate(tomorrowISO)) {
+      return open.reduce((list, id) => {
+        const item = list.find((candidate) => candidate.id === id);
+        return moveItem(list, id, { date: tomorrowISO, focus: item.focus === "later" ? "could" : item.focus });
+      }, items);
+    }
+    if (choice === "inbox") return open.reduce((list, id) => moveItem(list, id, { date: null }), items);
+    return items;
+  }
+
   function moveItem(items, id, { date = null, beforeId = null, focus = null } = {}) {
     const moving = items.find((item) => item.id === id);
     if (!moving) return items;
@@ -789,7 +804,7 @@
   // Everything worth a heads-up today and tomorrow, each with the moment to
   // fire (`at`, ms) and a stable `key` so it's only shown once. The caller
   // decides which are due and builds the words.
-  function reminders({ items = [], habits = [], habitLog = {}, events = [], now = new Date(), lead = 10, kinds = {}, morningAt = null } = {}) {
+  function reminders({ items = [], habits = [], habitLog = {}, events = [], now = new Date(), lead = 10, kinds = {}, morningAt = null, closureAt = null } = {}) {
     const today = startOfDay(now);
     const days = [toISODate(today), toISODate(addDays(today, 1))];
     const at = (iso, time) => parseISODate(iso).getTime() + timeToMinutes(time) * 60000;
@@ -823,6 +838,7 @@
       });
     }
     if (isTime(morningAt)) out.push({ key: `morning:${days[0]}`, kind: "morning", at: at(days[0], morningAt), iso: days[0], start: morningAt, title: "" });
+    if (isTime(closureAt)) out.push({ key: `closure:${days[0]}`, kind: "closure", at: at(days[0], closureAt), iso: days[0], start: closureAt, title: "" });
     return out.sort((a, b) => a.at - b.at);
   }
 
@@ -1128,6 +1144,7 @@
     nextOrder,
     createItem,
     moveItem,
+    closeDay,
     toggleDone,
     weekStats,
     parseCapture,

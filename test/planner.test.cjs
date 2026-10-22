@@ -348,6 +348,23 @@ test("habits only count between their start and end dates", () => {
   assert.equal(P.habitStreak(log, fresh, "2026-10-13"), 2);
 });
 
+test("closing a day moves, returns or leaves its unfinished tasks", () => {
+  const day = "2026-10-21";
+  const items = [
+    P.normalizeItem({ id: "a", title: "a", date: day, focus: "must" }),
+    P.normalizeItem({ id: "b", title: "b", date: day, focus: "later" }),
+    P.normalizeItem({ id: "c", title: "c", date: day, done: true }),
+    P.normalizeItem({ id: "d", title: "d", date: day, start: "15:00", duration: 30 }),
+    P.normalizeItem({ id: "e", title: "e", date: "2026-10-22" }),
+  ];
+  const moved = P.closeDay(items, day, "tomorrow", "2026-10-22");
+  const byId = Object.fromEntries(moved.map((item) => [item.id, item]));
+  assert.deepEqual([byId.a.date, byId.a.focus, byId.b.date, byId.b.focus, byId.c.date, byId.d.date], ["2026-10-22", "must", "2026-10-22", "could", day, "2026-10-22"]);
+  const inbox = Object.fromEntries(P.closeDay(items, day, "inbox").map((item) => [item.id, item]));
+  assert.deepEqual([inbox.a.date, inbox.d.date, inbox.d.start, inbox.c.date], [null, null, null, day]);
+  assert.equal(P.closeDay(items, day, "stay"), items);
+});
+
 test("reminders cover timed tasks, habits and meetings today and tomorrow", () => {
   const now = new Date(2026, 9, 21, 9, 0); // Wednesday 21 October 2026, 09:00
   const local = (d, h, m = 0) => new Date(2026, 9, d, h, m);
@@ -375,6 +392,8 @@ test("reminders cover timed tasks, habits and meetings today and tomorrow", () =
   ]);
   assert.equal(list[1].at, local(21, 9, 20).getTime());
   assert.equal(new Set(list.map((r) => r.key)).size, list.length);
+  assert.deepEqual(P.reminders({ now, kinds: { tasks: false, habits: false, meetings: false }, closureAt: "21:30" }).map((r) => [r.kind, r.key]),
+    [["closure", "closure:2026-10-21"]]);
   const quiet = P.reminders({ items, habits, events, now, lead: 5, kinds: { tasks: false, meetings: false } });
   assert.deepEqual(quiet.map((r) => r.kind), ["habit"]);
   const doneGym = P.reminders({ habits, habitLog: { "2026-10-21": ["gym"] }, now, kinds: { tasks: false, meetings: false } });

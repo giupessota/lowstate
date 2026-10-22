@@ -127,8 +127,15 @@
                 <div class="week-mark">
                   <strong data-i18n="todayTasks">For this day</strong>
                 </div>
-                <span class="range-mark" id="dayProgress"></span>
+                <span class="day-head-side">
+                  <span class="range-mark" id="dayProgress"></span>
+                  <button type="button" class="close-day-btn" id="closeDayBtn" hidden>
+                    <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.2 6.2 0 0 0 10.1 10.1z"/></svg>
+                    <span data-i18n="closeDay">Close the day</span>
+                  </button>
+                </span>
               </header>
+              <p class="closed-line" id="closedLine" hidden></p>
               <section class="load" id="loadMeter" data-i18n-aria="load"></section>
               <form class="day-capture" id="dayCaptureForm">
                 <span class="day-capture-mark" aria-hidden="true">✎</span>
@@ -330,6 +337,34 @@
           <span class="spacer"></span>
           <button type="button" class="btn ghost" id="itemCancel" data-i18n="cancel">Cancel</button>
           <button type="submit" class="btn primary" data-i18n="save">Save</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog class="sheet closure-sheet" id="closureDialog" aria-labelledby="closureTitle">
+      <form class="sheet-body" id="closureForm" method="dialog">
+        <header class="sheet-head">
+          <svg class="i closure-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.5 14.6A7.8 7.8 0 1 1 9.4 4.5a6.2 6.2 0 0 0 10.1 10.1z"/></svg>
+          <div class="detail-name">
+            <h2 id="closureTitle" data-i18n="closeDay">Close the day</h2>
+            <span class="field-hint" data-i18n="closeSubtitle">A little space before tomorrow.</span>
+          </div>
+        </header>
+        <p class="closure-recap" id="closureRecap"></p>
+        <label class="field">
+          <span class="field-label" data-i18n="closeGood">What went well today?</span>
+          <textarea id="closureGood" rows="3" maxlength="500" data-i18n-placeholder="closeGoodPlaceholder"></textarea>
+        </label>
+        <fieldset class="field closure-left" id="closureLeft">
+          <legend class="field-label"><span data-i18n="closeLeft">And what was left?</span> <span class="closure-count" id="closureCount"></span></legend>
+          <label class="closure-choice"><input type="radio" name="closureChoice" value="tomorrow" checked /> <span data-i18n="closeTomorrow">Move to tomorrow</span></label>
+          <label class="closure-choice"><input type="radio" name="closureChoice" value="inbox" /> <span data-i18n="closeInbox">Back to “To schedule”</span></label>
+          <label class="closure-choice"><input type="radio" name="closureChoice" value="stay" /> <span><span data-i18n="closeStay">Leave them where they are</span> <small data-i18n="closeStayHint"></small></span></label>
+        </fieldset>
+        <footer class="sheet-foot">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="closureCancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="closeButton">Close the day</button>
         </footer>
       </form>
     </dialog>
@@ -565,6 +600,16 @@
             <div class="morning-row">
               <input type="time" id="morningAt" step="900" data-i18n-aria="morningAt" />
               <div class="seg" data-setting="morningOn">
+                <button type="button" data-value="on" data-i18n="on">ON</button>
+                <button type="button" data-value="off" data-i18n="off">OFF</button>
+              </div>
+            </div>
+          </div>
+          <div class="set-row">
+            <span data-i18n="closeReminder">Close the day</span>
+            <div class="morning-row">
+              <input type="time" id="closureAt" step="900" data-i18n-aria="closeReminder" />
+              <div class="seg" data-setting="closureOn">
                 <button type="button" data-value="on" data-i18n="on">ON</button>
                 <button type="button" data-value="off" data-i18n="off">OFF</button>
               </div>

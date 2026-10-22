@@ -1486,6 +1486,45 @@ svg.i {
 .block.event.has-habit.is-done { opacity: 1; }
 .block.event.has-habit.is-done .block-title { text-decoration: none; }
 
+/* Closing the day */
+.day-head-side { display: flex; align-items: center; gap: 10px; }
+.close-day-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px 3px 7px;
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--ink-2);
+  font: 500 11px var(--sans);
+  cursor: pointer;
+}
+.close-day-btn svg.i { width: 13px; height: 13px; }
+.close-day-btn:hover { border-color: var(--indigo); color: var(--indigo); }
+.closed-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--indigo) 7%, var(--paper)); color: var(--ink-2); font-size: 12.5px; }
+.closed-mark { color: var(--indigo); font-weight: 600; }
+.closed-good { font-style: italic; }
+.closed-line .focus-action { margin-left: auto; }
+.closure-sheet { width: min(440px, calc(100vw - 32px)); }
+.closure-moon { width: 26px; height: 26px; color: var(--indigo); margin-top: 2px; }
+.closure-recap { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--ink) 4%, transparent); color: var(--ink-2); font: 500 12px var(--mono); }
+.closure-sheet textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.5 var(--sans);
+  resize: vertical;
+}
+.closure-sheet textarea:focus { border-color: var(--ink-2); outline: none; }
+.closure-left { margin: 0; padding: 0; border: 0; }
+.closure-count { color: var(--muted); letter-spacing: 0; text-transform: none; }
+.closure-choice { display: flex; align-items: baseline; gap: 8px; padding: 4px 2px; font-size: 13.5px; cursor: pointer; }
+.closure-choice input { accent-color: var(--indigo); }
+.closure-choice small { color: var(--muted); font-size: 11.5px; }
+
 /* Habit editor */
 .habit-sheet { width: min(420px, calc(100vw - 32px)); }
 .habit-sheet .sheet-body { max-height: calc(100vh - 48px); overflow-y: auto; }

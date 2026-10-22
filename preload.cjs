@@ -29,5 +29,5 @@ contextBridge.exposeInMainWorld("desktopGadget", {
   onQuickCapture: (cb) => ipcRenderer.on("quick-capture", (_e, mode) => cb(mode)),
   onUpdateAvailable: (cb) => ipcRenderer.on("update-available", (_e, info) => cb(info)),
   notify: (payload) => ipcRenderer.send("notify", payload),
-  onOpenDay: (cb) => ipcRenderer.on("open-day", (_e, iso) => cb(iso))
+  onOpenDay: (cb) => ipcRenderer.on("open-day", (_e, iso, action) => cb(iso, action))
 });

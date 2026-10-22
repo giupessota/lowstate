@@ -21,6 +21,7 @@
     loads: "type-todo.planner.load.v1",
     habits: "type-todo.planner.habits.v1",
     habitLog: "type-todo.planner.habitlog.v1",
+    closures: "type-todo.planner.closures.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
@@ -112,6 +113,16 @@
     habitPills: $("habitPills"),
     habitDialog: $("habitDialog"),
     habitDetail: $("habitDetail"),
+    closeDayBtn: $("closeDayBtn"),
+    closedLine: $("closedLine"),
+    closureDialog: $("closureDialog"),
+    closureForm: $("closureForm"),
+    closureRecap: $("closureRecap"),
+    closureGood: $("closureGood"),
+    closureLeft: $("closureLeft"),
+    closureCount: $("closureCount"),
+    closureCancel: $("closureCancel"),
+    closureAt: $("closureAt"),
     habitDetailIcon: $("habitDetailIcon"),
     habitDetailTitle: $("habitDetailTitle"),
     habitDetailMeta: $("habitDetailMeta"),
@@ -313,6 +324,8 @@
       notifyKinds: { tasks: true, habits: true, meetings: true, ...(savedSettings.notifyKinds || {}) },
       morningOn: savedSettings.morningOn !== false,
       morningAt: Planner.isTime(savedSettings.morningAt) ? savedSettings.morningAt : "08:00",
+      closureOn: savedSettings.closureOn !== false,
+      closureAt: Planner.isTime(savedSettings.closureAt) ? savedSettings.closureAt : "21:30",
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
@@ -323,6 +336,8 @@
     loads: Store.loadObject(KEYS.loads),
     habits: Planner.normalizeHabits(Store.loadArray(KEYS.habits)),
     habitLog: Planner.normalizeHabitLog(Store.loadObject(KEYS.habitLog)),
+    // { iso: { good, closedAt } } — the end-of-day ritual.
+    closures: Store.loadObject(KEYS.closures),
     // Read-only events from subscribed calendars (desktop only).
     calendars: [],
     events: [],
@@ -975,6 +990,7 @@
     renderTodayHabits(iso);
     renderMoodPicker(iso);
     renderDayNotes();
+    renderClosure(iso);
     renderMonthTabs(day);
   }
 
@@ -1941,6 +1957,7 @@
       notifyOn: state.settings.notifyOn ? "on" : "off",
       notifyLead: String(state.settings.notifyLead),
       morningOn: state.settings.morningOn ? "on" : "off",
+      closureOn: state.settings.closureOn ? "on" : "off",
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
       seg.querySelectorAll("button").forEach((button) => {
@@ -1992,7 +2009,7 @@
       if (setting === "glassMl" && Planner.CONTAINER_SIZES.includes(Number(value))) state.settings.glassMl = Number(value);
       persistSettings();
       render();
-    } else if (setting === "notifyOn" || setting === "morningOn") {
+    } else if (setting === "notifyOn" || setting === "morningOn" || setting === "closureOn") {
       state.settings[setting] = value === "on";
       persistSettings();
     } else if (setting === "notifyLead") {
@@ -2387,6 +2404,68 @@
     render();
   });
 
+  // ---------- closing the day ----------
+  // Offered for today and yesterday (closing late counts too).
+  function renderClosure(iso) {
+    const closed = state.closures[iso];
+    const yesterday = Core.toISODate(Planner.addDays(Core.parseISODate(todayISO()), -1));
+    els.closeDayBtn.hidden = Boolean(closed) || (iso !== todayISO() && iso !== yesterday);
+    els.closedLine.hidden = !closed;
+    if (closed) {
+      els.closedLine.replaceChildren(
+        h("span", { class: "closed-mark", text: `✓ ${t("closedLine")}` }),
+        closed.good ? h("span", { class: "closed-good", text: `“${closed.good}”` }) : null,
+        h("button", { type: "button", class: "focus-action", id: "reopenClosure", text: t("closedReopen") }));
+    }
+  }
+
+  function closureRecap(iso) {
+    const items = Planner.itemsForDay(state.items, iso).filter((item) => item.focus !== "later");
+    const parts = [];
+    if (items.length) parts.push(t("closeRecapTasks", { done: items.filter((item) => item.done).length, total: items.length }));
+    const habits = state.habits.filter((habit) => Planner.habitDone(state.habitLog, iso, habit.id)).length;
+    if (habits) parts.push(habits === 1 ? t("closeRecapHabit") : t("closeRecapHabits", { n: habits }));
+    if (state.water[iso]) parts.push(Planner.formatVolume(state.water[iso] * state.settings.glassMl, I18n.language));
+    if (state.moods[iso]) parts.push(t("closeRecapMood", { mood: t(`mood-${state.moods[iso]}`).toLowerCase() }));
+    return parts.join(" · ");
+  }
+
+  let closureISO = null;
+
+  function openClosure(iso = anchorISO()) {
+    closureISO = iso;
+    const left = state.items.filter((item) => item.date === iso && !item.done).length;
+    els.closureRecap.textContent = closureRecap(iso);
+    els.closureRecap.hidden = !els.closureRecap.textContent;
+    els.closureGood.value = state.closures[iso]?.good || "";
+    els.closureLeft.hidden = left === 0;
+    els.closureCount.textContent = left ? `· ${t("closeLeftCount", { n: left })}` : "";
+    els.closureForm.querySelector('input[value="tomorrow"]').checked = true;
+    els.closureDialog.showModal();
+    els.closureGood.focus();
+  }
+
+  els.closeDayBtn.addEventListener("click", () => openClosure());
+  els.closedLine.addEventListener("click", (event) => {
+    if (event.target.closest("#reopenClosure")) openClosure();
+  });
+  els.closureCancel.addEventListener("click", () => els.closureDialog.close());
+  els.closureDialog.addEventListener("click", (event) => {
+    if (event.target === els.closureDialog) els.closureDialog.close();
+  });
+  els.closureForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const iso = closureISO || anchorISO();
+    const choice = els.closureForm.querySelector('input[name="closureChoice"]:checked')?.value || "stay";
+    const tomorrow = Core.toISODate(Planner.addDays(Core.parseISODate(iso), 1));
+    if (!els.closureLeft.hidden) state.items = Planner.closeDay(state.items, iso, choice, tomorrow);
+    state.closures = { ...state.closures, [iso]: { good: els.closureGood.value.trim().slice(0, 500), closedAt: Date.now() } };
+    Store.save(KEYS.closures, state.closures);
+    els.closureDialog.close();
+    commit();
+    toast(t("closeDone"));
+  });
+
   // ---------- gentle habit states ----------
   function setHabitDay(habitId, iso, value) {
     state.habitLog = Planner.setHabitState(state.habitLog, iso, habitId, value);
@@ -2765,6 +2844,7 @@
       chip.setAttribute("aria-pressed", String(on));
     });
     if (document.activeElement !== els.morningAt) els.morningAt.value = state.settings.morningAt;
+    if (document.activeElement !== els.closureAt) els.closureAt.value = state.settings.closureAt;
     els.notifyTest.disabled = !desktop?.notify;
   }
 
@@ -2800,10 +2880,15 @@
       lead: state.settings.notifyLead,
       kinds: state.settings.notifyKinds,
       morningAt: state.settings.morningOn ? state.settings.morningAt : null,
+      closureAt: state.settings.closureOn && !state.closures[todayISO()] ? state.settings.closureAt : null,
     }).filter((reminder) => reminder.at <= now && now - reminder.at < 10 * 60000 && !notified[reminder.key]);
     if (!due.length) return;
     due.forEach((reminder) => {
       notified[reminder.key] = now;
+      if (reminder.kind === "closure") {
+        desktop.notify({ title: t("closeDay"), body: t("closeNotifyBody"), iso: reminder.iso, action: "closure" });
+        return;
+      }
       if (reminder.kind === "morning") {
         desktop.notify({ title: t("morningTitle"), body: morningBody(reminder.iso), iso: reminder.iso });
         return;
@@ -2830,6 +2915,11 @@
     persistSettings();
     renderNotifySettings();
   });
+  els.closureAt.addEventListener("change", () => {
+    if (!Planner.isTime(els.closureAt.value)) return;
+    state.settings.closureAt = els.closureAt.value;
+    persistSettings();
+  });
   els.morningAt.addEventListener("change", () => {
     if (!Planner.isTime(els.morningAt.value)) return;
     state.settings.morningAt = els.morningAt.value;
@@ -2842,9 +2932,10 @@
   if (desktop?.notify) {
     setInterval(checkReminders, 30000);
     setTimeout(checkReminders, 5000);
-    desktop.onOpenDay?.((iso) => {
+    desktop.onOpenDay?.((iso, action) => {
       document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
       openDay(iso);
+      if (action === "closure") openClosure(iso);
     });
   }
 
