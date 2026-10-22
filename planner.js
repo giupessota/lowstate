@@ -582,22 +582,56 @@
 
   const asHabit = (habitOrId) => (typeof habitOrId === "string" ? { id: habitOrId, days: [] } : habitOrId);
 
-  function habitDone(log, iso, id) {
-    return Array.isArray(log?.[iso]) && log[iso].includes(id);
+  // Gentle habits: a day can be "done", "little" (some progress — still
+  // counts) or "rest" (skipped on purpose — not a miss). The log is
+  // { iso: { habitId: state } }; older logs ({ iso: [habitId] }) read as done.
+  const HABIT_STATES = ["done", "little", "rest"];
+
+  function normalizeHabitLog(raw) {
+    const out = {};
+    Object.entries(raw && typeof raw === "object" ? raw : {}).forEach(([iso, day]) => {
+      if (!parseISODate(iso)) return;
+      const entries = Array.isArray(day)
+        ? day.filter((id) => typeof id === "string").map((id) => [id, "done"])
+        : Object.entries(day && typeof day === "object" ? day : {}).filter(([, state]) => HABIT_STATES.includes(state));
+      if (entries.length) out[iso] = Object.fromEntries(entries);
+    });
+    return out;
   }
 
-  // Returns a new log with the habit flipped for that day.
+  function habitState(log, iso, id) {
+    const day = log?.[iso];
+    if (Array.isArray(day)) return day.includes(id) ? "done" : null;
+    return HABIT_STATES.includes(day?.[id]) ? day[id] : null;
+  }
+
+  // Did something that day: fully or a little.
+  function habitDone(log, iso, id) {
+    const state = habitState(log, iso, id);
+    return state === "done" || state === "little";
+  }
+
+  // Returns a new log with that day's state set (null clears it).
+  function setHabitState(log, iso, id, state) {
+    const { [iso]: day = {}, ...rest } = normalizeHabitLog(log);
+    const { [id]: _previous, ...others } = day;
+    const next = HABIT_STATES.includes(state) ? { ...others, [id]: state } : others;
+    return Object.keys(next).length ? { ...rest, [iso]: next } : rest;
+  }
+
+  // One tap: mark done, or clear whatever was there.
   function toggleHabit(log, iso, id) {
-    const { [iso]: day = [], ...rest } = log || {};
-    const next = day.includes(id) ? day.filter((other) => other !== id) : [...day, id];
-    return next.length ? { ...rest, [iso]: next } : rest;
+    return setHabitState(log, iso, id, habitState(log, iso, id) ? null : "done");
   }
 
   // Drops a removed habit from every day of the log.
   function forgetHabit(log, id) {
-    return Object.fromEntries(Object.entries(log || {})
-      .map(([iso, ids]) => [iso, (ids || []).filter((other) => other !== id)])
-      .filter(([, ids]) => ids.length));
+    return Object.fromEntries(Object.entries(normalizeHabitLog(log))
+      .map(([iso, day]) => {
+        const { [id]: _removed, ...others } = day;
+        return [iso, others];
+      })
+      .filter(([, day]) => Object.keys(day).length));
   }
 
   // Times done in a row, ending today — or yesterday, so an unchecked today
@@ -613,7 +647,7 @@
       const iso = toISODate(day);
       if (habit.since && iso < habit.since) break;
       if (habitDone(log, iso, habit.id)) streak += 1;
-      else if (habitScheduled(habit, iso)) break;
+      else if (habitState(log, iso, habit.id) !== "rest" && habitScheduled(habit, iso)) break;
       day = addDays(day, -1);
     }
     return streak;
@@ -631,7 +665,7 @@
     for (let back = 1; back <= weeks * 7; back++) {
       const date = addDays(end, -back);
       const iso = toISODate(date);
-      if (!habitScheduled(habit, iso)) continue;
+      if (!habitScheduled(habit, iso) || habitState(log, iso, habit.id) === "rest") continue;
       byDay[date.getDay()].planned += 1;
       if (habitDone(log, iso, habit.id)) byDay[date.getDay()].done += 1;
     }
@@ -684,7 +718,7 @@
 
     habits.forEach((habit) => {
       // Mood on planned days the habit was done vs. skipped.
-      const planned = moodIsos.filter((iso) => habitScheduled(habit, iso));
+      const planned = moodIsos.filter((iso) => habitScheduled(habit, iso) && habitState(habitLog, iso, habit.id) !== "rest");
       const withHabit = comparison(
         planned.filter((iso) => habitDone(habitLog, iso, habit.id)).map(moodOf),
         planned.filter((iso) => !habitDone(habitLog, iso, habit.id)).map(moodOf),
@@ -692,7 +726,7 @@
       if (withHabit) found.push({ kind: "mood-habit", habitId: habit.id, ...withHabit });
 
       // Reported load the day after a planned day, done vs. skipped.
-      const after = isos.filter((iso) => habitScheduled(habit, iso))
+      const after = isos.filter((iso) => habitScheduled(habit, iso) && habitState(habitLog, iso, habit.id) !== "rest")
         .map((iso) => ({ iso, next: toISODate(addDays(parseISODate(iso), 1)) }))
         .filter(({ next }) => next < todayISO && loadOf(next) !== null);
       const nextDay = comparison(
@@ -716,29 +750,39 @@
     };
   }
 
-  // Planned days done in a month, out of the planned days so far; `extra`
-  // counts days done that weren't planned.
+  // A month for one habit. Of the planned days so far: `done` did something
+  // (fully or `little`), `rest` were skipped on purpose; `elapsed` is the
+  // planned days minus rest days. `score` counts a little as half, and
+  // consistency is score / elapsed. `extra` is days done that weren't planned.
   function habitMonth(log, habitOrId, year, month, todayISO) {
     const habit = asHabit(habitOrId);
     const days = new Date(year, month + 1, 0).getDate();
-    let total = 0;
-    let elapsed = 0;
-    let done = 0;
-    let extra = 0;
+    const out = { done: 0, little: 0, rest: 0, extra: 0, elapsed: 0, total: 0, score: 0 };
     for (let date = 1; date <= days; date++) {
       const iso = toISODate(new Date(year, month, date));
       const planned = habitScheduled(habit, iso);
-      const did = habitDone(log, iso, habit.id);
-      if (planned) total += 1;
+      const state = habitState(log, iso, habit.id);
+      if (planned) out.total += 1;
       if (iso > todayISO) continue;
-      if (planned) {
-        elapsed += 1;
-        if (did) done += 1;
-      } else if (did) {
-        extra += 1;
+      if (!planned) {
+        if (state === "done" || state === "little") out.extra += 1;
+        continue;
+      }
+      if (state === "rest") {
+        out.rest += 1;
+        continue;
+      }
+      out.elapsed += 1;
+      if (state === "done") {
+        out.done += 1;
+        out.score += 1;
+      } else if (state === "little") {
+        out.done += 1;
+        out.little += 1;
+        out.score += 0.5;
       }
     }
-    return { done, extra, elapsed, total };
+    return out;
   }
 
   // ---------- Reminders ----------
@@ -758,7 +802,7 @@
     if (kinds.habits !== false) {
       days.forEach((iso) => habits.forEach((habit) => {
         const time = habitTimeOn(habit, iso);
-        if (!time || habitDone(habitLog, iso, habit.id)) return;
+        if (!time || habitState(habitLog, iso, habit.id)) return;
         out.push({ key: `habit:${habit.id}:${iso}`, kind: "habit", at: at(iso, time.start) - lead * 60000, iso, start: time.start, title: habit.name });
       }));
     }
@@ -1027,6 +1071,10 @@
     habitTimeOn,
     scheduleRows,
     habitFromRows,
+    HABIT_STATES,
+    normalizeHabitLog,
+    habitState,
+    setHabitState,
     habitDone,
     toggleHabit,
     forgetHabit,

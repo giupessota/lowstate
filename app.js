@@ -322,7 +322,7 @@
     moodNotes: Store.loadObject(KEYS.moodNotes),
     loads: Store.loadObject(KEYS.loads),
     habits: Planner.normalizeHabits(Store.loadArray(KEYS.habits)),
-    habitLog: Store.loadObject(KEYS.habitLog),
+    habitLog: Planner.normalizeHabitLog(Store.loadObject(KEYS.habitLog)),
     // Read-only events from subscribed calendars (desktop only).
     calendars: [],
     events: [],
@@ -349,7 +349,7 @@
   // Habits from before start dates existed begin on their first logged day
   // (or today), so earlier months don't show them at 0%.
   if (state.habits.some((habit) => !habit.since)) {
-    const firstLogged = (id) => Object.keys(state.habitLog).filter((iso) => state.habitLog[iso].includes(id)).sort()[0];
+    const firstLogged = (id) => Object.keys(state.habitLog).filter((iso) => Planner.habitState(state.habitLog, iso, id)).sort()[0];
     state.habits = state.habits.map((habit) => (habit.since ? habit : { ...habit, since: firstLogged(habit.id) || todayISO() }));
     Store.save(KEYS.habits, state.habits);
   }
@@ -675,9 +675,9 @@
       .sort((a, b) => (a.time.start < b.time.start ? -1 : 1));
     if (!allDay.length && !timed.length && !routines.length) return null;
     const routineLines = routines.map(({ habit, time }) => h("li", {
-      class: `event-line routine${Planner.habitDone(state.habitLog, iso, habit.id) ? " is-done" : ""}`,
+      class: `event-line routine${stateClass(habit.id, iso)}`,
       style: `--habit: ${habit.color}`,
-      title: habit.name,
+      title: [habit.name, stateLabel(habit.id, iso)].filter(Boolean).join(" · "),
     },
       habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
       h("span", { class: "line-time", text: time.start }),
@@ -812,7 +812,7 @@
         const range = `${item.start}–${Planner.minutesToTime(Math.min(1439, Planner.timeToMinutes(item.start) + item.duration))}`;
         inner.append(h("button", {
           type: "button",
-          class: `block routine${done ? " is-done" : ""}${height < 34 ? " short" : ""}`,
+          class: `block routine${stateClass(habit.id, iso)}${height < 34 ? " short" : ""}`,
           "data-habit-cell": habit.id,
           "data-date": iso,
           "aria-pressed": String(done),
@@ -1161,6 +1161,12 @@
     leaf: ["M5 19.5C5 11.4 10.6 6 19.5 4.5 18.3 13.6 12.9 19.5 5 19.5z", "M5 19.5l8-8"],
   };
 
+  // Gentle habit states on a day: "done", "little" or "rest" (or none).
+  const STATE_LABELS = { done: "stateDone", little: "stateLittle", rest: "stateRest" };
+  const habitStateOn = (habitId, iso) => Planner.habitState(state.habitLog, iso, habitId);
+  const stateClass = (habitId, iso) => (habitStateOn(habitId, iso) ? ` is-${habitStateOn(habitId, iso)}` : "");
+  const stateLabel = (habitId, iso) => (habitStateOn(habitId, iso) ? t(STATE_LABELS[habitStateOn(habitId, iso)]) : "");
+
   function habitIconEl(icon, className = "habit-icon") {
     const paths = HABIT_ICON_PATHS[icon];
     if (!paths) return null;
@@ -1180,11 +1186,10 @@
       .filter((habit) => habit.icon && (Planner.habitScheduled(habit, iso) || (Planner.habitActive(habit, iso) && Planner.habitDone(state.habitLog, iso, habit.id))))
       .slice(0, 4)
       .map((habit) => {
-        const done = Planner.habitDone(state.habitLog, iso, habit.id);
-        const svg = habitIconEl(habit.icon, `habit-icon${done ? " is-done" : ""}`);
+        const svg = habitIconEl(habit.icon, `habit-icon${stateClass(habit.id, iso)}`);
         svg.style.setProperty("--habit", habit.color);
         const title = svgEl("title", {});
-        title.textContent = `${habit.name}${done ? " ✓" : ""}`;
+        title.textContent = [habit.name, stateLabel(habit.id, iso)].filter(Boolean).join(" · ");
         svg.prepend(title);
         svg.setAttribute("role", "img");
         svg.setAttribute("aria-label", title.textContent);
@@ -1228,7 +1233,8 @@
     const rows = visible.flatMap((habit) => {
       const stats = Planner.habitMonth(state.habitLog, habit, year, month, today);
       const streak = Planner.habitStreak(state.habitLog, habit, today);
-      const pct = stats.elapsed ? Math.round((stats.done / stats.elapsed) * 100) : 0;
+      // A little counts half; rest days are left out (see Planner.habitMonth).
+      const pct = stats.elapsed ? Math.round((stats.score / stats.elapsed) * 100) : 0;
       return [
         h("div", { class: "hg-name", style: `--habit: ${habit.color}` },
           h("button", { type: "button", class: "hg-edit", "data-habit-edit": habit.id, title: t("habitEdit"), "aria-label": t("habitEdit") }, habitMark(habit)),
@@ -1244,10 +1250,10 @@
           const future = iso > today;
           // Days the habit isn't planned for stay clickable as "extra" days.
           const off = !Planner.habitScheduled(habit, iso);
-          const label = `${t("habitCell", { habit: habit.name, date: shortDate(iso) })}${off ? ` (${t("habitExtraDay")})` : ""}`;
+          const label = [t("habitCell", { habit: habit.name, date: shortDate(iso) }), off ? t("habitExtraDay") : "", stateLabel(habit.id, iso)].filter(Boolean).join(" · ");
           return h("button", {
             type: "button",
-            class: `hg-cell${done ? " is-done" : ""}${off ? " is-off" : ""}${iso === today ? " is-today" : ""}`,
+            class: `hg-cell${stateClass(habit.id, iso)}${off ? " is-off" : ""}${iso === today ? " is-today" : ""}`,
             style: `--habit: ${habit.color}`,
             "data-habit-cell": habit.id,
             "data-date": iso,
@@ -1429,7 +1435,7 @@
       const done = Planner.habitDone(state.habitLog, iso, habit.id);
       return h("button", {
         type: "button",
-        class: `habit-pill${done ? " is-done" : ""}${habit.icon ? " has-icon" : ""}`,
+        class: `habit-pill${stateClass(habit.id, iso)}${habit.icon ? " has-icon" : ""}`,
         style: `--habit: ${habit.color}`,
         "data-habit-cell": habit.id,
         "data-date": iso,
@@ -1437,7 +1443,8 @@
         disabled: future ? "" : null,
       }, habitIconEl(habit.icon) || h("i", { "aria-hidden": "true" }),
         Planner.habitTimeOn(habit, iso) ? h("span", { class: "pill-time", text: Planner.habitTimeOn(habit, iso).start }) : null,
-        habit.name);
+        habit.name,
+        ["little", "rest"].includes(habitStateOn(habit.id, iso)) ? h("span", { class: "pill-state", text: stateLabel(habit.id, iso).toLowerCase() }) : null);
     }));
   }
 
@@ -1540,7 +1547,7 @@
     els.habitDetailStats.replaceChildren(
       stat(String(stats.done + stats.extra), t("habitDone")),
       stat(String(streak), t("habitStreakLabel")),
-      stat(stats.elapsed ? `${Math.round((stats.done / stats.elapsed) * 100)}%` : "—", t("habitConsistency")));
+      stat(stats.elapsed ? `${Math.round((stats.score / stats.elapsed) * 100)}%` : "—", t("habitConsistency")));
 
     // Two weeks ending with this one, laid out in weekday columns.
     const weekStart = Planner.startOfWeek(Core.parseISODate(today), state.settings.weekStart);
@@ -1552,10 +1559,10 @@
         const done = Planner.habitDone(state.habitLog, iso, habit.id);
         const planned = Planner.habitScheduled(habit, iso);
         const future = iso > today;
-        const label = `${t("habitCell", { habit: habit.name, date: shortDate(iso) })}${planned ? "" : ` (${t("habitExtraDay")})`}`;
+        const label = [t("habitCell", { habit: habit.name, date: shortDate(iso) }), planned ? "" : t("habitExtraDay"), stateLabel(habit.id, iso)].filter(Boolean).join(" · ");
         return h("button", {
           type: "button",
-          class: `dd-cell${done ? " is-done" : ""}${planned ? "" : " is-off"}${iso === today ? " is-today" : ""}`,
+          class: `dd-cell${stateClass(habit.id, iso)}${planned ? "" : " is-off"}${iso === today ? " is-today" : ""}`,
           "data-habit-cell": habit.id,
           "data-date": iso,
           "aria-pressed": String(done),
@@ -2201,12 +2208,18 @@
 
   // Habit cells (habits page) and pills (day page) share one handler.
   document.addEventListener("click", (event) => {
+    const option = event.target.closest(".state-menu [data-state]");
+    if (option) {
+      const menu = option.closest(".state-menu");
+      setHabitDay(menu.dataset.habit, menu.dataset.date, option.dataset.state || null);
+      closeStateMenu();
+      return;
+    }
+    if (!event.target.closest(".state-menu")) closeStateMenu();
     const cell = event.target.closest("[data-habit-cell]");
     if (cell && !cell.disabled) {
-      state.habitLog = Planner.toggleHabit(state.habitLog, cell.dataset.date, cell.dataset.habitCell);
-      persistHabits();
-      render();
-      if (els.habitDetail.open) renderHabitDetail();
+      if (Planner.habitState(state.habitLog, cell.dataset.date, cell.dataset.habitCell)) openStateMenu(cell);
+      else setHabitDay(cell.dataset.habitCell, cell.dataset.date, "done");
       return;
     }
     const idea = event.target.closest("[data-habit-idea]");
@@ -2311,6 +2324,61 @@
     els.habitDialog.close();
     render();
   });
+
+  // ---------- gentle habit states ----------
+  function setHabitDay(habitId, iso, value) {
+    state.habitLog = Planner.setHabitState(state.habitLog, iso, habitId, value);
+    persistHabits();
+    render();
+    if (els.habitDetail.open) renderHabitDetail();
+    if (value === "little") toast(t("littleCounts"));
+    else if (value === "rest") toast(t("restCounts"));
+  }
+
+  // A small menu next to a marked day: done / a little / rest / clear.
+  function openStateMenu(cell) {
+    closeStateMenu();
+    const habitId = cell.dataset.habitCell;
+    const iso = cell.dataset.date;
+    const current = Planner.habitState(state.habitLog, iso, habitId);
+    const habit = state.habits.find((candidate) => candidate.id === habitId);
+    const menu = h("div", { class: "state-menu", role: "menu", "data-habit": habitId, "data-date": iso, style: `--habit: ${habit?.color || "var(--ink)"}` },
+      ...Planner.HABIT_STATES.map((value) => h("button", {
+        type: "button",
+        role: "menuitemradio",
+        "aria-checked": String(current === value),
+        class: `state-option${current === value ? " active" : ""}`,
+        "data-state": value,
+      }, h("i", { class: `state-dot is-${value}`, "aria-hidden": "true" }),
+        h("span", { class: "state-text" }, h("strong", { text: t(STATE_LABELS[value]) }), h("small", { text: t(`${STATE_LABELS[value]}Hint`) })))),
+      h("button", { type: "button", role: "menuitem", class: "state-option clear", "data-state": "" }, t("stateClear")));
+    // Inside a modal dialog the menu has to live in the dialog to be seen.
+    (cell.closest("dialog") || document.body).append(menu);
+    const rect = cell.getBoundingClientRect();
+    const left = Math.min(Math.max(8, rect.left + rect.width / 2 - menu.offsetWidth / 2), innerWidth - menu.offsetWidth - 8);
+    const below = rect.bottom + 6 + menu.offsetHeight < innerHeight;
+    menu.style.left = `${left}px`;
+    menu.style.top = `${below ? rect.bottom + 6 : rect.top - menu.offsetHeight - 6}px`;
+    menu.querySelector(".state-option.active, .state-option")?.focus();
+  }
+
+  function closeStateMenu() {
+    document.querySelectorAll(".state-menu").forEach((menu) => menu.remove());
+  }
+
+  // Right-click (or the context-menu key) opens the choices on any day.
+  document.addEventListener("contextmenu", (event) => {
+    const cell = event.target.closest("[data-habit-cell]");
+    if (!cell || cell.disabled) return;
+    event.preventDefault();
+    openStateMenu(cell);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.querySelector(".state-menu")) {
+      event.stopPropagation();
+      closeStateMenu();
+    }
+  }, true);
 
   els.habitForm.addEventListener("submit", (event) => {
     event.preventDefault();

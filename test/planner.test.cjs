@@ -200,10 +200,33 @@ test("habits: toggling, streaks that survive an unchecked today, monthly progres
   assert.equal(P.habitStreak(log, "walk", "2026-10-22"), 0);
   log = P.toggleHabit(log, "2026-10-21", "read");
   assert.deepEqual(log["2026-10-21"], undefined);
-  assert.deepEqual(P.habitMonth(log, "read", 2026, 9, "2026-10-21"), { done: 3, extra: 0, elapsed: 21, total: 31 });
-  assert.deepEqual(P.habitMonth(log, "read", 2026, 8, "2026-10-21"), { done: 0, extra: 0, elapsed: 30, total: 30 });
-  assert.deepEqual(P.forgetHabit(log, "walk")["2026-10-20"], ["read"]);
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 9, "2026-10-21"), { done: 3, little: 0, rest: 0, extra: 0, elapsed: 21, total: 31, score: 3 });
+  assert.deepEqual(P.habitMonth(log, "read", 2026, 8, "2026-10-21"), { done: 0, little: 0, rest: 0, extra: 0, elapsed: 30, total: 30, score: 0 });
+  assert.deepEqual(P.forgetHabit(log, "walk")["2026-10-20"], { read: "done" });
   assert.equal(P.habitDone(P.forgetHabit(log, "read"), "2026-10-18", "read"), false);
+});
+
+test("gentle habits: a little counts half, rest days are neither missed nor counted", () => {
+  // Older logs ({ iso: [ids] }) read as done.
+  assert.deepEqual(P.normalizeHabitLog({ "2026-10-20": ["gym", 3], "2026-10-19": { gym: "little", x: "nope" }, bad: ["gym"] }),
+    { "2026-10-20": { gym: "done" }, "2026-10-19": { gym: "little" } });
+  assert.equal(P.habitState({ "2026-10-20": ["gym"] }, "2026-10-20", "gym"), "done");
+  const [gym] = P.normalizeHabits([{ id: "gym", name: "Academia", days: [1, 3, 5], since: "2026-10-01" }]);
+  let log = {};
+  log = P.setHabitState(log, "2026-10-19", "gym", "done");   // Mon
+  log = P.setHabitState(log, "2026-10-16", "gym", "rest");   // Fri — on purpose
+  log = P.setHabitState(log, "2026-10-14", "gym", "little"); // Wed
+  log = P.setHabitState(log, "2026-10-12", "gym", "done");   // Mon
+  assert.equal(P.habitDone(log, "2026-10-14", "gym"), true);
+  assert.equal(P.habitDone(log, "2026-10-16", "gym"), false);
+  // Rest doesn't break the streak and isn't counted in it.
+  assert.equal(P.habitStreak(log, gym, "2026-10-20"), 3);
+  // Oct 1–20 planned: 2,5,7,9,12,14,16,19 → 8; one rest → 7 counted; score 1 + 0.5 + 1.
+  assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-20"), { done: 3, little: 1, rest: 1, extra: 0, elapsed: 7, total: 13, score: 2.5 });
+  // Clearing and toggling.
+  assert.equal(P.habitState(P.setHabitState(log, "2026-10-14", "gym", null), "2026-10-14", "gym"), null);
+  assert.equal(P.habitState(P.toggleHabit(log, "2026-10-16", "gym"), "2026-10-16", "gym"), null);
+  assert.equal(P.habitState(P.toggleHabit({}, "2026-10-16", "gym"), "2026-10-16", "gym"), "done");
 });
 
 test("habits planned for some weekdays: icons, schedule, streaks and month counts", () => {
@@ -249,7 +272,7 @@ test("habits planned for some weekdays: icons, schedule, streaks and month count
   assert.equal(P.habitStreak(log, gym, "2026-10-22"), 3);
   log = P.toggleHabit(log, "2026-10-20", "gym");
   assert.equal(P.habitStreak(log, gym, "2026-10-22"), 4);
-  assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-22"), { done: 3, extra: 1, elapsed: 9, total: 13 });
+  assert.deepEqual(P.habitMonth(log, gym, 2026, 9, "2026-10-22"), { done: 3, little: 0, rest: 0, extra: 1, elapsed: 9, total: 13, score: 3 });
 });
 
 test("patterns need enough days on both sides and a clear difference", () => {
@@ -319,7 +342,7 @@ test("habits only count between their start and end dates", () => {
   // October 2026, today the 25th: planned from the 12th to the 23rd only.
   let log = {};
   ["2026-10-12", "2026-10-13", "2026-10-23"].forEach((iso) => { log = P.toggleHabit(log, iso, "w"); });
-  assert.deepEqual(P.habitMonth(log, walk, 2026, 9, "2026-10-25"), { done: 3, extra: 0, elapsed: 12, total: 12 });
+  assert.deepEqual(P.habitMonth(log, walk, 2026, 9, "2026-10-25"), { done: 3, little: 0, rest: 0, extra: 0, elapsed: 12, total: 12, score: 3 });
   const fresh = { ...walk, until: null };
   log = P.toggleHabit(P.toggleHabit({}, "2026-10-12", "w"), "2026-10-13", "w");
   assert.equal(P.habitStreak(log, fresh, "2026-10-13"), 2);

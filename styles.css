@@ -1354,6 +1354,73 @@ svg.i {
 .dd-cell:disabled { opacity: .35; cursor: default; }
 .detail-insight { margin: 0; padding-top: 12px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 13.5px; font-style: italic; }
 
+/* Gentle states: done = full, a little = half, rest = a calm dash */
+.hg-cell, .dd-cell { position: relative; }
+.hg-cell.is-little, .dd-cell.is-little {
+  border-color: var(--habit);
+  background: linear-gradient(to top, var(--habit) 50%, transparent 50%);
+}
+.dd-cell.is-little { color: var(--ink); }
+.hg-cell.is-rest, .dd-cell.is-rest { border-color: color-mix(in srgb, var(--habit) 55%, transparent); border-style: solid; }
+.hg-cell.is-rest::after, .dd-cell.is-rest::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 22%;
+  right: 22%;
+  height: 1.5px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--habit) 70%, transparent);
+  transform: translateY(-50%);
+}
+.dd-cell.is-rest .dd-num { visibility: hidden; }
+.habit-pill.is-little { border-color: var(--habit); background: color-mix(in srgb, var(--habit) 7%, var(--paper)); color: var(--ink); }
+.habit-pill.is-little i { background: linear-gradient(to top, var(--habit) 50%, transparent 50%); }
+.habit-pill.is-rest { border-style: dashed; color: var(--muted); }
+.pill-state { color: var(--muted); font: 500 10.5px var(--mono); }
+.block.routine.is-little { border-style: solid; background: color-mix(in srgb, var(--habit) 11%, var(--paper)); }
+.block.routine.is-rest { opacity: .55; }
+.event-line.routine.is-little .habit-icon { stroke: var(--habit); opacity: .7; }
+.event-line.routine.is-rest { opacity: .55; }
+.stamp-habits .habit-icon.is-little, .cell-habits .habit-icon.is-little { stroke: var(--habit); opacity: .6; }
+.stamp-habits .habit-icon.is-rest, .cell-habits .habit-icon.is-rest { opacity: .3; }
+.detail-hint { margin: 8px 0 0; }
+
+.state-menu {
+  position: fixed;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 200px;
+  padding: 6px;
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: 0 12px 30px rgba(30, 24, 12, .22);
+}
+.state-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.state-option:hover, .state-option:focus-visible { background: color-mix(in srgb, var(--habit) 10%, transparent); outline: none; }
+.state-option.active { background: color-mix(in srgb, var(--habit) 14%, transparent); }
+.state-option.clear { justify-content: center; margin-top: 2px; border-top: 1px solid var(--rule); border-radius: 0 0 8px 8px; color: var(--muted); font-size: 12.5px; }
+.state-text { display: flex; flex-direction: column; line-height: 1.2; }
+.state-text strong { font-size: 13.5px; font-weight: 600; }
+.state-text small { color: var(--muted); font-size: 11.5px; }
+.state-dot { position: relative; width: 16px; height: 16px; flex: none; border: 1.5px solid var(--habit); border-radius: 50%; }
+.state-dot.is-done { background: var(--habit); }
+.state-dot.is-little { background: linear-gradient(to top, var(--habit) 50%, transparent 50%); }
+.state-dot.is-rest::after { content: ""; position: absolute; top: 50%; left: 3px; right: 3px; height: 1.5px; background: var(--habit); transform: translateY(-50%); }
+
 /* Habit editor */
 .habit-sheet { width: min(420px, calc(100vw - 32px)); }
 .habit-sheet .sheet-body { max-height: calc(100vh - 48px); overflow-y: auto; }
