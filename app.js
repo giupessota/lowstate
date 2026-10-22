@@ -128,6 +128,10 @@
     dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
+    searchDialog: $("searchDialog"),
+    searchInput: $("searchInput"),
+    searchResults: $("searchResults"),
+    searchBtn: $("searchBtn"),
     closureForm: $("closureForm"),
     closureRecap: $("closureRecap"),
     closureGood: $("closureGood"),
@@ -185,6 +189,8 @@
     itemDateLabel: $("itemDateLabel"),
     dateChips: $("dateChips"),
     itemStart: $("itemStart"),
+    itemRepeat: $("itemRepeat"),
+    itemSkip: $("itemSkip"),
     itemDuration: $("itemDuration"),
     categoryChips: $("categoryChips"),
     newCategoryInput: $("newCategoryInput"),
@@ -423,9 +429,38 @@
   }
 
   function toggleItem(id) {
-    const item = findItem(id);
-    if (item) updateItem(Planner.toggleDone(item, todayISO()));
+    if (!findItem(id)) return;
+    state.items = Planner.completeItem(state.items, id, todayISO());
+    commit();
   }
+
+  // "Every month on the 5th", "Toda semana (terça-feira)"…
+  function repeatLabel(rule, iso) {
+    const date = Core.parseISODate(iso);
+    if (!rule || !date) return "";
+    return t(`repeat-${rule}`, {
+      day: formatDate(date, { weekday: "long" }),
+      n: date.getDate(),
+      date: formatDate(date, { day: "numeric", month: "long" }),
+    });
+  }
+
+  // A future occurrence of a repeating task: shown light, opens its series.
+  function ghostEl(ghost, variant) {
+    const category = categoryById(ghost.category);
+    return h("li", {
+      class: `item ${variant} is-ghost`,
+      "data-ghost-source": ghost.sourceId,
+      title: `${ghost.title} · ${repeatLabel(ghost.repeat, ghost.repeatAnchor)}`,
+      style: category ? `--cat: ${category.color}` : null,
+    },
+      variant === "mini" ? h("i", { "aria-hidden": "true" }) : h("span", { class: "repeat-mark ghost-mark", "aria-hidden": "true", text: "↻" }),
+      h("span", { class: variant === "mini" ? "item-body" : "line-title" },
+        ghost.start ? h("span", { class: variant === "mini" ? "mini-time" : "line-time", text: ghost.start }) : null,
+        ghost.title));
+  }
+
+  const ghostsOn = (ghosts, iso) => ghosts.filter((ghost) => ghost.date === iso);
 
   function moveToToday(ids) {
     const today = todayISO();
@@ -511,6 +546,7 @@
         h("i", { "aria-hidden": "true" }),
         h("span", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
           item.start ? h("span", { class: "mini-time", text: item.start }) : null,
+          item.repeat ? "↻ " : null,
           item.title));
     }
     const classes = ["item", variant === "line" ? "line" : "slip"];
@@ -531,6 +567,7 @@
       body = h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0" },
         item.start ? h("span", { class: "line-time", text: timeRange(item) }) : null,
         h("span", { class: "line-title", text: item.title }),
+        item.repeat ? h("span", { class: "repeat-mark", title: repeatLabel(item.repeat, item.repeatAnchor), text: "↻" }) : null,
         stamp, seal, notesMark);
     } else {
       const meta = [
@@ -738,6 +775,9 @@
     return h("ul", { class: "day-events" }, routineLines, [...allDay, ...timed].map((event) => h("li", {
       class: `event-line${event.allDay ? " is-allday" : ""}`,
       title: eventTooltip(event),
+      tabindex: "0",
+      "data-event": event.id,
+      "data-event-day": iso,
       style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
     },
       h("i", { "aria-hidden": "true" }),
@@ -745,7 +785,10 @@
       h("span", { class: "event-title", text: eventTitle(event) }))));
   }
 
+  let weekGhosts = [];
+
   function renderDays(days) {
+    weekGhosts = Planner.upcomingOccurrences(state.items, Core.toISODate(days[0]), Core.toISODate(days[days.length - 1]));
     els.weekGrid.replaceChildren(...days.map((day) => {
       const iso = Core.toISODate(day);
       const holiday = holidayFor(iso);
@@ -764,7 +807,8 @@
           holiday ? h("p", { class: "holiday", text: holiday }) : null,
           weekEventsEl(iso),
           h("ul", { class: "day-items", "data-date": iso },
-            Planner.itemsForDay(state.items, iso).map((item) => itemEl(item, "line"))),
+            Planner.itemsForDay(state.items, iso).map((item) => itemEl(item, "line")),
+            ghostsOn(weekGhosts, iso).map((ghost) => ghostEl(ghost, "line"))),
           h("form", { class: "day-add", "data-date": iso },
             h("input", {
               name: "title",
@@ -915,6 +959,8 @@
           type: twin ? "button" : null,
           class: `block event${twin ? ` has-habit${stateClass(twin.id, iso)}` : ""}${height < 34 ? " short" : ""}${item.event.busy === false ? " is-free" : ""}`,
           title: eventTooltip(item.event),
+          "data-event": twin ? null : item.event.id,
+          "data-event-day": twin ? null : iso,
           "data-habit-cell": twin?.id || null,
           "data-date": twin ? iso : null,
           "aria-pressed": twin ? String(Planner.habitDone(state.habitLog, iso, twin.id)) : null,
@@ -944,7 +990,8 @@
         checkButton(item.done, { "data-action": "toggle" }),
         h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
           h("span", { class: "block-time", text: timeRange(item) }),
-          h("span", { class: "block-title", text: item.title }))));
+          h("span", { class: "block-title", text: item.title })),
+        h("span", { class: "block-resize", "aria-hidden": "true", title: t("resizeBlock") })));
     });
 
     if (iso === todayISO()) inner.append(h("div", { class: "now-line", id: "nowLine", title: t("now") }, h("span", { class: "now-time" })));
@@ -1004,6 +1051,9 @@
     els.dayAllDay.replaceChildren(...allDay.map((event) => h("span", {
       class: "allday-chip",
       title: eventTooltip(event),
+      tabindex: "0",
+      "data-event": event.id,
+      "data-event-day": iso,
       style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
     }, eventTitle(event))));
 
@@ -1076,6 +1126,7 @@
     els.dayTasks.dataset.date = iso;
     els.dayTasks.replaceChildren(...Planner.FOCUS.map((focus) => {
       const group = items.filter((item) => item.focus === focus);
+      const ghosts = Planner.upcomingOccurrences(state.items, iso, iso).filter((ghost) => ghost.focus === focus);
       const movable = focus === "later" && group.some((item) => !item.done);
       return h("section", { class: `focus-group focus-${focus}`, "data-focus": focus },
         h("h3", { class: "focus-head" },
@@ -1093,8 +1144,8 @@
             text: t(`move-${other}`),
           }))));
           return line;
-        })),
-        group.length ? null : h("p", { class: "focus-hint", text: t(`${FOCUS_LABELS[focus]}Hint`) }));
+        }), ghosts.map((ghost) => ghostEl(ghost, "line"))),
+        group.length || ghosts.length ? null : h("p", { class: "focus-hint", text: t(`${FOCUS_LABELS[focus]}Hint`) }));
     }));
   }
 
@@ -1156,10 +1207,13 @@
 
     const limit = weeks.length > 5 ? 3 : 4;
     els.monthGrid.style.gridTemplateRows = `repeat(${weeks.length}, minmax(0, 1fr))`;
+    // Daily and weekday repeats would fill every cell; the month shows the rarer ones.
+    const monthGhosts = Planner.upcomingOccurrences(state.items, Core.toISODate(weeks[0][0]), Core.toISODate(weeks[weeks.length - 1][6]))
+      .filter((ghost) => ghost.repeat !== "daily" && ghost.repeat !== "weekdays");
     els.monthGrid.replaceChildren(...weeks.flat().map((day) => {
       const iso = Core.toISODate(day);
       const holiday = holidayFor(iso);
-      const items = Planner.itemsForDay(state.items, iso);
+      const items = [...Planner.itemsForDay(state.items, iso), ...ghostsOn(monthGhosts, iso)];
       const { allDay: allDayEvents, timed: timedEvents } = dayEvents(iso);
       const meetings = [...allDayEvents, ...timedEvents];
       const classes = dayClasses(day, "month-cell") + (day.getMonth() === month ? "" : " is-other");
@@ -1173,13 +1227,15 @@
           meetings.slice(0, limit).map((event) => h("li", {
             class: "mini event",
             title: eventTooltip(event),
+            "data-event": event.id,
+            "data-event-day": iso,
             style: calendarById(event.calendarId) ? `--cat: ${calendarById(event.calendarId).color}` : null,
           },
             h("i", { "aria-hidden": "true" }),
             h("span", { class: "item-body" },
               event.allDay ? null : h("span", { class: "mini-time", text: clockTime(new Date(event.start)) }),
               eventTitle(event)))),
-          items.slice(0, Math.max(0, limit - meetings.length)).map((item) => itemEl(item, "mini"))),
+          items.slice(0, Math.max(0, limit - meetings.length)).map((item) => (item.ghost ? ghostEl(item, "mini") : itemEl(item, "mini")))),
         items.length + meetings.length > limit
           ? h("span", { class: "cell-more", text: t("moreItems", { n: items.length + meetings.length - limit }) })
           : null);
@@ -1840,6 +1896,12 @@
       style: `--cat: ${category.color}`,
     }, h("i"), category.name)));
 
+    fillSelect(els.itemRepeat, Planner.REPEATS, draft.date ? t("repeatNone") : t("repeatNeedsDate"), (rule) => repeatLabel(rule, draft.date));
+    els.itemRepeat.value = draft.repeat || "";
+    els.itemRepeat.disabled = !draft.date;
+    const saved = findItem(state.editingId);
+    els.itemSkip.hidden = !(saved?.repeat && !saved.done);
+
     els.itemUrgent.setAttribute("aria-pressed", String(draft.priority === "urgent"));
     els.itemFocus.querySelectorAll("[data-focus]").forEach((button) => {
       const active = button.dataset.focus === draft.focus;
@@ -1885,8 +1947,16 @@
       draft.order = Planner.nextOrder(state.items.filter((item) => item.id !== original.id), draft.date);
     }
     if (draft.done && !original.done) draft.doneAt = Date.now();
+    // A new date restarts the repeat from it; no date, no repeat.
+    if (draft.repeat && draft.date !== original.date) draft.repeatAnchor = draft.date;
+    if (!draft.date) draft.repeat = null;
     els.itemDialog.close();
-    updateItem(Planner.normalizeItem(draft));
+    // Finishing a repeating task from the editor also creates its next one.
+    const finishing = draft.done && !original.done && draft.repeat;
+    const saved = Planner.normalizeItem(finishing ? { ...draft, done: false, doneAt: null } : draft);
+    state.items = state.items.map((item) => (item.id === saved.id ? saved : item));
+    if (finishing) state.items = Planner.completeItem(state.items, saved.id, todayISO());
+    commit();
   }
 
   function addCategoryFromEditor() {
@@ -1917,6 +1987,18 @@
     if (!button) return;
     state.draft.focus = button.dataset.focus;
     renderEditor();
+  });
+  els.itemRepeat.addEventListener("change", () => {
+    state.draft.repeat = els.itemRepeat.value || null;
+    state.draft.repeatAnchor = state.draft.repeat ? state.draft.date : null;
+  });
+  els.itemSkip.addEventListener("click", () => {
+    const id = state.editingId;
+    els.itemDialog.close();
+    state.items = Planner.skipOccurrence(state.items, id, todayISO());
+    commit();
+    const moved = findItem(id);
+    if (moved) toast(t("repeatSkipped", { date: shortDate(moved.date) }));
   });
   els.itemUrgent.addEventListener("click", () => {
     state.draft.priority = state.draft.priority === "urgent" ? "normal" : "urgent";
@@ -2452,6 +2534,12 @@
 
   // Habit cells (habits page) and pills (day page) share one handler.
   document.addEventListener("click", (event) => {
+    const ghost = event.target.closest("[data-ghost-source]");
+    if (ghost) {
+      event.stopPropagation();
+      openEditor(ghost.dataset.ghostSource);
+      return;
+    }
     const option = event.target.closest(".state-menu [data-state]");
     if (option) {
       const menu = option.closest(".state-menu");
@@ -2592,6 +2680,215 @@
     setView("dump");
     els.dumpInput.focus();
   }
+
+  // ---------- meeting details ----------
+  // Clicking a meeting shows what the calendar knows about it, with a way
+  // to join the call and to turn it into a task for the day.
+  function closeEventCard() {
+    document.querySelectorAll(".event-card").forEach((card) => card.remove());
+  }
+
+  function openEventCard(target) {
+    closeEventCard();
+    const event = state.events.find((candidate) => candidate.id === target.dataset.event);
+    const iso = target.dataset.eventDay;
+    if (!event || !Core.parseISODate(iso)) return;
+    const calendar = calendarById(event.calendarId);
+    const day = capitalize(formatDate(Core.parseISODate(iso), { weekday: "long", day: "numeric", month: "long" }));
+    const card = h("div", {
+      class: "event-card",
+      role: "dialog",
+      "aria-label": eventTitle(event),
+      "data-event-id": event.id,
+      "data-event-day": iso,
+      style: calendar ? `--cat: ${calendar.color}` : null,
+    },
+      calendar ? h("span", { class: "event-card-cal" }, h("i", { "aria-hidden": "true" }), calendar.name) : null,
+      h("h3", { class: "event-card-title", text: eventTitle(event) }),
+      h("p", { class: "event-card-when", text: `${day} · ${eventRange(event)}` }),
+      event.location ? h("p", { class: "event-card-where", text: event.location }) : null,
+      event.description ? h("p", { class: "event-card-notes", text: event.description }) : null,
+      h("div", { class: "event-card-actions" },
+        event.link ? h("button", { type: "button", class: "btn", "data-event-join": event.link, text: t("eventJoin") }) : null,
+        h("button", { type: "button", class: "btn primary", "data-event-task": "", text: t("eventPrep") })));
+    (target.closest("dialog") || document.body).append(card);
+    const rect = target.getBoundingClientRect();
+    const width = card.offsetWidth;
+    const height = card.offsetHeight;
+    // Beside a timeline block (it can be tall), under or over anything else.
+    const beside = target.classList.contains("block") && rect.right + 10 + width < innerWidth;
+    const left = beside ? rect.right + 10 : Math.min(Math.max(8, rect.left), innerWidth - width - 8);
+    const top = beside
+      ? Math.min(Math.max(8, rect.top), innerHeight - height - 8)
+      : rect.bottom + 6 + height < innerHeight ? rect.bottom + 6 : Math.max(8, rect.top - height - 6);
+    card.style.left = `${left}px`;
+    card.style.top = `${top}px`;
+    card.querySelector("[data-event-task]").focus();
+  }
+
+  function openMeeting(url) {
+    if (desktop?.openMeeting) desktop.openMeeting(url);
+    else window.open(url, "_blank", "noopener");
+  }
+
+  // "Prepare: …" as a must-do on the meeting's day, straight into the editor.
+  function taskFromEvent(card) {
+    const event = state.events.find((candidate) => candidate.id === card.dataset.eventId);
+    closeEventCard();
+    if (!event) return;
+    const item = addItem({ title: t("eventPrepTitle", { title: eventTitle(event) }).slice(0, 200), date: card.dataset.eventDay, focus: "must" });
+    openEditor(item.id);
+  }
+
+  document.addEventListener("click", (event) => {
+    const card = event.target.closest(".event-card");
+    if (card) {
+      const join = event.target.closest("[data-event-join]");
+      if (join) {
+        openMeeting(join.dataset.eventJoin);
+        closeEventCard();
+      } else if (event.target.closest("[data-event-task]")) {
+        taskFromEvent(card);
+      }
+      return;
+    }
+    const target = event.target.closest("[data-event]");
+    if (target) openEventCard(target);
+    else closeEventCard();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.querySelector(".event-card")) {
+      event.stopPropagation();
+      event.preventDefault();
+      const opener = document.querySelector(`[data-event="${CSS.escape(document.querySelector(".event-card").dataset.eventId)}"]`);
+      closeEventCard();
+      opener?.focus();
+    }
+  }, true);
+  document.addEventListener("scroll", (event) => {
+    if (!event.target.closest?.(".event-card")) closeEventCard();
+  }, true);
+  window.addEventListener("resize", closeEventCard);
+
+  // ---------- search ----------
+  const SEARCH_LABELS = {
+    task: "searchTasks", habit: "searchHabits", dump: "viewDump", dayNote: "searchDayNotes",
+    closure: "searchClosures", mood: "searchMoods", weekNote: "searchWeekNotes",
+  };
+  let searchResults = [];
+  let searchIndex = 0;
+
+  function searchDate(iso) {
+    const date = Core.parseISODate(iso);
+    if (!date) return "";
+    const options = { day: "numeric", month: "short" };
+    if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+    return formatDate(date, options);
+  }
+
+  function runSearch() {
+    searchResults = Planner.search({
+      items: state.items, habits: state.habits, dump: state.dump, dayNotes: state.dayNotes,
+      closures: state.closures, moodNotes: state.moodNotes, weekNotes: state.notes,
+    }, els.searchInput.value);
+    searchIndex = 0;
+    renderSearch();
+  }
+
+  function renderSearch() {
+    const query = els.searchInput.value.trim();
+    if (!query || !searchResults.length) {
+      els.searchResults.replaceChildren(h("p", { class: "search-hint", text: query ? t("searchNone", { q: query }) : t("searchHint") }));
+      return;
+    }
+    const nodes = [];
+    searchResults.forEach((result, index) => {
+      if (result.kind !== searchResults[index - 1]?.kind) nodes.push(h("h3", { class: "search-group", text: t(SEARCH_LABELS[result.kind]) }));
+      const meta = result.kind === "weekNote" ? t("searchWeekOf", { date: searchDate(result.date) })
+        : result.kind === "task" && !result.date ? t("dumpInbox")
+          : result.kind === "habit" ? "" : searchDate(result.date);
+      const active = index === searchIndex;
+      nodes.push(h("button", {
+        type: "button", role: "option", "aria-selected": String(active), "data-index": index,
+        class: `search-result${active ? " active" : ""}${result.done ? " is-done" : ""}`,
+      },
+      h("span", { class: "search-text" },
+        h("span", { class: "search-title", text: result.title }),
+        result.snippet ? h("span", { class: "search-snippet", text: result.snippet }) : null),
+      meta ? h("span", { class: "search-meta", text: meta }) : null));
+    });
+    nodes.push(h("p", { class: "search-keys", text: t("searchKeys") }));
+    els.searchResults.replaceChildren(...nodes);
+    els.searchResults.querySelector(".active")?.scrollIntoView({ block: "nearest" });
+  }
+
+  function openSearch() {
+    if (document.querySelector("dialog[open]:not(#searchDialog)")) return;
+    els.searchInput.value = "";
+    runSearch();
+    if (!els.searchDialog.open) els.searchDialog.showModal();
+    els.searchInput.focus();
+  }
+
+  // Draws the eye to where the result lives.
+  function flash(node) {
+    if (!node || node.hidden) return;
+    node.scrollIntoView({ block: "center", behavior: "smooth" });
+    node.classList.remove("search-flash");
+    void node.offsetWidth;
+    node.classList.add("search-flash");
+    node.addEventListener("animationend", () => node.classList.remove("search-flash"), { once: true });
+  }
+
+  function pickResult(result) {
+    if (!result) return;
+    els.searchDialog.close();
+    if (result.kind === "task") {
+      if (result.date) openDay(result.date);
+      openEditor(result.id);
+    } else if (result.kind === "habit") {
+      setView("habits");
+      openHabitDetail(result.id);
+    } else if (result.kind === "dump") {
+      setView("dump");
+      flash(els.dumpList.querySelector(`[data-dump="${CSS.escape(result.id)}"]`));
+    } else if (result.kind === "weekNote") {
+      state.anchor = Core.parseISODate(result.date);
+      setView("week");
+      flash(els.weekNotes);
+    } else {
+      openDay(result.date);
+      flash({ dayNote: els.dayNotes, mood: els.moodReason, closure: els.closedLine }[result.kind]);
+    }
+  }
+
+  els.searchBtn.addEventListener("click", openSearch);
+  els.searchInput.addEventListener("input", runSearch);
+  els.searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!searchResults.length) return;
+      searchIndex = (searchIndex + (event.key === "ArrowDown" ? 1 : -1) + searchResults.length) % searchResults.length;
+      renderSearch();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      pickResult(searchResults[searchIndex]);
+    }
+  });
+  els.searchResults.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-index]");
+    if (button) pickResult(searchResults[Number(button.dataset.index)]);
+  });
+  els.searchDialog.addEventListener("click", (event) => {
+    if (event.target === els.searchDialog) els.searchDialog.close();
+  });
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (els.searchDialog.open) els.searchDialog.close();
+      else openSearch();
+    }
+  });
 
   // Sorting a thought: a task (today / tomorrow / to schedule, with the
   // usual #tag, !urgent and time syntax), a line in today's notes, or gone.
@@ -2919,7 +3216,7 @@
 
   // Dates in the week and month views open that day's page.
   document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-action], .month-tabs")) return;
+    if (event.target.closest("[data-action], .month-tabs, [data-ghost-source], [data-event], .event-card")) return;
     const opener = event.target.closest("[data-open-day]");
     if (opener) openDay(opener.dataset.openDay);
   });
@@ -2950,7 +3247,13 @@
   });
 
   document.addEventListener("keydown", (event) => {
-    if (event.target.matches?.(".item-body") && (event.key === "Enter" || event.key === " ")) {
+    const eventTarget = event.target.closest?.("[data-event]");
+    if (eventTarget && (event.key === "Enter" || event.key === " ") && !event.target.closest(".event-card")) {
+      event.preventDefault();
+      openEventCard(eventTarget);
+      return;
+    }
+    if (event.target.matches?.(".item-body") && event.target.closest(".item") && (event.key === "Enter" || event.key === " ")) {
       event.preventDefault();
       openEditor(event.target.closest(".item").dataset.id);
       return;
@@ -2967,9 +3270,63 @@
       (state.view === "day" ? els.dayCaptureInput : els.inboxInput).focus();
     } else if (event.key === "t" || event.key === "T") goToday();
     else if (event.key === "b" || event.key === "B") openDump();
+    else if (event.key === "/") {
+      event.preventDefault();
+      openSearch();
+    }
     else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
     else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
   });
+
+  // ---------- resizing a timeline block ----------
+  // Dragging a task block's bottom edge changes its duration in 15-minute
+  // steps; the change is saved when the pointer is released.
+  let resizing = null;
+
+  els.timeline.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest(".block-resize");
+    if (!handle || event.button !== 0) return;
+    const block = handle.closest(".block");
+    const item = findItem(block?.dataset.id);
+    if (!item?.start) return;
+    event.preventDefault();
+    block.draggable = false;
+    block.classList.add("is-resizing");
+    const duration = item.duration || 60;
+    resizing = {
+      id: item.id, block, duration, next: duration,
+      y: event.clientY, hour: timelineHourHeight(), startMin: Planner.timeToMinutes(item.start),
+    };
+    document.body.classList.add("is-resizing");
+  });
+
+  window.addEventListener("pointermove", (event) => {
+    if (!resizing) return;
+    const { block, duration, hour, startMin } = resizing;
+    const delta = ((event.clientY - resizing.y) / hour) * 60;
+    const next = Math.min(1440 - startMin, Math.max(15, Math.round((duration + delta) / 15) * 15));
+    if (next === resizing.next) return;
+    resizing.next = next;
+    const height = Math.max((next / 60) * hour - 2, 20);
+    block.style.setProperty("--h", `${height}px`);
+    block.style.setProperty("--lines", String(Math.max(1, Math.floor((height - 19) / 16))));
+    block.classList.toggle("short", height < 34);
+    const time = block.querySelector(".block-time");
+    if (time) time.textContent = `${Planner.minutesToTime(startMin)}–${Planner.minutesToTime(Math.min(1439, startMin + next))}`;
+  });
+
+  function endResize() {
+    if (!resizing) return;
+    const { id, block, duration, next } = resizing;
+    resizing = null;
+    document.body.classList.remove("is-resizing");
+    block.draggable = true;
+    block.classList.remove("is-resizing");
+    const item = findItem(id);
+    if (item && next !== duration) updateItem({ ...item, duration: next });
+  }
+  window.addEventListener("pointerup", endResize);
+  window.addEventListener("pointercancel", endResize);
 
   // ---------- drag & drop ----------
   function dropZoneFrom(target) {
@@ -3114,13 +3471,17 @@
     return parts.length ? parts.join(" · ") : t("morningEmpty");
   }
 
-  // Checked every 30 seconds: anything whose moment has come in the last ten
-  // minutes and wasn't shown yet becomes a notification. Older ones (the
-  // computer was asleep) are skipped rather than delivered late.
-  function checkReminders() {
-    if (!desktop?.notify || !state.settings.notifyOn) return;
-    const now = Date.now();
-    const due = Planner.reminders({
+  // Snoozed reminders come back ten minutes later ({ key: when }), unless
+  // the task was done or the habit checked in the meantime.
+  const SNOOZE_MS = 10 * 60000;
+  const snoozed = {};
+  function snoozeReminder(key) {
+    snoozed[key] = Date.now() + SNOOZE_MS;
+    toast(t("snoozed"));
+  }
+
+  function currentReminders(now = Date.now()) {
+    return Planner.reminders({
       items: state.items,
       habits: state.habits,
       habitLog: state.habitLog,
@@ -3130,7 +3491,23 @@
       kinds: state.settings.notifyKinds,
       morningAt: state.settings.morningOn ? state.settings.morningAt : null,
       closureAt: state.settings.closureOn && !state.closures[todayISO()] ? state.settings.closureAt : null,
-    }).filter((reminder) => reminder.at <= now && now - reminder.at < 10 * 60000 && !notified[reminder.key]);
+    });
+  }
+
+  // Checked every 30 seconds: anything whose moment has come in the last ten
+  // minutes and wasn't shown yet becomes a notification. Older ones (the
+  // computer was asleep) are skipped rather than delivered late.
+  function checkReminders() {
+    if (!desktop?.notify || !state.settings.notifyOn) return;
+    const now = Date.now();
+    const all = currentReminders(now);
+    const due = all.filter((reminder) => reminder.at <= now && now - reminder.at < 10 * 60000 && !notified[reminder.key]);
+    Object.entries(snoozed).forEach(([key, at]) => {
+      if (at > now) return;
+      delete snoozed[key];
+      const reminder = all.find((candidate) => candidate.key === key);
+      if (reminder && !due.includes(reminder)) due.push(reminder);
+    });
     if (!due.length) return;
     due.forEach((reminder) => {
       notified[reminder.key] = now;
@@ -3142,8 +3519,9 @@
         desktop.notify({ title: t("morningTitle"), body: morningBody(reminder.iso), iso: reminder.iso });
         return;
       }
-      const minutes = Math.max(0, Math.round((reminder.at + state.settings.notifyLead * 60000 - now) / 60000));
-      const when = minutes ? t("remindIn", { time: reminder.start, n: minutes }) : t("remindNow", { time: reminder.start });
+      const minutes = Math.round((reminder.at + state.settings.notifyLead * 60000 - now) / 60000);
+      const when = minutes > 0 ? t("remindIn", { time: reminder.start, n: minutes })
+        : minutes < 0 ? t("remindStarted", { time: reminder.start }) : t("remindNow", { time: reminder.start });
       const extra = reminder.kind === "meeting"
         ? [reminder.event.location, calendarById(reminder.event.calendarId)?.name].filter(Boolean)
         : [];
@@ -3151,6 +3529,8 @@
         title: reminder.title || t("untitledEvent"),
         body: [when, ...extra].join(" · "),
         iso: reminder.iso,
+        snooze: reminder.key,
+        snoozeLabel: t("snooze10"),
       });
     });
     saveNotified();
@@ -3181,11 +3561,16 @@
   if (desktop?.notify) {
     setInterval(checkReminders, 30000);
     setTimeout(checkReminders, 5000);
-    desktop.onOpenDay?.((iso, action) => {
+    desktop.onOpenDay?.((iso, action, key) => {
       document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
       openDay(iso);
       if (action === "closure") openClosure(iso);
+      // Opened from a reminder: offer the snooze here too (Windows has no
+      // button on the notification itself).
+      const reminder = key && currentReminders().find((candidate) => candidate.key === key);
+      if (reminder) toast(`${reminder.title || t("untitledEvent")} · ${reminder.start}`, t("snooze10"), () => snoozeReminder(key));
     });
+    desktop.onSnoozeReminder?.(snoozeReminder);
   }
 
   // ---------- desktop integration ----------

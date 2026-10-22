@@ -98,7 +98,161 @@
       notes: String(item.notes ?? ""),
       createdAt: Number.isFinite(item.createdAt) ? item.createdAt : now,
       order: Number.isFinite(item.order) ? item.order : 0,
+      // Repeating tasks: the rule, the date the rule counts from (so a
+      // monthly "31st" comes back to the 31st), and — once done — the id of
+      // the next occurrence it created.
+      repeat: date && REPEATS.includes(item.repeat) ? item.repeat : null,
+      repeatAnchor: date && REPEATS.includes(item.repeat) ? (parseISODate(item.repeatAnchor) ? item.repeatAnchor : date) : null,
+      spawned: typeof item.spawned === "string" && item.spawned ? item.spawned : null,
     };
+  }
+
+  // ---------- Search ----------
+  const foldText = (text) => String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  // Monday of an ISO week key ("2026-W43").
+  function weekKeyToDate(key) {
+    const match = /^(\d{4})-W(\d{2})$/.exec(String(key || ""));
+    if (!match) return null;
+    const jan4 = new Date(Number(match[1]), 0, 4);
+    const monday = addDays(jan4, -((jan4.getDay() + 6) % 7));
+    return addDays(monday, (Number(match[2]) - 1) * 7);
+  }
+
+  // A short excerpt around the first match.
+  function snippet(text, terms, radius = 48) {
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    const folded = foldText(clean);
+    const at = Math.max(0, Math.min(...terms.map((term) => {
+      const index = folded.indexOf(term);
+      return index < 0 ? Infinity : index;
+    })));
+    const start = Number.isFinite(at) ? Math.max(0, at - radius) : 0;
+    const end = Math.min(clean.length, start + radius * 3);
+    return `${start > 0 ? "…" : ""}${clean.slice(start, end)}${end < clean.length ? "…" : ""}`;
+  }
+
+  // Everything written in the planner, searched by words (accents and case
+  // ignored, every word must appear). Newest first within each kind.
+  const SEARCH_KINDS = ["task", "habit", "dump", "dayNote", "closure", "mood", "weekNote"];
+
+  function search(sources, query, limit = 40) {
+    const terms = foldText(query).split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    const matches = (text) => {
+      const folded = foldText(text);
+      return terms.every((term) => folded.includes(term));
+    };
+    const out = [];
+    (sources.items || []).forEach((item) => {
+      const text = `${item.title} ${item.notes || ""}`;
+      if (matches(text)) out.push({ kind: "task", id: item.id, title: item.title, snippet: matches(item.title) ? "" : snippet(item.notes, terms), date: item.date, done: item.done });
+    });
+    (sources.habits || []).forEach((habit) => {
+      if (matches(habit.name)) out.push({ kind: "habit", id: habit.id, title: habit.name, snippet: "", date: null });
+    });
+    (sources.dump || []).forEach((note) => {
+      if (matches(note.text)) out.push({ kind: "dump", id: note.id, title: note.text, snippet: "", date: toISODate(new Date(note.createdAt)) });
+    });
+    Object.entries(sources.dayNotes || {}).forEach(([iso, text]) => {
+      if (matches(text)) out.push({ kind: "dayNote", id: iso, title: snippet(text, terms), snippet: "", date: iso });
+    });
+    Object.entries(sources.closures || {}).forEach(([iso, closure]) => {
+      if (closure?.good && matches(closure.good)) out.push({ kind: "closure", id: iso, title: snippet(closure.good, terms), snippet: "", date: iso });
+    });
+    Object.entries(sources.moodNotes || {}).forEach(([iso, text]) => {
+      if (matches(text)) out.push({ kind: "mood", id: iso, title: snippet(text, terms), snippet: "", date: iso });
+    });
+    Object.entries(sources.weekNotes || {}).forEach(([key, text]) => {
+      const monday = weekKeyToDate(key);
+      if (monday && matches(text)) out.push({ kind: "weekNote", id: key, title: snippet(text, terms), snippet: "", date: toISODate(monday) });
+    });
+    return out
+      .sort((a, b) => SEARCH_KINDS.indexOf(a.kind) - SEARCH_KINDS.indexOf(b.kind) || String(b.date || "").localeCompare(String(a.date || "")))
+      .slice(0, limit);
+  }
+
+  // ---------- Repeating tasks ----------
+  const REPEATS = ["daily", "weekdays", "weekly", "biweekly", "monthly", "yearly"];
+
+  // The occurrence right after `iso` for a rule; monthly and yearly keep the
+  // anchor's day (clamped to shorter months).
+  function nextOccurrence(repeat, iso, anchorISO = iso) {
+    const date = parseISODate(iso);
+    const anchor = parseISODate(anchorISO) || date;
+    if (!date || !REPEATS.includes(repeat)) return null;
+    if (repeat === "daily") return toISODate(addDays(date, 1));
+    if (repeat === "weekly") return toISODate(addDays(date, 7));
+    if (repeat === "biweekly") return toISODate(addDays(date, 14));
+    if (repeat === "weekdays") {
+      let next = addDays(date, 1);
+      while (next.getDay() === 0 || next.getDay() === 6) next = addDays(next, 1);
+      return toISODate(next);
+    }
+    const months = repeat === "monthly" ? 1 : 12;
+    const year = date.getFullYear();
+    const month = date.getMonth() + months;
+    const targetMonth = repeat === "yearly" ? anchor.getMonth() : ((month % 12) + 12) % 12;
+    const targetYear = repeat === "yearly" ? year + 1 : year + Math.floor(month / 12);
+    const last = new Date(targetYear, targetMonth + 1, 0).getDate();
+    return toISODate(new Date(targetYear, targetMonth, Math.min(anchor.getDate(), last)));
+  }
+
+  // First occurrence after the item's date that isn't in the past, so a task
+  // finished late doesn't leave a trail of overdue copies.
+  function nextUpcoming(item, todayISO) {
+    let next = nextOccurrence(item.repeat, item.date, item.repeatAnchor);
+    for (let guard = 0; next && next < todayISO && guard < 1000; guard++) next = nextOccurrence(item.repeat, next, item.repeatAnchor);
+    return next;
+  }
+
+  // Ticking a task. A repeating one, when done, creates its next occurrence
+  // (unticking it again takes that copy back if it's still untouched).
+  function completeItem(items, id, todayISO, now = Date.now()) {
+    const item = items.find((candidate) => candidate.id === id);
+    if (!item) return items;
+    if (item.done) {
+      const spawned = item.spawned ? items.find((candidate) => candidate.id === item.spawned) : null;
+      const keep = items.filter((candidate) => !(spawned && candidate.id === spawned.id && !spawned.done));
+      return keep.map((candidate) => (candidate.id === id ? { ...toggleDone(candidate, todayISO, now), spawned: null } : candidate));
+    }
+    const done = toggleDone(item, todayISO, now);
+    if (!item.repeat || !item.date) return items.map((candidate) => (candidate.id === id ? done : candidate));
+    const date = nextUpcoming(item, todayISO);
+    const others = items.filter((candidate) => candidate.id !== id);
+    const next = normalizeItem({
+      ...item,
+      id: newId(),
+      date,
+      done: false,
+      doneAt: null,
+      spawned: null,
+      createdAt: now,
+      order: nextOrder(others, date),
+    }, now);
+    return [...items.map((candidate) => (candidate.id === id ? { ...done, spawned: next.id } : candidate)), next];
+  }
+
+  // "Skip this one": the task moves to its next occurrence.
+  function skipOccurrence(items, id, todayISO) {
+    return items.map((item) => {
+      if (item.id !== id || !item.repeat || item.done) return item;
+      return { ...item, date: nextUpcoming({ ...item, date: item.date < todayISO ? todayISO : item.date }, todayISO) };
+    });
+  }
+
+  // Future occurrences of open repeating tasks between two dates, as light
+  // read-only copies for the week and month pages.
+  function upcomingOccurrences(items, fromISO, toISO) {
+    const out = [];
+    items.filter((item) => item.repeat && item.date && !item.done).forEach((item) => {
+      let date = nextOccurrence(item.repeat, item.date, item.repeatAnchor);
+      for (let guard = 0; date && date <= toISO && guard < 400; guard++) {
+        if (date >= fromISO) out.push({ ...item, id: `${item.id}@${date}`, sourceId: item.id, date, ghost: true });
+        date = nextOccurrence(item.repeat, date, item.repeatAnchor);
+      }
+    });
+    return out;
   }
 
   function defaultCategories(language = "en") {
@@ -952,10 +1106,27 @@
     return total;
   }
 
+  // How many busy calls a day has, and the longest run of them back to back
+  // (less than 15 minutes between one ending and the next starting).
+  function callStats(events, iso) {
+    const calls = eventsForDay(events, iso).timed.filter((event) => event.busy !== false);
+    let streak = 0;
+    let run = 0;
+    let reach = -Infinity;
+    calls.forEach((event) => {
+      run = event.startMin - reach < 15 ? run + 1 : 1;
+      reach = Math.max(reach, event.endMin);
+      streak = Math.max(streak, run);
+    });
+    return { count: calls.length, streak };
+  }
+
   // ---------- Mental load (perceived, not a stress measure) ----------
   // A rough 0–10 estimate of how full the day feels, from what the planner
   // knows: open must-dos and urgent items, busy hours on the timeline,
   // overdue tasks (today only) and whether the last two days felt heavy.
+  // Meetings count twice over: by the hours they take and by how chopped up
+  // they leave the day (many calls, or three or more back to back).
   // The person can always override it with their own number.
   const HEAVY_MOODS = ["tiring", "stressed", "rough"];
 
@@ -969,6 +1140,8 @@
       .filter((item) => item.start && item.focus !== "later")
       .reduce((sum, item) => sum + (item.duration || 60), 0);
     const meetingMinutes = busyMinutes(events, iso);
+    const { count: calls, streak } = callStats(events, iso);
+    const backToBack = streak >= 3 ? streak : 0;
     const overdue = iso === todayISO ? overdueItems(items, todayISO).length : 0;
     const date = parseISODate(iso);
     const heavyDays = date
@@ -979,6 +1152,8 @@
       + Math.min(could * 0.4, 2)
       + Math.min(urgent * 0.5, 1.5)
       + Math.min(((minutes + meetingMinutes) / 60) * 0.5, 3)
+      + Math.min(Math.max(0, calls - 3) * 0.3, 1.5)
+      + (backToBack ? 0.5 : 0)
       + Math.min(overdue * 0.5, 2)
       + Math.min(heavyDays * 0.5, 1);
     return {
@@ -989,6 +1164,8 @@
         urgent,
         hours: Math.round((minutes / 60) * 10) / 10,
         meetings: Math.round((meetingMinutes / 60) * 10) / 10,
+        calls,
+        backToBack,
         overdue,
         heavyDays,
       },
@@ -1216,6 +1393,14 @@
     nextOrder,
     createItem,
     moveItem,
+    REPEATS,
+    callStats,
+    search,
+    weekKeyToDate,
+    nextOccurrence,
+    completeItem,
+    skipOccurrence,
+    upcomingOccurrences,
     closeDay,
     parseDump,
     legacyDumpNotes,

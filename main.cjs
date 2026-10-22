@@ -4,7 +4,7 @@ const https = require("https");
 const path = require("path");
 const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
-const { createCalendarStore } = require("./desktop-calendars.cjs");
+const { createCalendarStore, isMeetingUrl } = require("./desktop-calendars.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
@@ -315,8 +315,9 @@ ipcMain.handle("calendars-refresh", async () => {
 });
 
 // Native notifications for reminders. Clicking one brings the window up on
-// that day. References are kept so they aren't garbage-collected (which
-// would drop the click handler).
+// that day; reminders carry a key so they can be snoozed (a button on macOS,
+// a prompt in the app after the click everywhere). References are kept so
+// they aren't garbage-collected (which would drop the click handler).
 const liveNotifications = new Set();
 ipcMain.on("notify", (_event, payload) => {
   if (!Notification.isSupported() || !payload || typeof payload !== "object") return;
@@ -324,13 +325,21 @@ ipcMain.on("notify", (_event, payload) => {
   const body = String(payload.body || "").slice(0, 240);
   const iso = /^\d{4}-\d{2}-\d{2}$/.test(String(payload.iso || "")) ? payload.iso : null;
   const action = payload.action === "closure" ? "closure" : null;
-  const notification = new Notification({ title, body });
+  const snooze = typeof payload.snooze === "string" && payload.snooze.length <= 200 ? payload.snooze : null;
+  const actions = snooze && process.platform === "darwin"
+    ? [{ type: "button", text: String(payload.snoozeLabel || "Snooze 10 min").slice(0, 40) }]
+    : [];
+  const notification = new Notification({ title, body, actions });
   liveNotifications.add(notification);
   const release = () => liveNotifications.delete(notification);
   notification.on("click", () => {
     release();
     focusWindow();
-    if (iso && window) window.webContents.send("open-day", iso, action);
+    if (iso && window) window.webContents.send("open-day", iso, action, snooze);
+  });
+  notification.on("action", () => {
+    release();
+    if (snooze && window) window.webContents.send("snooze-reminder", snooze);
   });
   notification.on("close", release);
   notification.show();
@@ -338,6 +347,10 @@ ipcMain.on("notify", (_event, payload) => {
 
 ipcMain.on("hide-window", () => { if (window) window.hide(); });
 ipcMain.on("set-always-on-top", (_event, on) => { if (window) window.setAlwaysOnTop(!!on, "floating"); });
+// "Join call" in a meeting's details: only known video-call hosts.
+ipcMain.on("open-meeting", (_event, url) => {
+  if (typeof url === "string" && isMeetingUrl(url)) shell.openExternal(url);
+});
 ipcMain.on("open-external", (_event, url) => {
   if (typeof url === "string" && url.startsWith("https://github.com/")) shell.openExternal(url);
 });

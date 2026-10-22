@@ -179,7 +179,7 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
     P.normalizeItem({ title: "old", date: "2026-10-19" }),
   ];
   const load = P.mentalLoad(busy, day, { todayISO: day, moods: { "2026-10-20": "stressed" } });
-  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, meetings: 0, overdue: 1, heavyDays: 1 });
+  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, meetings: 0, calls: 0, backToBack: 0, overdue: 1, heavyDays: 1 });
   assert.equal(load.score, 8);
   assert.equal(P.mentalLoad(busy, day, { todayISO: "2026-10-20" }).factors.overdue, 0);
   assert.equal(P.loadLevel(2), "light");
@@ -388,6 +388,72 @@ test("brain dump splits lines, drops bullets and blanks, and imports old notes",
   assert.deepEqual(notes, [{ id: "n1", text: "ideia solta", createdAt: 5 }]);
 });
 
+test("search finds words anywhere, ignoring accents and case", () => {
+  const sources = {
+    items: [
+      P.normalizeItem({ id: "a", title: "Dentista às 14h", date: "2026-10-20" }),
+      P.normalizeItem({ id: "b", title: "Ligar", notes: "perguntar sobre o orçamento do dentista", date: "2026-09-01" }),
+      P.normalizeItem({ id: "c", title: "Comprar café" }),
+    ],
+    habits: P.normalizeHabits([{ id: "h", name: "Café sem açúcar" }]),
+    dump: [{ id: "d", text: "ideia: app de receitas com café", createdAt: new Date(2026, 9, 21).getTime() }],
+    dayNotes: { "2026-10-18": "Dia longo. Café com a Ana." },
+    closures: { "2026-10-19": { good: "Terminei o orçamento" } },
+    moodNotes: { "2026-10-17": "reunião difícil" },
+    weekNotes: { "2026-W43": "Semana do orçamento" },
+  };
+  assert.deepEqual(P.search(sources, "DENTISTA").map((r) => [r.kind, r.id]), [["task", "a"], ["task", "b"]]);
+  assert.match(P.search(sources, "dentista")[1].snippet, /orçamento do dentista/);
+  assert.deepEqual(P.search(sources, "cafe").map((r) => r.kind), ["task", "habit", "dump", "dayNote"]);
+  assert.deepEqual(P.search(sources, "orcamento").map((r) => r.kind), ["task", "closure", "weekNote"]);
+  assert.equal(P.search(sources, "orcamento").find((r) => r.kind === "weekNote").date, "2026-10-19");
+  assert.deepEqual(P.search(sources, "cafe ana").map((r) => r.kind), ["dayNote"]);
+  assert.deepEqual(P.search(sources, "   "), []);
+  assert.equal(P.weekKeyToDate("2027-W01").getDate(), 4);
+});
+
+test("repeat rules find the next date, keeping the day of month", () => {
+  assert.equal(P.nextOccurrence("daily", "2026-10-21"), "2026-10-22");
+  assert.equal(P.nextOccurrence("weekly", "2026-10-21"), "2026-10-28");
+  assert.equal(P.nextOccurrence("biweekly", "2026-10-21"), "2026-11-04");
+  assert.equal(P.nextOccurrence("weekdays", "2026-10-23"), "2026-10-26"); // Fri → Mon
+  assert.equal(P.nextOccurrence("monthly", "2026-01-31", "2026-01-31"), "2026-02-28");
+  assert.equal(P.nextOccurrence("monthly", "2026-02-28", "2026-01-31"), "2026-03-31");
+  assert.equal(P.nextOccurrence("monthly", "2026-12-05"), "2027-01-05");
+  assert.equal(P.nextOccurrence("yearly", "2028-02-29", "2028-02-29"), "2029-02-28");
+  assert.equal(P.nextOccurrence("nope", "2026-10-21"), null);
+  assert.equal(P.normalizeItem({ title: "x", repeat: "monthly" }).repeat, null); // needs a date
+  const rent = P.normalizeItem({ title: "Aluguel", date: "2026-10-05", repeat: "monthly" });
+  assert.deepEqual([rent.repeat, rent.repeatAnchor], ["monthly", "2026-10-05"]);
+});
+
+test("completing a repeating task creates the next one; unticking takes it back", () => {
+  const rent = P.normalizeItem({ id: "rent", title: "Pagar aluguel", date: "2026-10-05", repeat: "monthly", focus: "must" });
+  // Paid late, on the 21st: the next is November 5th (not an overdue copy).
+  let items = P.completeItem([rent], "rent", "2026-10-21", 1);
+  assert.equal(items.length, 2);
+  const next = items.find((item) => item.id !== "rent");
+  assert.deepEqual([next.date, next.done, next.repeat, next.focus, next.title], ["2026-11-05", false, "monthly", "must", "Pagar aluguel"]);
+  assert.equal(items.find((item) => item.id === "rent").spawned, next.id);
+  items = P.completeItem(items, "rent", "2026-10-21");
+  assert.deepEqual(items.map((item) => [item.id, item.done]), [["rent", false]]);
+  // A daily task overdue for days jumps to today.
+  const water = P.normalizeItem({ id: "w", title: "Regar plantas", date: "2026-10-15", repeat: "daily" });
+  assert.equal(P.completeItem([water], "w", "2026-10-21").find((item) => item.id !== "w").date, "2026-10-21");
+  // Plain tasks just toggle.
+  assert.equal(P.completeItem([P.normalizeItem({ id: "p", title: "p", date: "2026-10-21" })], "p", "2026-10-21").length, 1);
+  // Skipping moves the open task to its next date.
+  assert.equal(P.skipOccurrence([rent], "rent", "2026-10-01")[0].date, "2026-11-05");
+});
+
+test("upcoming occurrences fill the calendar ahead, read-only", () => {
+  const gym = P.normalizeItem({ id: "g", title: "Pilates", date: "2026-10-20", repeat: "weekly" });
+  const ghosts = P.upcomingOccurrences([gym], "2026-10-01", "2026-11-30");
+  assert.deepEqual(ghosts.map((ghost) => ghost.date), ["2026-10-27", "2026-11-03", "2026-11-10", "2026-11-17", "2026-11-24"]);
+  assert.ok(ghosts.every((ghost) => ghost.ghost && ghost.sourceId === "g" && ghost.id.startsWith("g@")));
+  assert.deepEqual(P.upcomingOccurrences([{ ...gym, done: true }], "2026-10-01", "2026-11-30"), []);
+});
+
 test("closing a day moves, returns or leaves its unfinished tasks", () => {
   const day = "2026-10-21";
   const items = [
@@ -465,6 +531,28 @@ test("calendar events split into all-day and timed slices of a local day", () =>
   const load = P.mentalLoad([], "2026-11-03", { events: overlapping });
   assert.equal(load.factors.meetings, 3);
   assert.equal(load.score, 2);
+});
+
+test("a day chopped into many calls weighs more than one long meeting", () => {
+  const at = (hour, minute = 0) => new Date(2026, 10, 4, hour, minute).toISOString();
+  const call = (id, [h1, m1], [h2, m2], busy = true) => ({ id, allDay: false, start: at(h1, m1), end: at(h2, m2), busy });
+  const chopped = [
+    call("a", [9, 0], [9, 30]), call("b", [9, 40], [10, 10]), call("c", [10, 15], [10, 45]),
+    call("d", [13, 0], [13, 30]), call("e", [15, 0], [15, 30]), call("f", [16, 0], [16, 30]),
+    call("free", [17, 0], [18, 0], false),
+  ];
+  const workshop = [call("w", [9, 0], [12, 0])];
+  assert.deepEqual(P.callStats(chopped, "2026-11-04"), { count: 6, streak: 3 });
+  assert.deepEqual(P.callStats([call("x", [9, 0], [10, 0]), call("y", [10, 20], [11, 0])], "2026-11-04"), { count: 2, streak: 1 });
+  const choppedLoad = P.mentalLoad([], "2026-11-04", { events: chopped });
+  const workshopLoad = P.mentalLoad([], "2026-11-04", { events: workshop });
+  assert.equal(choppedLoad.factors.meetings, workshopLoad.factors.meetings);
+  assert.deepEqual([choppedLoad.factors.calls, choppedLoad.factors.backToBack], [6, 3]);
+  assert.deepEqual([workshopLoad.factors.calls, workshopLoad.factors.backToBack], [1, 0]);
+  assert.ok(choppedLoad.score > workshopLoad.score);
+  // 1.5 (hours) + 0.9 (three calls past the third) + 0.5 (back to back) → 3 (rounded)
+  assert.equal(choppedLoad.score, 3);
+  assert.equal(workshopLoad.score, 2);
 });
 
 test("perceived load can be set and cleared; postpone picks the last plain could-do", () => {
