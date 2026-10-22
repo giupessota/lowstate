@@ -28,6 +28,7 @@
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
+    coverColor: "type-todo.cover-color.v1",
     alwaysOnTop: "type-todo.always-on-top.v1",
     shortcuts: "type-todo.shortcuts.v1",
     legacyTodos: "quest-log.todos.v1",
@@ -1966,8 +1967,125 @@
 
   // ---------- settings ----------
   const currentTheme = () => (document.documentElement.dataset.theme === "dark" ? "dark" : "light");
-  const COVERS = ["green", "navy", "wine", "black", "pink", "mustard", "lavender", "teal"];
-  const currentCover = () => (COVERS.includes(document.documentElement.dataset.cover) ? document.documentElement.dataset.cover : "green");
+  const COVERS = ["green", "navy", "wine", "black", "pink", "mustard", "lavender", "teal", "custom"];
+  // Blue (navy) is the default cover, also for older values like 1.x's "mono".
+  const currentCover = () => (COVERS.includes(document.documentElement.dataset.cover) ? document.documentElement.dataset.cover : "navy");
+  // ---------- cover color picker (in the app, not the system one) ----------
+  const picker = {
+    panel: document.getElementById("colorPanel"),
+    sv: document.getElementById("colorSV"),
+    handle: document.getElementById("colorHandle"),
+    hue: document.getElementById("colorHue"),
+    suggest: document.getElementById("colorSuggest"),
+    preview: document.getElementById("colorPreview"),
+    hex: document.getElementById("colorHex"),
+    note: document.getElementById("colorNote"),
+  };
+  // Tones that suit a cloth cover.
+  const COVER_SUGGESTIONS = ["#4a5d7a", "#2f5a46", "#5e3552", "#8a4b2f", "#44505c", "#1f5c73", "#5b6236", "#7a3b5a"];
+  let pick = null; // { h, s, v, before: { cover, color } } while the panel is open
+
+  const pickedHex = () => Planner.hsvToHex(pick.h, pick.s, pick.v);
+
+  // Shows the color live on the cover while picking.
+  function showPick() {
+    const raw = pickedHex();
+    const color = Planner.readableCover(raw);
+    document.documentElement.style.setProperty("--cover-custom", color);
+    document.documentElement.dataset.cover = "custom";
+    picker.sv.style.setProperty("--hue", pick.h);
+    picker.handle.style.left = `${pick.s * 100}%`;
+    picker.handle.style.top = `${(1 - pick.v) * 100}%`;
+    picker.handle.style.background = raw;
+    picker.hue.value = String(pick.h);
+    if (document.activeElement !== picker.hex) picker.hex.value = raw;
+    picker.preview.style.background = color;
+    picker.note.hidden = color === raw;
+  }
+
+  function openColorPicker() {
+    const start = Store.getRaw(KEYS.coverColor) || getComputedStyle(document.documentElement).getPropertyValue("--cover").trim();
+    const hsv = Planner.hexToHsv(start) || { h: 220, s: 0.55, v: 0.4 };
+    pick = { ...hsv, before: { cover: currentCover(), color: Store.getRaw(KEYS.coverColor) } };
+    picker.suggest.replaceChildren(...COVER_SUGGESTIONS.map((hex) => h("button", {
+      type: "button",
+      class: "color-chip",
+      "data-hex": hex,
+      title: hex,
+      "aria-label": hex,
+      style: `background: ${hex}`,
+    })));
+    picker.panel.hidden = false;
+    showPick();
+    renderSettings(); // the "Any color" swatch shows as the chosen one while picking
+    picker.sv.focus();
+  }
+
+  function closeColorPicker(keep) {
+    if (!pick) return;
+    if (keep) {
+      const color = Planner.readableCover(pickedHex());
+      Store.setRaw(KEYS.coverColor, color);
+      Store.setRaw(KEYS.cover, "custom");
+    } else {
+      const { cover, color } = pick.before;
+      if (color) document.documentElement.style.setProperty("--cover-custom", color);
+      document.documentElement.dataset.cover = cover;
+    }
+    pick = null;
+    picker.panel.hidden = true;
+    renderSettings();
+  }
+
+  // Dragging in the square sets saturation (→) and brightness (↑).
+  function pickAt(event) {
+    const rect = picker.sv.getBoundingClientRect();
+    pick.s = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    pick.v = Math.min(1, Math.max(0, 1 - (event.clientY - rect.top) / rect.height));
+    showPick();
+  }
+  picker.sv.addEventListener("pointerdown", (event) => {
+    if (!pick) return;
+    picker.sv.setPointerCapture(event.pointerId);
+    pickAt(event);
+  });
+  picker.sv.addEventListener("pointermove", (event) => {
+    if (pick && picker.sv.hasPointerCapture(event.pointerId)) pickAt(event);
+  });
+  picker.sv.addEventListener("keydown", (event) => {
+    const moves = { ArrowLeft: ["s", -0.02], ArrowRight: ["s", 0.02], ArrowUp: ["v", 0.02], ArrowDown: ["v", -0.02] };
+    if (!pick || !moves[event.key]) return;
+    event.preventDefault();
+    const [key, delta] = moves[event.key];
+    pick[key] = Math.min(1, Math.max(0, pick[key] + delta));
+    showPick();
+  });
+  picker.hue.addEventListener("input", () => {
+    pick.h = Number(picker.hue.value);
+    showPick();
+  });
+  picker.hex.addEventListener("input", () => {
+    const value = picker.hex.value.trim();
+    const hsv = Planner.hexToHsv(value.startsWith("#") ? value : `#${value}`);
+    if (!hsv) return;
+    Object.assign(pick, hsv);
+    showPick();
+  });
+  picker.suggest.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-hex]");
+    if (!chip) return;
+    Object.assign(pick, Planner.hexToHsv(chip.dataset.hex));
+    showPick();
+  });
+  document.getElementById("colorDone").addEventListener("click", () => closeColorPicker(true));
+  document.getElementById("colorCancel").addEventListener("click", () => closeColorPicker(false));
+  picker.panel.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    // Esc cancels the color, not the whole settings sheet.
+    event.preventDefault();
+    event.stopPropagation();
+    closeColorPicker(false);
+  });
   const alwaysOnTop = () => Store.getRaw(KEYS.alwaysOnTop) === "on";
 
   function entryToItem(entry) {
@@ -1979,6 +2097,10 @@
   }
 
   function renderSettings() {
+    const customSwatch = els.settingsDialog.querySelector(".swatch-custom");
+    const customColor = Store.getRaw(KEYS.coverColor);
+    if (customColor) customSwatch.style.setProperty("--chosen", customColor);
+    customSwatch.classList.toggle("has-color", Boolean(customColor));
     const values = {
       theme: currentTheme(),
       cover: currentCover(),
@@ -2020,7 +2142,12 @@
       Store.setRaw(KEYS.theme, value);
       document.documentElement.dataset.theme = value === "dark" ? "dark" : "light";
     } else if (setting === "cover") {
-      const cover = COVERS.includes(value) ? value : "green";
+      if (value === "custom") {
+        if (!pick) openColorPicker();
+        return;
+      }
+      if (pick) closeColorPicker(false);
+      const cover = COVERS.includes(value) ? value : "navy";
       Store.setRaw(KEYS.cover, cover);
       document.documentElement.dataset.cover = cover;
     } else if (setting === "language") {
@@ -2177,6 +2304,9 @@
       button.setAttribute("aria-selected", String(button.dataset.tab === tab));
     });
   }
+
+  // Closing the sheet mid-pick keeps the cover as it was.
+  els.settingsDialog.addEventListener("close", () => closeColorPicker(false));
 
   els.settingsBtn.addEventListener("click", () => {
     showSettingsTab(settingsTab);

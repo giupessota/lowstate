@@ -106,6 +106,53 @@
     return names.map((name, index) => ({ id: slug(DEFAULT_CATEGORY_NAMES.en[index]), name, color: PALETTE[index] }));
   }
 
+  // A cover color picked freely, darkened just enough for the cover's light
+  // text to stay readable (contrast with #efe8d8 of at least 4.5:1).
+  function readableCover(hex) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+    if (!match) return null;
+    const rgb = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16));
+    const channel = (value) => {
+      const c = value / 255;
+      return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+    };
+    const luminance = (color) => 0.2126 * channel(color[0]) + 0.7152 * channel(color[1]) + 0.0722 * channel(color[2]);
+    let color = rgb;
+    for (let step = 1; step <= 20 && luminance(color) > 0.139; step++) {
+      color = rgb.map((value) => Math.round(value * (1 - step * 0.05)));
+    }
+    return `#${color.map((value) => value.toString(16).padStart(2, "0")).join("")}`;
+  }
+
+  // Hue (0–360), saturation and value (0–1) for the cover color picker.
+  function hexToHsv(hex) {
+    const match = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+    if (!match) return null;
+    const [r, g, b] = [0, 2, 4].map((offset) => parseInt(match[1].slice(offset, offset + 2), 16) / 255);
+    const max = Math.max(r, g, b);
+    const delta = max - Math.min(r, g, b);
+    let h = 0;
+    if (delta) {
+      if (max === r) h = ((g - b) / delta) % 6;
+      else if (max === g) h = (b - r) / delta + 2;
+      else h = (r - g) / delta + 4;
+      h = Math.round(h * 60 + 360) % 360;
+    }
+    return { h, s: max ? delta / max : 0, v: max };
+  }
+
+  function hsvToHex(h, s, v) {
+    const hue = ((Number(h) % 360) + 360) % 360;
+    const sat = Math.min(1, Math.max(0, Number(s) || 0));
+    const val = Math.min(1, Math.max(0, Number(v) || 0));
+    const c = val * sat;
+    const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+    const m = val - c;
+    const [r, g, b] = hue < 60 ? [c, x, 0] : hue < 120 ? [x, c, 0] : hue < 180 ? [0, c, x]
+      : hue < 240 ? [0, x, c] : hue < 300 ? [x, 0, c] : [c, 0, x];
+    return `#${[r, g, b].map((value) => Math.round((value + m) * 255).toString(16).padStart(2, "0")).join("")}`;
+  }
+
   function nextColor(categories) {
     const used = new Set(categories.map((category) => category.color));
     return PALETTE.find((color) => !used.has(color)) || PALETTE[categories.length % PALETTE.length];
@@ -1092,6 +1139,9 @@
 
   return {
     PALETTE,
+    readableCover,
+    hexToHsv,
+    hsvToHex,
     FOCUS,
     QUOTES,
     QUOTE_STYLES,

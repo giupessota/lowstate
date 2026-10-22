@@ -187,6 +187,33 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
   assert.equal(P.loadLevel(10), "veryHeavy");
 });
 
+test("cover picker converts between hex and hue/saturation/value", () => {
+  assert.deepEqual(P.hexToHsv("#ff0000"), { h: 0, s: 1, v: 1 });
+  assert.deepEqual(P.hexToHsv("#000000"), { h: 0, s: 0, v: 0 });
+  assert.equal(P.hsvToHex(120, 1, 1), "#00ff00");
+  assert.equal(P.hsvToHex(0, 0, 1), "#ffffff");
+  ["#2b3d63", "#7a2e8c", "#d64a32", "#3e9aa8"].forEach((hex) => {
+    const { h, s, v } = P.hexToHsv(hex);
+    const back = P.hsvToHex(h, s, v);
+    const diff = [1, 3, 5].map((i) => Math.abs(parseInt(back.slice(i, i + 2), 16) - parseInt(hex.slice(i, i + 2), 16)));
+    assert.ok(Math.max(...diff) <= 2, `${hex} -> ${back}`);
+  });
+  assert.equal(P.hexToHsv("nope"), null);
+});
+
+test("custom cover colors are darkened only as much as the light text needs", () => {
+  assert.equal(P.readableCover("#2b3d63"), "#2b3d63");
+  assert.equal(P.readableCover("2B3D63"), "#2b3d63");
+  const yellow = P.readableCover("#ffe066");
+  assert.notEqual(yellow, "#ffe066");
+  const lum = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+    .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+  assert.ok(lum(yellow) <= 0.139);
+  assert.equal(P.readableCover("#ffffff").length, 7);
+  assert.equal(P.readableCover("blue"), null);
+});
+
 test("habits: toggling, streaks that survive an unchecked today, monthly progress", () => {
   assert.deepEqual(P.normalizeHabits([{ id: "a", name: " Ler " }, { id: "a", name: "dup" }, { id: "b", name: "" }, null]), [
     { id: "a", name: "Ler", color: P.PALETTE[0], icon: null, days: [], start: null, duration: null, times: {}, since: null, until: null },
