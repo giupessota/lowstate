@@ -985,7 +985,8 @@
         checkButton(item.done, { "data-action": "toggle" }),
         h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
           h("span", { class: "block-time", text: timeRange(item) }),
-          h("span", { class: "block-title", text: item.title }))));
+          h("span", { class: "block-title", text: item.title })),
+        h("span", { class: "block-resize", "aria-hidden": "true", title: t("resizeBlock") })));
     });
 
     if (iso === todayISO()) inner.append(h("div", { class: "now-line", id: "nowLine", title: t("now") }, h("span", { class: "now-time" })));
@@ -3171,6 +3172,56 @@
     else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
     else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
   });
+
+  // ---------- resizing a timeline block ----------
+  // Dragging a task block's bottom edge changes its duration in 15-minute
+  // steps; the change is saved when the pointer is released.
+  let resizing = null;
+
+  els.timeline.addEventListener("pointerdown", (event) => {
+    const handle = event.target.closest(".block-resize");
+    if (!handle || event.button !== 0) return;
+    const block = handle.closest(".block");
+    const item = findItem(block?.dataset.id);
+    if (!item?.start) return;
+    event.preventDefault();
+    block.draggable = false;
+    block.classList.add("is-resizing");
+    const duration = item.duration || 60;
+    resizing = {
+      id: item.id, block, duration, next: duration,
+      y: event.clientY, hour: timelineHourHeight(), startMin: Planner.timeToMinutes(item.start),
+    };
+    document.body.classList.add("is-resizing");
+  });
+
+  window.addEventListener("pointermove", (event) => {
+    if (!resizing) return;
+    const { block, duration, hour, startMin } = resizing;
+    const delta = ((event.clientY - resizing.y) / hour) * 60;
+    const next = Math.min(1440 - startMin, Math.max(15, Math.round((duration + delta) / 15) * 15));
+    if (next === resizing.next) return;
+    resizing.next = next;
+    const height = Math.max((next / 60) * hour - 2, 20);
+    block.style.setProperty("--h", `${height}px`);
+    block.style.setProperty("--lines", String(Math.max(1, Math.floor((height - 19) / 16))));
+    block.classList.toggle("short", height < 34);
+    const time = block.querySelector(".block-time");
+    if (time) time.textContent = `${Planner.minutesToTime(startMin)}–${Planner.minutesToTime(Math.min(1439, startMin + next))}`;
+  });
+
+  function endResize() {
+    if (!resizing) return;
+    const { id, block, duration, next } = resizing;
+    resizing = null;
+    document.body.classList.remove("is-resizing");
+    block.draggable = true;
+    block.classList.remove("is-resizing");
+    const item = findItem(id);
+    if (item && next !== duration) updateItem({ ...item, duration: next });
+  }
+  window.addEventListener("pointerup", endResize);
+  window.addEventListener("pointercancel", endResize);
 
   // ---------- drag & drop ----------
   function dropZoneFrom(target) {

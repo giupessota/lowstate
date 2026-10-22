@@ -912,6 +912,32 @@ svg.i {
   box-shadow: 0 1px 2px rgba(40, 30, 10, .1);
 }
 .block:hover { box-shadow: 0 4px 10px rgba(40, 30, 10, .16); z-index: 3; }
+/* Bottom edge of a task block: drag to change its duration. */
+.block-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 7px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+.block-resize::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 18px;
+  height: 2px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--cat, var(--indigo)) 70%, var(--ink));
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity .15s;
+}
+.block:hover .block-resize::after, .block.is-resizing .block-resize::after { opacity: .6; }
+.block.is-resizing { z-index: 4; box-shadow: 0 6px 16px rgba(40, 30, 10, .2); }
+body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select: none; }
 .block .check { width: 13px; height: 13px; margin-top: 2px; }
 .block .check svg.i { width: 13px; height: 13px; }
 .block .item-body { display: flex; flex-direction: column; min-width: 0; }
