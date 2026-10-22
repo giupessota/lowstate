@@ -197,6 +197,7 @@ completely.
 - `←` `→`: previous / next day, week or month
 - `T`: back to today
 - `B`: brain dump
+- `⌘K` / `Ctrl+K` or `/`: search tasks, notes, brain dump, what went well and habits
 - `N`: jump to the capture field
 - `Enter`: add the task
 - `Esc`: leave the field / close a dialog

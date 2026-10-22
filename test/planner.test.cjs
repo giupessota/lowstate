@@ -388,6 +388,30 @@ test("brain dump splits lines, drops bullets and blanks, and imports old notes",
   assert.deepEqual(notes, [{ id: "n1", text: "ideia solta", createdAt: 5 }]);
 });
 
+test("search finds words anywhere, ignoring accents and case", () => {
+  const sources = {
+    items: [
+      P.normalizeItem({ id: "a", title: "Dentista às 14h", date: "2026-10-20" }),
+      P.normalizeItem({ id: "b", title: "Ligar", notes: "perguntar sobre o orçamento do dentista", date: "2026-09-01" }),
+      P.normalizeItem({ id: "c", title: "Comprar café" }),
+    ],
+    habits: P.normalizeHabits([{ id: "h", name: "Café sem açúcar" }]),
+    dump: [{ id: "d", text: "ideia: app de receitas com café", createdAt: new Date(2026, 9, 21).getTime() }],
+    dayNotes: { "2026-10-18": "Dia longo. Café com a Ana." },
+    closures: { "2026-10-19": { good: "Terminei o orçamento" } },
+    moodNotes: { "2026-10-17": "reunião difícil" },
+    weekNotes: { "2026-W43": "Semana do orçamento" },
+  };
+  assert.deepEqual(P.search(sources, "DENTISTA").map((r) => [r.kind, r.id]), [["task", "a"], ["task", "b"]]);
+  assert.match(P.search(sources, "dentista")[1].snippet, /orçamento do dentista/);
+  assert.deepEqual(P.search(sources, "cafe").map((r) => r.kind), ["task", "habit", "dump", "dayNote"]);
+  assert.deepEqual(P.search(sources, "orcamento").map((r) => r.kind), ["task", "closure", "weekNote"]);
+  assert.equal(P.search(sources, "orcamento").find((r) => r.kind === "weekNote").date, "2026-10-19");
+  assert.deepEqual(P.search(sources, "cafe ana").map((r) => r.kind), ["dayNote"]);
+  assert.deepEqual(P.search(sources, "   "), []);
+  assert.equal(P.weekKeyToDate("2027-W01").getDate(), 4);
+});
+
 test("repeat rules find the next date, keeping the day of month", () => {
   assert.equal(P.nextOccurrence("daily", "2026-10-21"), "2026-10-22");
   assert.equal(P.nextOccurrence("weekly", "2026-10-21"), "2026-10-28");

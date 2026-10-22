@@ -107,6 +107,71 @@
     };
   }
 
+  // ---------- Search ----------
+  const foldText = (text) => String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+  // Monday of an ISO week key ("2026-W43").
+  function weekKeyToDate(key) {
+    const match = /^(\d{4})-W(\d{2})$/.exec(String(key || ""));
+    if (!match) return null;
+    const jan4 = new Date(Number(match[1]), 0, 4);
+    const monday = addDays(jan4, -((jan4.getDay() + 6) % 7));
+    return addDays(monday, (Number(match[2]) - 1) * 7);
+  }
+
+  // A short excerpt around the first match.
+  function snippet(text, terms, radius = 48) {
+    const clean = String(text || "").replace(/\s+/g, " ").trim();
+    const folded = foldText(clean);
+    const at = Math.max(0, Math.min(...terms.map((term) => {
+      const index = folded.indexOf(term);
+      return index < 0 ? Infinity : index;
+    })));
+    const start = Number.isFinite(at) ? Math.max(0, at - radius) : 0;
+    const end = Math.min(clean.length, start + radius * 3);
+    return `${start > 0 ? "…" : ""}${clean.slice(start, end)}${end < clean.length ? "…" : ""}`;
+  }
+
+  // Everything written in the planner, searched by words (accents and case
+  // ignored, every word must appear). Newest first within each kind.
+  const SEARCH_KINDS = ["task", "habit", "dump", "dayNote", "closure", "mood", "weekNote"];
+
+  function search(sources, query, limit = 40) {
+    const terms = foldText(query).split(/\s+/).filter(Boolean);
+    if (!terms.length) return [];
+    const matches = (text) => {
+      const folded = foldText(text);
+      return terms.every((term) => folded.includes(term));
+    };
+    const out = [];
+    (sources.items || []).forEach((item) => {
+      const text = `${item.title} ${item.notes || ""}`;
+      if (matches(text)) out.push({ kind: "task", id: item.id, title: item.title, snippet: matches(item.title) ? "" : snippet(item.notes, terms), date: item.date, done: item.done });
+    });
+    (sources.habits || []).forEach((habit) => {
+      if (matches(habit.name)) out.push({ kind: "habit", id: habit.id, title: habit.name, snippet: "", date: null });
+    });
+    (sources.dump || []).forEach((note) => {
+      if (matches(note.text)) out.push({ kind: "dump", id: note.id, title: note.text, snippet: "", date: toISODate(new Date(note.createdAt)) });
+    });
+    Object.entries(sources.dayNotes || {}).forEach(([iso, text]) => {
+      if (matches(text)) out.push({ kind: "dayNote", id: iso, title: snippet(text, terms), snippet: "", date: iso });
+    });
+    Object.entries(sources.closures || {}).forEach(([iso, closure]) => {
+      if (closure?.good && matches(closure.good)) out.push({ kind: "closure", id: iso, title: snippet(closure.good, terms), snippet: "", date: iso });
+    });
+    Object.entries(sources.moodNotes || {}).forEach(([iso, text]) => {
+      if (matches(text)) out.push({ kind: "mood", id: iso, title: snippet(text, terms), snippet: "", date: iso });
+    });
+    Object.entries(sources.weekNotes || {}).forEach(([key, text]) => {
+      const monday = weekKeyToDate(key);
+      if (monday && matches(text)) out.push({ kind: "weekNote", id: key, title: snippet(text, terms), snippet: "", date: toISODate(monday) });
+    });
+    return out
+      .sort((a, b) => SEARCH_KINDS.indexOf(a.kind) - SEARCH_KINDS.indexOf(b.kind) || String(b.date || "").localeCompare(String(a.date || "")))
+      .slice(0, limit);
+  }
+
   // ---------- Repeating tasks ----------
   const REPEATS = ["daily", "weekdays", "weekly", "biweekly", "monthly", "yearly"];
 
@@ -1306,6 +1371,8 @@
     createItem,
     moveItem,
     REPEATS,
+    search,
+    weekKeyToDate,
     nextOccurrence,
     completeItem,
     skipOccurrence,

@@ -128,6 +128,10 @@
     dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
+    searchDialog: $("searchDialog"),
+    searchInput: $("searchInput"),
+    searchResults: $("searchResults"),
+    searchBtn: $("searchBtn"),
     closureForm: $("closureForm"),
     closureRecap: $("closureRecap"),
     closureGood: $("closureGood"),
@@ -2666,6 +2670,126 @@
     els.dumpInput.focus();
   }
 
+  // ---------- search ----------
+  const SEARCH_LABELS = {
+    task: "searchTasks", habit: "searchHabits", dump: "viewDump", dayNote: "searchDayNotes",
+    closure: "searchClosures", mood: "searchMoods", weekNote: "searchWeekNotes",
+  };
+  let searchResults = [];
+  let searchIndex = 0;
+
+  function searchDate(iso) {
+    const date = Core.parseISODate(iso);
+    if (!date) return "";
+    const options = { day: "numeric", month: "short" };
+    if (date.getFullYear() !== new Date().getFullYear()) options.year = "numeric";
+    return formatDate(date, options);
+  }
+
+  function runSearch() {
+    searchResults = Planner.search({
+      items: state.items, habits: state.habits, dump: state.dump, dayNotes: state.dayNotes,
+      closures: state.closures, moodNotes: state.moodNotes, weekNotes: state.notes,
+    }, els.searchInput.value);
+    searchIndex = 0;
+    renderSearch();
+  }
+
+  function renderSearch() {
+    const query = els.searchInput.value.trim();
+    if (!query || !searchResults.length) {
+      els.searchResults.replaceChildren(h("p", { class: "search-hint", text: query ? t("searchNone", { q: query }) : t("searchHint") }));
+      return;
+    }
+    const nodes = [];
+    searchResults.forEach((result, index) => {
+      if (result.kind !== searchResults[index - 1]?.kind) nodes.push(h("h3", { class: "search-group", text: t(SEARCH_LABELS[result.kind]) }));
+      const meta = result.kind === "weekNote" ? t("searchWeekOf", { date: searchDate(result.date) })
+        : result.kind === "task" && !result.date ? t("dumpInbox")
+          : result.kind === "habit" ? "" : searchDate(result.date);
+      const active = index === searchIndex;
+      nodes.push(h("button", {
+        type: "button", role: "option", "aria-selected": String(active), "data-index": index,
+        class: `search-result${active ? " active" : ""}${result.done ? " is-done" : ""}`,
+      },
+      h("span", { class: "search-text" },
+        h("span", { class: "search-title", text: result.title }),
+        result.snippet ? h("span", { class: "search-snippet", text: result.snippet }) : null),
+      meta ? h("span", { class: "search-meta", text: meta }) : null));
+    });
+    nodes.push(h("p", { class: "search-keys", text: t("searchKeys") }));
+    els.searchResults.replaceChildren(...nodes);
+    els.searchResults.querySelector(".active")?.scrollIntoView({ block: "nearest" });
+  }
+
+  function openSearch() {
+    if (document.querySelector("dialog[open]:not(#searchDialog)")) return;
+    els.searchInput.value = "";
+    runSearch();
+    if (!els.searchDialog.open) els.searchDialog.showModal();
+    els.searchInput.focus();
+  }
+
+  // Draws the eye to where the result lives.
+  function flash(node) {
+    if (!node || node.hidden) return;
+    node.scrollIntoView({ block: "center", behavior: "smooth" });
+    node.classList.remove("search-flash");
+    void node.offsetWidth;
+    node.classList.add("search-flash");
+    node.addEventListener("animationend", () => node.classList.remove("search-flash"), { once: true });
+  }
+
+  function pickResult(result) {
+    if (!result) return;
+    els.searchDialog.close();
+    if (result.kind === "task") {
+      if (result.date) openDay(result.date);
+      openEditor(result.id);
+    } else if (result.kind === "habit") {
+      setView("habits");
+      openHabitDetail(result.id);
+    } else if (result.kind === "dump") {
+      setView("dump");
+      flash(els.dumpList.querySelector(`[data-dump="${CSS.escape(result.id)}"]`));
+    } else if (result.kind === "weekNote") {
+      state.anchor = Core.parseISODate(result.date);
+      setView("week");
+      flash(els.weekNotes);
+    } else {
+      openDay(result.date);
+      flash({ dayNote: els.dayNotes, mood: els.moodReason, closure: els.closedLine }[result.kind]);
+    }
+  }
+
+  els.searchBtn.addEventListener("click", openSearch);
+  els.searchInput.addEventListener("input", runSearch);
+  els.searchInput.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!searchResults.length) return;
+      searchIndex = (searchIndex + (event.key === "ArrowDown" ? 1 : -1) + searchResults.length) % searchResults.length;
+      renderSearch();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      pickResult(searchResults[searchIndex]);
+    }
+  });
+  els.searchResults.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-index]");
+    if (button) pickResult(searchResults[Number(button.dataset.index)]);
+  });
+  els.searchDialog.addEventListener("click", (event) => {
+    if (event.target === els.searchDialog) els.searchDialog.close();
+  });
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (els.searchDialog.open) els.searchDialog.close();
+      else openSearch();
+    }
+  });
+
   // Sorting a thought: a task (today / tomorrow / to schedule, with the
   // usual #tag, !urgent and time syntax), a line in today's notes, or gone.
   function sortDumpNote(id, action) {
@@ -3040,6 +3164,10 @@
       (state.view === "day" ? els.dayCaptureInput : els.inboxInput).focus();
     } else if (event.key === "t" || event.key === "T") goToday();
     else if (event.key === "b" || event.key === "B") openDump();
+    else if (event.key === "/") {
+      event.preventDefault();
+      openSearch();
+    }
     else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
     else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
   });

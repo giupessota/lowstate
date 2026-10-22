@@ -94,6 +94,9 @@
             <div class="progress-bar"><span id="progressFill"></span></div>
             <span id="progressText"></span>
           </div>
+          <button type="button" class="icon-btn search-btn" id="searchBtn" data-i18n-aria="search" data-i18n-title="searchTitle" aria-label="Search">
+            <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+          </button>
           <div class="nav-controls" id="navControls">
             <button type="button" class="icon-btn" id="prevBtn" data-i18n-aria="previous" aria-label="Previous">
               <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
@@ -383,6 +386,15 @@
           <button type="submit" class="btn primary" data-i18n="save">Save</button>
         </footer>
       </form>
+    </dialog>
+
+    <dialog class="sheet search-sheet" id="searchDialog" data-i18n-aria="search" aria-label="Search">
+      <label class="search-field">
+        <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>
+        <input id="searchInput" type="search" maxlength="120" autocomplete="off" spellcheck="false" data-i18n-placeholder="searchPlaceholder" aria-controls="searchResults" />
+        <kbd>esc</kbd>
+      </label>
+      <div class="search-results" id="searchResults" role="listbox" data-i18n-aria="search"></div>
     </dialog>
 
     <dialog class="sheet closure-sheet" id="closureDialog" aria-labelledby="closureTitle">
