@@ -510,7 +510,19 @@
               <button type="button" data-value="lavender" data-i18n-aria="coverLavender" data-i18n-title="coverLavender"></button>
               <button type="button" data-value="teal" data-i18n-aria="coverTeal" data-i18n-title="coverTeal"></button>
               <button type="button" class="swatch-custom" data-value="custom" data-i18n-aria="coverCustom" data-i18n-title="coverCustom"></button>
-              <input type="color" id="coverColorInput" class="visually-hidden" tabindex="-1" aria-hidden="true" />
+            </div>
+          </div>
+          <div class="color-panel" id="colorPanel" hidden>
+            <div class="color-sv" id="colorSV" tabindex="0" role="slider" data-i18n-aria="colorShade"><span class="color-handle" id="colorHandle"></span></div>
+            <input type="range" class="color-hue" id="colorHue" min="0" max="359" step="1" data-i18n-aria="colorHue" />
+            <div class="color-suggest" id="colorSuggest"></div>
+            <div class="color-foot">
+              <span class="color-preview" id="colorPreview"></span>
+              <input class="color-hex" id="colorHex" maxlength="7" spellcheck="false" autocomplete="off" data-i18n-aria="colorHex" />
+              <span class="color-note" id="colorNote" data-i18n="colorAdjusted" hidden></span>
+              <span class="spacer"></span>
+              <button type="button" class="btn ghost" id="colorCancel" data-i18n="cancel">Cancel</button>
+              <button type="button" class="btn primary" id="colorDone" data-i18n="colorDone">Done</button>
             </div>
           </div>
           <div class="set-row">
