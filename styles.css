@@ -1486,6 +1486,63 @@ svg.i {
 .block.event.has-habit.is-done { opacity: 1; }
 .block.event.has-habit.is-done .block-title { text-decoration: none; }
 
+/* Brain dump */
+.dump-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -6px 0 0;
+  padding: 8px 12px;
+  border: 1px dashed rgba(239, 232, 216, .22);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cover-muted);
+  font: 500 13px var(--sans);
+  text-align: left;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+.dump-btn:hover { border-color: rgba(239, 232, 216, .4); background: var(--cover-fill); color: var(--cover-ink); }
+.dump-btn kbd { margin-left: auto; font: 400 10px var(--mono); opacity: 0; transition: opacity .15s; }
+.dump-btn:hover kbd { opacity: .55; }
+.dump-btn .count { margin-left: auto; }
+.dump-btn .count + kbd { margin-left: 6px; }
+.dump-sheet { width: min(560px, calc(100vw - 32px)); }
+.dump-sheet .sheet-body { max-height: calc(100vh - 48px); overflow-y: auto; }
+.dump-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--paper) 70%, transparent);
+  color: var(--ink);
+  font: 14.5px/28px var(--sans);
+  resize: vertical;
+}
+.dump-form textarea:focus { border-color: var(--ink-2); outline: none; }
+.dump-form textarea::placeholder { color: var(--muted); font-style: italic; }
+.dump-form-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.dump-sort { padding-top: 12px; border-top: 1px solid var(--rule); }
+.dump-sort-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.dump-sort-head h3 { margin: 0; }
+.dump-list { display: flex; flex-direction: column; margin: 6px 0 0; padding: 0; list-style: none; }
+.dump-note { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 7px 2px; border-bottom: 1px dashed var(--rule); }
+.dump-text { flex: 1 1 200px; min-width: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.dump-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.dump-action {
+  padding: 2px 8px;
+  border: 1px solid var(--rule);
+  border-radius: 99px;
+  background: var(--paper);
+  color: var(--ink-2);
+  font: 500 10.5px var(--mono);
+  cursor: pointer;
+}
+.dump-action:hover { border-color: var(--ink-2); color: var(--ink); }
+.dump-action.discard { width: 24px; padding: 2px 0; color: var(--muted); font-size: 13px; }
+.dump-action.discard:hover { border-color: var(--vermilion); color: var(--vermilion); }
+.dump-empty { padding-left: 2px; }
+
 /* Closing the day */
 .day-head-side { display: flex; align-items: center; gap: 10px; }
 .close-day-btn {

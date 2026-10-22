@@ -158,6 +158,28 @@
   // Moves an item into a day (or back to the unscheduled list when date is
   // null), placing it before `beforeId` and reindexing that bucket's order.
   // `focus` optionally moves it into a must/could/later group as well.
+  // ---------- Brain dump ----------
+  // One thought per line; list bullets ("- ", "• ", "* ", "1. ", "[ ] ")
+  // are dropped, blank lines ignored.
+  function parseDump(text) {
+    return String(text || "")
+      .split(/\r?\n/)
+      .map((line) => line.replace(/^\s*(?:[-•*·–]|\d+[.)]|\[\s?[xX]?\s?\])\s+/, "").trim())
+      .filter(Boolean)
+      .map((line) => line.slice(0, 280));
+  }
+
+  // 1.x Brain Inbox notes that were never processed, as dump entries.
+  function legacyDumpNotes(notes) {
+    return (Array.isArray(notes) ? notes : [])
+      .filter((note) => note && !note.processed && String(note.text || "").trim())
+      .map((note) => ({
+        id: typeof note.id === "string" && note.id ? note.id : newId(),
+        text: String(note.text).trim().slice(0, 280),
+        createdAt: Number.isFinite(note.createdAt) ? note.createdAt : Date.now(),
+      }));
+  }
+
   // Closing a day: what happens to its unfinished tasks ("Not today" ones
   // included). "tomorrow" moves them on (not-today ones come back as could
   // do), "inbox" returns them to "To schedule", "stay" leaves them.
@@ -1145,6 +1167,8 @@
     createItem,
     moveItem,
     closeDay,
+    parseDump,
+    legacyDumpNotes,
     toggleDone,
     weekStats,
     parseCapture,

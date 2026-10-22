@@ -59,6 +59,10 @@ switches to the week or the month when you want the bigger picture.
 **Everything else**
 
 - "To schedule" list for things without a date, plus an Overdue list
+- Brain dump: pour out everything on your mind, one line each, then sort
+  each thought into today, tomorrow, "To schedule" or the day's notes
+- Close the day: a short evening ritual — what went well, and what happens
+  to unfinished tasks
 - Quick capture syntax: `#work`, `!urgent`, `@tomorrow`, and times like
   `14:30`, `14h` or `9h30`
 - Categories as ink stamps, urgent seal, 30-day Trash with undo
@@ -179,8 +183,8 @@ npm run check
 **Global (desktop app — work from anywhere, even when the app is hidden):**
 
 - `Ctrl/Cmd + Shift + Space`: show / hide Lowstate
-- `Ctrl/Cmd + Shift + N` or `Ctrl/Cmd + Shift + B`: open today's page ready to
-  capture
+- `Ctrl/Cmd + Shift + N`: open today's page ready to capture
+- `Ctrl/Cmd + Shift + B`: brain dump — empty your head, sort it later
 
 On Windows, clicking the window's **X** hides Lowstate in the system tray so
 these shortcuts remain active. Use the tray menu's **Quit** command to exit it
@@ -191,6 +195,7 @@ completely.
 - `1` `2` `3` `4`: Day, Week, Month, Habits
 - `←` `→`: previous / next day, week or month
 - `T`: back to today
+- `B`: brain dump
 - `N`: jump to the capture field
 - `Enter`: add the task
 - `Esc`: leave the field / close a dialog

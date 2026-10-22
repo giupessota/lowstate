@@ -348,6 +348,19 @@ test("habits only count between their start and end dates", () => {
   assert.equal(P.habitStreak(log, fresh, "2026-10-13"), 2);
 });
 
+test("brain dump splits lines, drops bullets and blanks, and imports old notes", () => {
+  assert.deepEqual(P.parseDump("comprar café\n\n- ligar pra mãe\n  • ideia: app de receitas \n1. revisar contrato #trabalho\n[ ] pagar boleto !urgente\n* 14h dentista"), [
+    "comprar café", "ligar pra mãe", "ideia: app de receitas", "revisar contrato #trabalho", "pagar boleto !urgente", "14h dentista",
+  ]);
+  assert.deepEqual(P.parseDump("   \n  "), []);
+  const notes = P.legacyDumpNotes([
+    { id: "n1", text: "ideia solta", processed: false, createdAt: 5 },
+    { id: "n2", text: "já virou tarefa", processed: true, createdAt: 6 },
+    { id: "n3", text: "  ", processed: false },
+  ]);
+  assert.deepEqual(notes, [{ id: "n1", text: "ideia solta", createdAt: 5 }]);
+});
+
 test("closing a day moves, returns or leaves its unfinished tasks", () => {
   const day = "2026-10-21";
   const items = [

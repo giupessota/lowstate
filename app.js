@@ -22,6 +22,9 @@
     habits: "type-todo.planner.habits.v1",
     habitLog: "type-todo.planner.habitlog.v1",
     closures: "type-todo.planner.closures.v1",
+    dump: "type-todo.planner.dump.v1",
+    dumpMigrated: "type-todo.planner.dump-migrated.v1",
+    legacyBrain: "type-todo.brain-inbox.v1",
     migrated: "type-todo.planner.migrated.v1",
     theme: "type-todo.theme.v1",
     cover: "type-todo.cover.v1",
@@ -114,6 +117,16 @@
     habitDialog: $("habitDialog"),
     habitDetail: $("habitDetail"),
     closeDayBtn: $("closeDayBtn"),
+    dumpBtn: $("dumpBtn"),
+    dumpCount: $("dumpCount"),
+    dumpDialog: $("dumpDialog"),
+    dumpClose: $("dumpClose"),
+    dumpForm: $("dumpForm"),
+    dumpInput: $("dumpInput"),
+    dumpSortTitle: $("dumpSortTitle"),
+    dumpAllInbox: $("dumpAllInbox"),
+    dumpList: $("dumpList"),
+    dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
     closureForm: $("closureForm"),
@@ -338,6 +351,8 @@
     habitLog: Planner.normalizeHabitLog(Store.loadObject(KEYS.habitLog)),
     // { iso: { good, closedAt } } — the end-of-day ritual.
     closures: Store.loadObject(KEYS.closures),
+    // Brain dump: thoughts waiting to be sorted, [{ id, text, createdAt }].
+    dump: Store.loadArray(KEYS.dump).filter((note) => note && typeof note.text === "string" && note.text.trim()),
     // Read-only events from subscribed calendars (desktop only).
     calendars: [],
     events: [],
@@ -360,6 +375,20 @@
     Store.save(KEYS.habits, state.habits);
     Store.save(KEYS.habitLog, state.habitLog);
   };
+
+  const persistDump = () => Store.save(KEYS.dump, state.dump);
+
+  // Unsorted notes from the 1.x Brain Inbox come over once (the old key is
+  // left untouched).
+  if (Store.getRaw(KEYS.dumpMigrated) === null) {
+    const known = new Set(state.dump.map((note) => note.id));
+    const legacy = Planner.legacyDumpNotes(Store.loadArray(KEYS.legacyBrain)).filter((note) => !known.has(note.id));
+    if (legacy.length) {
+      state.dump = [...state.dump, ...legacy];
+      persistDump();
+    }
+    Store.setRaw(KEYS.dumpMigrated, "1");
+  }
 
   // Habits from before start dates existed begin on their first logged day
   // (or today), so earlier months don't show them at 0%.
@@ -1704,6 +1733,7 @@
   }
 
   function renderSidebar() {
+    els.dumpCount.textContent = state.dump.length || "";
     const overdue = Planner.overdueItems(state.items, todayISO());
     els.overdueSection.hidden = overdue.length === 0;
     els.overdueCount.textContent = overdue.length || "";
@@ -2404,6 +2434,96 @@
     render();
   });
 
+  // ---------- brain dump ----------
+  function renderDump() {
+    els.dumpSortTitle.textContent = t("dumpSortTitle", { n: state.dump.length });
+    els.dumpAllInbox.hidden = state.dump.length < 2;
+    els.dumpEmpty.hidden = state.dump.length > 0;
+    els.dumpList.replaceChildren(...state.dump.map((note) => h("li", { class: "dump-note", "data-dump": note.id },
+      h("span", { class: "dump-text", text: note.text }),
+      h("span", { class: "dump-actions" },
+        ...[["today", "dumpToday"], ["tomorrow", "dumpTomorrow"], ["inbox", "dumpInbox"], ["note", "dumpNote"]].map(([action, key]) => h("button", {
+          type: "button",
+          class: "dump-action",
+          "data-dump-action": action,
+          text: t(key),
+        })),
+        h("button", { type: "button", class: "dump-action discard", "data-dump-action": "discard", title: t("dumpDiscard"), "aria-label": t("dumpDiscard"), text: "×" })))));
+  }
+
+  function openDump() {
+    document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
+    renderDump();
+    els.dumpDialog.showModal();
+    els.dumpInput.focus();
+  }
+
+  // Sorting a thought: a task (today / tomorrow / to schedule, with the
+  // usual #tag, !urgent and time syntax), a line in today's notes, or gone.
+  function sortDumpNote(id, action) {
+    const note = state.dump.find((candidate) => candidate.id === id);
+    if (!note) return;
+    const index = state.dump.indexOf(note);
+    state.dump = state.dump.filter((candidate) => candidate.id !== id);
+    persistDump();
+    const today = todayISO();
+    if (action === "today" || action === "tomorrow" || action === "inbox") {
+      const date = action === "today" ? today : action === "tomorrow" ? Core.toISODate(Planner.addDays(Core.parseISODate(today), 1)) : null;
+      const parsed = Planner.parseCapture(note.text);
+      capture(note.text, parsed.date ? null : date);
+    } else if (action === "note") {
+      const current = state.dayNotes[today] || "";
+      state.dayNotes = { ...state.dayNotes, [today]: `${current}${current && !current.endsWith("\n") ? "\n" : ""}• ${note.text}` };
+      persistDayNotes();
+      dayNotesKey = null;
+      render();
+    } else {
+      render();
+      toast(t("dumpDiscarded"), t("undo"), () => {
+        const list = [...state.dump];
+        list.splice(Math.min(index, list.length), 0, note);
+        state.dump = list;
+        persistDump();
+        render();
+        if (els.dumpDialog.open) renderDump();
+      });
+    }
+    renderDump();
+  }
+
+  els.dumpBtn.addEventListener("click", openDump);
+  els.dumpClose.addEventListener("click", () => els.dumpDialog.close());
+  els.dumpDialog.addEventListener("click", (event) => {
+    if (event.target === els.dumpDialog) {
+      els.dumpDialog.close();
+      return;
+    }
+    const action = event.target.closest("[data-dump-action]");
+    if (action) sortDumpNote(action.closest("[data-dump]").dataset.dump, action.dataset.dumpAction);
+  });
+  els.dumpForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const lines = Planner.parseDump(els.dumpInput.value);
+    if (!lines.length) return;
+    const now = Date.now();
+    state.dump = [...state.dump, ...lines.map((text, index) => ({ id: Planner.newId(), text, createdAt: now + index }))];
+    persistDump();
+    els.dumpInput.value = "";
+    renderDump();
+    render();
+    toast(lines.length === 1 ? t("dumpSavedOne") : t("dumpSaved", { n: lines.length }));
+    els.dumpInput.focus();
+  });
+  els.dumpInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      els.dumpForm.requestSubmit();
+    }
+  });
+  els.dumpAllInbox.addEventListener("click", () => {
+    [...state.dump].forEach((note) => sortDumpNote(note.id, "inbox"));
+  });
+
   // ---------- closing the day ----------
   // Offered for today and yesterday (closing late counts too).
   function renderClosure(iso) {
@@ -2718,6 +2838,7 @@
       event.preventDefault();
       (state.view === "day" ? els.dayCaptureInput : els.inboxInput).focus();
     } else if (event.key === "t" || event.key === "T") goToday();
+    else if (event.key === "b" || event.key === "B") openDump();
     else if (event.key === "ArrowLeft") shift(-1);
     else if (event.key === "ArrowRight") shift(1);
   });
@@ -2945,7 +3066,12 @@
     const shortcuts = Store.loadObject(KEYS.shortcuts);
     if (Object.keys(shortcuts).length) desktop.setShortcuts?.(shortcuts);
     // The global capture shortcut opens today's page ready to write.
-    desktop.onQuickCapture?.(() => {
+    desktop.onQuickCapture?.((mode) => {
+      // Cmd/Ctrl+Shift+B is the brain dump; the other shortcut opens today ready to write.
+      if (mode === "brain") {
+        openDump();
+        return;
+      }
       document.querySelectorAll("dialog[open]").forEach((dialog) => dialog.close());
       state.anchor = Core.startOfDay(new Date());
       setView("day");
