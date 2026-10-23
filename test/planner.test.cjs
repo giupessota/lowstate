@@ -388,6 +388,13 @@ test("brain dump splits lines, drops bullets and blanks, and imports old notes",
   assert.deepEqual(notes, [{ id: "n1", text: "ideia solta", createdAt: 5 }]);
 });
 
+test("day page modules default to open and keep only known states", () => {
+  assert.deepEqual(P.normalizeDayModules(undefined), { load: "open", water: "open", habits: "open", mood: "open", notes: "open" });
+  assert.deepEqual(P.normalizeDayModules({ water: "hidden", mood: "collapsed", load: "gone", timeline: "hidden" }),
+    { load: "open", water: "hidden", habits: "open", mood: "collapsed", notes: "open" });
+  assert.deepEqual(P.normalizeDayModules([1]), P.normalizeDayModules({}));
+});
+
 test("search finds words anywhere, ignoring accents and case", () => {
   const sources = {
     items: [

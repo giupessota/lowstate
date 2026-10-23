@@ -128,6 +128,11 @@
     dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
+    modulesHidden: $("modulesHidden"),
+    moodSum: $("moodSum"),
+    notesSum: $("notesSum"),
+    habitsSum: $("habitsSum"),
+    dayModulesChips: $("dayModulesChips"),
     searchDialog: $("searchDialog"),
     searchInput: $("searchInput"),
     searchResults: $("searchResults"),
@@ -355,6 +360,7 @@
       morningAt: Planner.isTime(savedSettings.morningAt) ? savedSettings.morningAt : "08:00",
       closureOn: savedSettings.closureOn !== false,
       closureAt: Planner.isTime(savedSettings.closureAt) ? savedSettings.closureAt : "21:30",
+      dayModules: Planner.normalizeDayModules(savedSettings.dayModules),
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
@@ -1086,7 +1092,81 @@
     renderDayNotes();
     renderClosure(iso);
     renderMonthTabs(day);
+    applyDayModules();
   }
+
+  // ---------- day page modules ----------
+  const MODULE_NAMES = { load: "load", water: "water", habits: "viewHabits", mood: "dayMood", notes: "dayNotes" };
+  const moduleEl = (id) => els.dayView.querySelector(`[data-module="${id}"]`);
+
+  function applyDayModules() {
+    const modules = state.settings.dayModules;
+    Planner.DAY_MODULES.forEach((id) => {
+      const el = moduleEl(id);
+      if (!el) return;
+      el.classList.toggle("is-collapsed", modules[id] === "collapsed");
+      el.classList.toggle("is-off", modules[id] === "hidden");
+      el.querySelector("[data-module-toggle]")?.setAttribute("aria-expanded", String(modules[id] === "open"));
+    });
+    const hidden = Planner.DAY_MODULES.filter((id) => modules[id] === "hidden");
+    els.modulesHidden.hidden = hidden.length === 0;
+    els.modulesHidden.replaceChildren(...(hidden.length ? [
+      h("span", { text: t("modulesHiddenLine", { list: hidden.map((id) => t(MODULE_NAMES[id])).join(", ") }) }),
+      h("button", { type: "button", class: "link-btn", "data-modules-show": "", text: t("modulesShow") }),
+    ] : []));
+    // Small summaries for folded modules.
+    const iso = anchorISO();
+    const mood = state.moods[iso];
+    els.moodSum.textContent = mood ? t(`mood-${mood}`) : "";
+    const notes = (state.dayNotes[iso] || "").trim().split("\n")[0];
+    els.notesSum.textContent = notes.length > 40 ? `${notes.slice(0, 40)}…` : notes;
+    const pills = [...els.habitPills.querySelectorAll("[data-habit-cell]")];
+    els.habitsSum.textContent = pills.length
+      ? t("habitsSum", { done: pills.filter((pill) => pill.getAttribute("aria-pressed") === "true").length, total: pills.length })
+      : "";
+  }
+
+  function setDayModule(id, value) {
+    if (!Planner.DAY_MODULES.includes(id)) return;
+    state.settings.dayModules = { ...state.settings.dayModules, [id]: value };
+    persistSettings();
+    applyDayModules();
+    renderDayModuleChips();
+  }
+
+  function renderDayModuleChips() {
+    els.dayModulesChips.querySelectorAll("[data-day-module]").forEach((chip) => {
+      const on = state.settings.dayModules[chip.dataset.dayModule] !== "hidden";
+      chip.classList.toggle("active", on);
+      chip.setAttribute("aria-pressed", String(on));
+    });
+  }
+
+  els.dayView.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-module-toggle]");
+    const hide = event.target.closest("[data-module-hide]");
+    if (toggle) {
+      const id = toggle.dataset.moduleToggle;
+      setDayModule(id, state.settings.dayModules[id] === "collapsed" ? "open" : "collapsed");
+    } else if (hide) {
+      const id = hide.dataset.moduleHide;
+      setDayModule(id, "hidden");
+      toast(t("moduleHidden", { name: t(MODULE_NAMES[id]) }), t("undo"), () => setDayModule(id, "open"));
+      els.dayCaptureInput.focus({ preventScroll: true });
+    } else if (event.target.closest("[data-modules-show]")) {
+      state.settings.dayModules = Object.fromEntries(Object.entries(state.settings.dayModules)
+        .map(([id, value]) => [id, value === "hidden" ? "open" : value]));
+      persistSettings();
+      applyDayModules();
+      renderDayModuleChips();
+    }
+  });
+  els.dayModulesChips.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-day-module]");
+    if (!chip) return;
+    const id = chip.dataset.dayModule;
+    setDayModule(id, state.settings.dayModules[id] === "hidden" ? "open" : "hidden");
+  });
 
   // Mental load: the app's estimate as a ghost, the person's own rating
   // solid. Clicking a tick sets the rating; clicking it again clears it.
@@ -1118,7 +1198,10 @@
     // replaceChildren (unlike h) would print a null child as "null".
     els.loadMeter.replaceChildren(...[
       h("div", { class: "load-head", title: why },
-        h("span", { class: "load-title", text: t("load") }),
+        h("button", { type: "button", class: "module-toggle", "data-module-toggle": "load", "aria-expanded": "true" },
+          icon('<svg class="i chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>'),
+          h("span", { class: "load-title", text: t("load") })),
+        h("button", { type: "button", class: "module-hide", "data-module-hide": "load", "aria-label": t("moduleHide-load"), title: t("moduleHide-load"), text: "×" }),
         h("span", { class: "load-reading" },
           h("strong", { class: "load-score", text: String(score) }),
           h("span", { class: "load-of", text: "/10" }),
@@ -2191,6 +2274,7 @@
   }
 
   function renderSettings() {
+    renderDayModuleChips();
     const customSwatch = els.settingsDialog.querySelector(".swatch-custom");
     const customColor = Store.getRaw(KEYS.coverColor);
     if (customColor) customSwatch.style.setProperty("--chosen", customColor);

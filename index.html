@@ -152,29 +152,30 @@
                 </span>
               </header>
               <p class="closed-line" id="closedLine" hidden></p>
-              <section class="load" id="loadMeter" data-i18n-aria="load"></section>
+              <section class="load" id="loadMeter" data-module="load" data-i18n-aria="load"></section>
               <form class="day-capture" id="dayCaptureForm">
                 <span class="day-capture-mark" aria-hidden="true">✎</span>
                 <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" data-i18n-title="dayCaptureHint" />
               </form>
               <div class="day-tasks focus-groups" id="dayTasks"></div>
-              <section class="water">
-                <h2 class="section-title"><span data-i18n="water">Water</span><span class="water-sum" id="waterSum"></span></h2>
+              <section class="water" data-module="water">
+                <h2 class="section-title"><button type="button" class="module-toggle" data-module-toggle="water" aria-expanded="true"><svg class="i chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg><span data-i18n="water">Water</span></button><span class="water-sum" id="waterSum"></span><button type="button" class="module-hide" data-module-hide="water" data-i18n-aria="moduleHide-water" data-i18n-title="moduleHide-water">×</button></h2>
                 <div class="water-row" id="waterRow" role="group" data-i18n-aria="water"></div>
               </section>
-              <section class="today-habits" id="todayHabits" hidden>
-                <h2 class="section-title"><span data-i18n="viewHabits">Habits</span></h2>
+              <section class="today-habits" id="todayHabits" data-module="habits" hidden>
+                <h2 class="section-title"><button type="button" class="module-toggle" data-module-toggle="habits" aria-expanded="true"><svg class="i chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg><span data-i18n="viewHabits">Habits</span></button><span class="module-sum" id="habitsSum"></span><button type="button" class="module-hide" data-module-hide="habits" data-i18n-aria="moduleHide-habits" data-i18n-title="moduleHide-habits">×</button></h2>
                 <div class="habit-pills" id="habitPills"></div>
               </section>
-              <section class="mood">
-                <h2 class="section-title"><span data-i18n="dayMood">Mood of the day</span></h2>
+              <section class="mood" data-module="mood">
+                <h2 class="section-title"><button type="button" class="module-toggle" data-module-toggle="mood" aria-expanded="true"><svg class="i chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg><span data-i18n="dayMood">Mood of the day</span></button><span class="module-sum" id="moodSum"></span><button type="button" class="module-hide" data-module-hide="mood" data-i18n-aria="moduleHide-mood" data-i18n-title="moduleHide-mood">×</button></h2>
                 <div class="mood-picker" id="moodPicker" role="group" data-i18n-aria="dayMood"></div>
                 <input class="mood-reason" id="moodReason" maxlength="140" autocomplete="off" data-i18n-placeholder="moodReasonPlaceholder" data-i18n-aria="moodReason" hidden />
               </section>
-              <section class="notes">
-                <h2 class="section-title"><span data-i18n="dayNotes">Notes</span></h2>
+              <section class="notes" data-module="notes">
+                <h2 class="section-title"><button type="button" class="module-toggle" data-module-toggle="notes" aria-expanded="true"><svg class="i chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg><span data-i18n="dayNotes">Notes</span></button><span class="module-sum" id="notesSum"></span><button type="button" class="module-hide" data-module-hide="notes" data-i18n-aria="moduleHide-notes" data-i18n-title="moduleHide-notes">×</button></h2>
                 <textarea id="dayNotes" data-i18n-placeholder="dayNotesPlaceholder" data-i18n-aria="dayNotes"></textarea>
               </section>
+              <p class="modules-hidden" id="modulesHidden" hidden></p>
             </article>
 
             <nav class="month-tabs" data-i18n-aria="months" aria-label="Months"></nav>
@@ -561,6 +562,16 @@
         </section>
 
         <section class="set-group" data-tab="planner">
+          <div class="set-row stacked">
+            <span><span data-i18n="dayModules">Day page</span> <small class="set-hint" data-i18n="dayModulesHint">The timeline and tasks always stay.</small></span>
+            <div class="chip-row" id="dayModulesChips">
+              <button type="button" class="chip" data-day-module="load" data-i18n="load">Mental load</button>
+              <button type="button" class="chip" data-day-module="water" data-i18n="water">Water</button>
+              <button type="button" class="chip" data-day-module="habits" data-i18n="viewHabits">Habits</button>
+              <button type="button" class="chip" data-day-module="mood" data-i18n="dayMood">Mood of the day</button>
+              <button type="button" class="chip" data-day-module="notes" data-i18n="dayNotes">Notes</button>
+            </div>
+          </div>
           <div class="set-row">
             <span data-i18n="weekStartsOn">Week starts on</span>
             <div class="seg" data-setting="weekStart">

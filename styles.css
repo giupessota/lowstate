@@ -1586,6 +1586,55 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 .closed-mark { color: var(--indigo); font-weight: 600; }
 .closed-good { font-style: italic; }
 .closed-line .focus-action { margin-left: auto; }
+/* ===== Day page modules (fold or put away) ===== */
+.module-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 0 -2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.module-toggle .chevron { width: 12px; height: 12px; flex: none; opacity: .55; transition: transform .15s; }
+.module-toggle:hover .chevron, .module-toggle:focus-visible .chevron { opacity: 1; }
+.is-collapsed .module-toggle .chevron { transform: rotate(-90deg); }
+.module-hide {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font: 400 15px/1 var(--sans);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s;
+}
+[data-module]:hover .module-hide, .module-hide:focus-visible { opacity: 1; }
+.module-hide:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.section-title .module-hide { margin-left: auto; }
+.section-title .water-sum + .module-hide { margin-left: 4px; }
+.load-head .module-hide { margin-left: 0; align-self: center; }
+.module-sum { display: none; color: var(--muted); letter-spacing: .04em; text-transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-collapsed .module-sum:not(:empty) { display: inline; margin-left: auto; }
+.is-collapsed .module-sum:not(:empty) + .module-hide { margin-left: 4px; }
+[data-module].is-collapsed > :not(.section-title):not(.load-head) { display: none; }
+.load.is-collapsed { padding-block: 6px; }
+.notes.is-collapsed { flex: none; min-height: 0; }
+[data-module].is-off { display: none !important; }
+.modules-hidden { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+.modules-hidden[hidden] { display: none; }
+.modules-hidden .link-btn { margin: 0; color: var(--ink-2); text-decoration-color: var(--rule); cursor: pointer; }
+
 /* ===== Save status & restore ===== */
 .save-alert {
   display: flex;
