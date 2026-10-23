@@ -217,4 +217,5 @@ completely.
 - `⌘K` / `Ctrl+K` or `/`: search tasks, notes, brain dump, what went well and habits
 - `N`: jump to the capture field
 - `Enter`: add the task
+- `Alt+↑` / `Alt+↓` on a timeline task: move it 15 minutes; with `Shift`, change how long it takes
 - `Esc`: leave the field / close a dialog

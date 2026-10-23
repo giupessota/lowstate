@@ -290,6 +290,8 @@ svg.i {
 .inbox .side-list { flex: 1 1 auto; }
 .overdue .side-list { max-height: 210px; }
 .side-list:empty { display: none; }
+.side-more { display: flex; padding: 4px 8px; list-style: none; }
+.side-more .link-btn { margin-left: 0; }
 .side-section.drop-target .side-list, .side-section.drop-target .side-empty { border-radius: 8px; outline: 1.5px dashed rgba(239, 232, 216, .4); outline-offset: 2px; }
 .side-empty { margin: 0; padding: 0 4px; color: var(--cover-muted); font-size: 11.5px; font-style: italic; line-height: 1.45; opacity: .85; }
 
@@ -2163,7 +2165,9 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
 
 /* ===== Smaller windows ===== */
 @media (max-width: 1100px) {
-  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, auto); overflow-y: auto; gap: 14px; }
+  /* Stacked pages take their content's height (the spread scrolls), so the
+     timeline can't spill over the page below. */
+  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; overflow-y: auto; gap: 14px; }
   .timeline { flex: none; height: 60vh; }
   .month-grid { grid-auto-rows: minmax(90px, auto); }
   .page-left, .page-right { border-radius: 12px; }
@@ -2181,6 +2185,16 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
   .inbox .side-list { max-height: 240px; }
   .stage { padding: 14px; }
   .topbar { flex-wrap: wrap; }
+}
+
+/* Short windows (the desktop app goes down to 560 px): the sidebar keeps
+   its footer reachable and the lists scroll instead of running into it. */
+@media (max-height: 680px) {
+  .sidebar { gap: 12px; overflow-y: auto; }
+  .side-section.inbox { flex: none; }
+  .inbox .side-list { max-height: 140px; }
+  .overdue .side-list { max-height: 112px; }
+  .side-empty { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

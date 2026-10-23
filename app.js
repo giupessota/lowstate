@@ -1005,7 +1005,10 @@
         style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${category ? ` --cat: ${category.color};` : ""}`,
       },
         checkButton(item.done, { "data-action": "toggle" }),
-        h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
+        h("div", {
+          class: "item-body", "data-action": "edit", role: "button", tabindex: "0",
+          title: `${item.title}\n${t("blockKeys")}`, "aria-keyshortcuts": "Alt+ArrowUp Alt+ArrowDown Alt+Shift+ArrowUp Alt+Shift+ArrowDown",
+        },
           h("span", { class: "block-time", text: timeRange(item) }),
           h("span", { class: "block-title", text: item.title })),
         h("span", { class: "block-resize", "aria-hidden": "true", title: t("resizeBlock") })));
@@ -1886,20 +1889,80 @@
     return [habit.start ? `${habit.start} · ${days}` : days];
   }
 
+  // Long sidebar lists show their first entries and the rest on request:
+  // rebuilding hundreds of overdue tasks on every change made the app slow.
+  const SIDE_LIST_LIMIT = 40;
+  const sideListOpen = { overdue: false, inbox: false };
+
+  function sideListEls(items, variant) {
+    const shown = sideListOpen[variant] ? items : items.slice(0, SIDE_LIST_LIMIT);
+    const rest = items.length - shown.length;
+    return [
+      ...shown.map((item) => itemEl(item, variant)),
+      rest > 0 ? h("li", { class: "side-more" },
+        h("button", { type: "button", class: "link-btn", "data-side-more": variant, text: t("showMore", { n: rest }) })) : null,
+    ].filter(Boolean);
+  }
+
   function renderSidebar() {
     els.dumpCount.textContent = state.dump.length || "";
     const overdue = Planner.overdueItems(state.items, todayISO());
     els.overdueSection.hidden = overdue.length === 0;
     els.overdueCount.textContent = overdue.length || "";
-    els.overdueList.replaceChildren(...overdue.map((item) => itemEl(item, "overdue")));
+    els.overdueList.replaceChildren(...sideListEls(overdue, "overdue"));
 
     const inbox = Planner.inboxItems(state.items);
     els.inboxCount.textContent = inbox.length || "";
-    els.inboxList.replaceChildren(...inbox.map((item) => itemEl(item, "inbox")));
+    els.inboxList.replaceChildren(...sideListEls(inbox, "inbox"));
     els.inboxEmpty.hidden = inbox.length > 0;
   }
 
+  document.addEventListener("click", (event) => {
+    const more = event.target.closest("[data-side-more]");
+    if (!more) return;
+    const list = more.closest(".side-list");
+    sideListOpen[more.dataset.sideMore] = true;
+    renderSidebar();
+    // Keyboard focus moves to the first entry that just appeared.
+    list?.querySelectorAll(".item .item-body")[SIDE_LIST_LIMIT]?.focus({ preventScroll: true });
+  });
+
+  // Re-rendering replaces lists, which would drop keyboard focus onto the
+  // page. This finds the same control again (same task, habit, button) by
+  // its data attributes, first inside the same static container.
+  const describeNode = (node) => [...node.attributes]
+    .filter((attribute) => attribute.name.startsWith("data-") && !attribute.name.startsWith("data-i18n"))
+    .map((attribute) => `[${attribute.name}="${CSS.escape(attribute.value)}"]`)
+    .join("");
+
+  function focusMemo() {
+    const active = document.activeElement;
+    if (!active || active === document.body || active.id || active.closest("dialog")) return null;
+    const host = active.closest("[data-id], [data-habit-cell], [data-event], [data-dump]");
+    const own = `${active.tagName.toLowerCase()}${describeNode(active)}`;
+    const selector = host && host !== active ? `${host.tagName.toLowerCase()}${describeNode(host)} ${own}` : own;
+    if (selector === active.tagName.toLowerCase()) return null;
+    return { zone: active.parentElement?.closest("[id]")?.id || null, selector };
+  }
+
+  function restoreFocus(memo) {
+    if (!memo || (document.activeElement && document.activeElement !== document.body)) return;
+    let target = null;
+    try {
+      target = (memo.zone && document.getElementById(memo.zone)?.querySelector(memo.selector)) || document.querySelector(memo.selector);
+    } catch {
+      return;
+    }
+    if (target && !target.closest("[hidden]")) target.focus({ preventScroll: true });
+  }
+
   function render() {
+    const memo = focusMemo();
+    renderViews();
+    restoreFocus(memo);
+  }
+
+  function renderViews() {
     els.brandYear.textContent = String(new Date().getFullYear());
     document.querySelectorAll(".nav-btn").forEach((button) => {
       const active = button.dataset.view === state.view;
@@ -3467,6 +3530,26 @@
     }
     else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
     else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
+  });
+
+  // ---------- moving a timeline block by keyboard ----------
+  // Alt+↑/↓ moves a task 15 minutes; Alt+Shift+↑/↓ changes its duration.
+  els.timeline.addEventListener("keydown", (event) => {
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+    const block = event.target.closest(".block.item[data-id]");
+    const item = findItem(block?.dataset.id);
+    if (!item?.start) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = event.key === "ArrowUp" ? -15 : 15;
+    const start = Planner.timeToMinutes(item.start);
+    const duration = item.duration || 60;
+    const next = event.shiftKey
+      ? { ...item, duration: Math.min(1440 - start, Math.max(15, duration + step)) }
+      : { ...item, start: Planner.minutesToTime(Math.min(1440 - Math.min(duration, 15), Math.max(0, start + step))) };
+    if (next.start === item.start && next.duration === item.duration) return;
+    updateItem(next);
+    toast(`${item.title} · ${timeRange(next)}`);
   });
 
   // ---------- resizing a timeline block ----------
