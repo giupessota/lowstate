@@ -3573,6 +3573,29 @@
     desktop.onSnoozeReminder?.(snoozeReminder);
   }
 
+  // ---------- always back to today ----------
+  // Opening the app lands on today's page. The desktop window is only hidden
+  // when closed, so it says when it is shown again; and a page left open
+  // overnight follows the date when it is seen again (or, if it was showing
+  // today, right at midnight).
+  let seenDay = todayISO();
+  function openToday() {
+    seenDay = todayISO();
+    state.anchor = Core.startOfDay(new Date());
+    setView("day");
+  }
+  function followNewDay() {
+    if (todayISO() !== seenDay) openToday();
+  }
+  desktop?.onWindowOpened?.(openToday);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") followNewDay();
+  });
+  window.addEventListener("focus", followNewDay);
+  setInterval(() => {
+    if (todayISO() !== seenDay && state.view === "day" && anchorISO() === seenDay) openToday();
+  }, 60000);
+
   // ---------- desktop integration ----------
   if (desktop) {
     desktop.setAlwaysOnTop?.(alwaysOnTop());
