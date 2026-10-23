@@ -206,6 +206,17 @@
     exportData: $("exportData"),
     importData: $("importData"),
     importFile: $("importFile"),
+    saveAlert: $("saveAlert"),
+    saveAlertTitle: $("saveAlertTitle"),
+    saveAlertBody: $("saveAlertBody"),
+    saveRetry: $("saveRetry"),
+    saveExport: $("saveExport"),
+    restoreDialog: $("restoreDialog"),
+    restoreForm: $("restoreForm"),
+    restoreFacts: $("restoreFacts"),
+    restoreNote: $("restoreNote"),
+    restoreError: $("restoreError"),
+    restoreCancel: $("restoreCancel"),
     trashSummary: $("trashSummary"),
     trashRestore: $("trashRestore"),
     trashEmpty: $("trashEmpty"),
@@ -1825,6 +1836,7 @@
     else if (state.view === "habits") renderHabitsView();
     else renderDump();
     renderSidebar();
+    renderSaveStatus();
   }
 
   function setView(view) {
@@ -2434,34 +2446,129 @@
     renderSettings();
   });
 
-  els.exportData.addEventListener("click", () => {
-    const payload = { app: "lowstate", version: 3, exportedAt: new Date().toISOString(), data: Store.collect() };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = h("a", { href: url, download: `lowstate-backup-${todayISO()}.json` });
+  // ---------- backup & restore ----------
+  function downloadJSON(text, name) {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const link = h("a", { href: url, download: name });
     document.body.append(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast(t("backupSaved"));
-  });
+  }
+
+  // The desktop app writes through the system's save dialog and only then
+  // says "saved"; the browser can only hand the file to its downloads.
+  async function exportBackup() {
+    Store.flush();
+    const text = JSON.stringify(Store.backupPayload(), null, 2);
+    const name = `lowstate-backup-${todayISO()}.json`;
+    const storageApi = window.desktopStorage;
+    if (storageApi?.saveBackup) {
+      const result = await storageApi.saveBackup(text, name).catch(() => ({ ok: false }));
+      if (result?.ok) toast(t("backupSaved", { file: result.file }));
+      else if (!result?.canceled) toast(t("backupFailed"));
+      return;
+    }
+    downloadJSON(text, name);
+    toast(t("backupDownloaded"));
+  }
+
+  let restoreCandidate = null;
+
+  function restoreFact(label, value) {
+    return [h("dt", { text: label }), h("dd", { text: value })];
+  }
+
+  function openRestorePreview(backup) {
+    restoreCandidate = backup;
+    const { info } = backup;
+    const made = info.date
+      ? formatDate(new Date(info.date), { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      : t("restoreUnknownDate");
+    els.restoreFacts.replaceChildren(
+      ...restoreFact(t("restoreMade"), made),
+      ...restoreFact(t("restoreFrom"), t(info.generation === 1 ? "restoreGen1" : "restoreGen2")),
+      ...restoreFact(t("restoreTasks"), String(info.tasks)),
+      ...restoreFact(t("restoreHabits"), String(info.habits)),
+      ...restoreFact(t("restoreNow"), t("restoreNowValue", { tasks: state.items.length, habits: state.habits.length })));
+    els.restoreNote.textContent = t(window.desktopStorage?.saveRestorePoint ? "restoreNoteDesktop" : "restoreNoteWeb");
+    els.restoreError.hidden = true;
+    els.restoreDialog.showModal();
+  }
+
+  function restoreFailed(message) {
+    els.restoreError.textContent = message;
+    els.restoreError.hidden = false;
+  }
+
+  els.exportData.addEventListener("click", exportBackup);
   els.importData.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", async () => {
     const file = els.importFile.files[0];
+    els.importFile.value = "";
     if (!file) return;
+    let text;
     try {
-      const parsed = JSON.parse(await file.text());
-      const data = parsed && typeof parsed.data === "object" ? parsed.data : parsed;
-      const keys = Object.keys(data || {}).filter(Store.isAppKey);
-      if (!keys.length) throw new Error("No Lowstate data found");
-      if (!window.confirm(t("confirmRestore"))) return;
-      Store.replaceAll(Object.fromEntries(keys.map((key) => [key, data[key]])));
-      location.reload();
+      text = await file.text();
     } catch {
       toast(t("restoreFailed"));
-    } finally {
-      els.importFile.value = "";
+      return;
     }
+    const backup = Store.readBackup(text);
+    if (!backup.ok) {
+      toast(t(`restoreErr-${backup.error}`, { key: (backup.key || "").replace(/^(type-todo\.(planner\.)?|quest-log\.)/, "").replace(/\.v\d+$/, "") }));
+      return;
+    }
+    openRestorePreview(backup);
+  });
+  els.restoreCancel.addEventListener("click", () => els.restoreDialog.close());
+  els.restoreDialog.addEventListener("close", () => {
+    restoreCandidate = null;
+  });
+  els.restoreForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!restoreCandidate) return;
+    Store.flush();
+    // A copy of what's here now, before anything is replaced.
+    if (window.desktopStorage?.saveRestorePoint) {
+      if (!Store.keepRestorePoint().ok) {
+        restoreFailed(t("restoreNoCopy"));
+        return;
+      }
+    } else {
+      downloadJSON(JSON.stringify(Store.backupPayload(), null, 2), `lowstate-before-restore-${todayISO()}.json`);
+    }
+    const result = Store.replaceAll(restoreCandidate.data);
+    if (!result.ok) {
+      restoreFailed(t("restoreNoRoom"));
+      return;
+    }
+    location.reload();
+  });
+
+  // ---------- save status ----------
+  // A calm but persistent note when data isn't being kept, with a retry and
+  // a way to take the data out. Local failures matter most: shown first.
+  function renderSaveStatus(status = Store.getStatus()) {
+    const local = status.local === "failed";
+    const disk = status.desktop === "failed";
+    els.saveAlert.hidden = !local && !disk;
+    if (els.saveAlert.hidden) return;
+    els.saveAlert.classList.toggle("is-local", local);
+    els.saveAlertTitle.textContent = t(local ? "saveLocalTitle" : "saveDiskTitle");
+    els.saveAlertBody.textContent = t(local ? "saveLocalBody" : "saveDiskBody");
+  }
+  Store.onStatus(renderSaveStatus);
+  els.saveRetry.addEventListener("click", () => {
+    const status = Store.retry();
+    toast(t(status.local === "failed" || status.desktop === "failed" ? "saveStillFailing" : "saveAllGood"));
+  });
+  els.saveExport.addEventListener("click", exportBackup);
+  // The disk copy waits a moment to group writes; leaving writes it now.
+  window.addEventListener("pagehide", () => Store.flush());
+  window.addEventListener("beforeunload", () => Store.flush());
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") Store.flush();
   });
 
   // ---------- toast ----------

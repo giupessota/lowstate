@@ -1,8 +1,8 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
-const { loadSnapshot, saveSnapshot } = require("./desktop-storage.cjs");
+const { loadSnapshot, saveSnapshot, saveRestorePoint } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
 const { createCalendarStore, isMeetingUrl } = require("./desktop-calendars.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
@@ -75,6 +75,35 @@ function desktopStoragePaths() {
 ipcMain.on("storage-load", (event) => {
   const paths = desktopStoragePaths();
   event.returnValue = loadSnapshot(paths.current, paths.backup);
+});
+
+ipcMain.on("storage-restore-point", (event, data) => {
+  try {
+    const file = saveRestorePoint(path.dirname(desktopStoragePaths().current), data);
+    event.returnValue = { ok: true, file };
+  } catch (error) {
+    console.error("Could not keep a copy before restoring:", error);
+    event.returnValue = { ok: false };
+  }
+});
+
+// Backups go through the system's save dialog, so the page only says
+// "saved" once the file is really written.
+ipcMain.handle("backup-save", async (_event, text, name) => {
+  if (typeof text !== "string" || !window) return { ok: false };
+  const fileName = /^[\w.-]{1,80}\.json$/.test(String(name || "")) ? name : "lowstate-backup.json";
+  const choice = await dialog.showSaveDialog(window, {
+    defaultPath: path.join(app.getPath("downloads"), fileName),
+    filters: [{ name: "JSON", extensions: ["json"] }],
+  });
+  if (choice.canceled || !choice.filePath) return { ok: false, canceled: true };
+  try {
+    await fs.promises.writeFile(choice.filePath, text, { encoding: "utf8", mode: 0o600 });
+    return { ok: true, file: path.basename(choice.filePath) };
+  } catch (error) {
+    console.error("Could not write the backup:", error);
+    return { ok: false };
+  }
 });
 
 ipcMain.on("storage-save", (event, data) => {

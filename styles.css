@@ -1586,6 +1586,35 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 .closed-mark { color: var(--indigo); font-weight: 600; }
 .closed-good { font-style: italic; }
 .closed-line .focus-action { margin-left: auto; }
+/* ===== Save status & restore ===== */
+.save-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--yamabuki) 55%, var(--rule));
+  border-left: 4px solid var(--yamabuki);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--yamabuki) 12%, var(--paper));
+  color: var(--ink);
+  font-size: 13px;
+}
+.save-alert.is-local { border-color: color-mix(in srgb, var(--vermilion) 45%, var(--rule)); border-left-color: var(--vermilion); background: color-mix(in srgb, var(--vermilion) 9%, var(--paper)); }
+.save-alert[hidden] { display: none; }
+.save-alert .i { flex: none; width: 18px; height: 18px; color: var(--vermilion); }
+.save-alert p { flex: 1; min-width: 0; margin: 0; line-height: 1.4; }
+.save-alert span { color: var(--ink-2); }
+.save-alert .btn { flex: none; }
+dialog.sheet.restore-sheet { width: min(440px, calc(100vw - 32px)); }
+.restore-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 13.5px; }
+.restore-facts dt { color: var(--muted); font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; align-self: center; }
+.restore-facts dd { margin: 0; }
+.restore-facts dt:last-of-type, .restore-facts dd:last-of-type { padding-top: 6px; border-top: 1px dashed var(--rule); }
+.restore-note { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.45; }
+.restore-error { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--vermilion) 12%, transparent); color: var(--ink); font-size: 13px; }
+.restore-error[hidden] { display: none; }
+
 /* ===== Meeting details ===== */
 [data-event] { cursor: pointer; }
 .event-card {

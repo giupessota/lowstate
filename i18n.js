@@ -32,7 +32,7 @@
       quickCapture: "Quick-capture a task", brainDump: "Brain dump", focusInput: "Focus the input", closeCancel: "Close / cancel",
       newTask: "New task", newBrain: "New brain capture", addTask: "Add task", addCapture: "Add capture",
       completeTask: "Complete task", reopenTask: "Reopen task", markProcessed: "Mark as processed", markUnprocessed: "Mark as unprocessed",
-      clearedTasks: "{count} completed task(s) moved to Trash", backupSaved: "BACKUP SAVED",
+      clearedTasks: "{count} completed task(s) moved to Trash", backupSaved: "Backup saved: {file}", backupDownloaded: "Backup sent to your downloads.", backupFailed: "Couldn't write the backup file. Nothing was saved.",
       viewWeek: "Week", viewDay: "Day", viewMonth: "Month", viewHabits: "Habits", views: "Views",
       toSchedule: "To schedule", overdueTitle: "Overdue", moveAllToday: "All to today", moveToday: "Move to today",
       inboxPlaceholder: "Jot something down…", inboxHint: "Tip: #category, !urgent, @tomorrow, 14:30", addInline: "Add",
@@ -49,6 +49,21 @@
       newCategoryName: "New category", addCategory: "Add", itemDeleted: "Moved to Trash", itemRestored: "Restored",
       weekStartsOn: "Week starts on", monday: "MONDAY", sunday: "SUNDAY", trashCount: "{count} item(s) in Trash",
       restoreFailed: "Couldn't restore that file — is it a Lowstate backup?", confirmRestore: "Replace all current data with this backup?",
+      saveRetry: "Try again", saveExport: "Export data", saveLocalTitle: "Your latest changes weren't saved.",
+      saveLocalBody: "The app's storage is full or blocked. They stay here while Lowstate is open — try again or export your data.",
+      saveDiskTitle: "The backup copy on disk failed.",
+      saveDiskBody: "Your changes are saved in the app, but the durable copy wasn't updated. Try again or export your data.",
+      saveAllGood: "Everything is saved.", saveStillFailing: "Still not saving. Export your data to keep it safe.",
+      restoreTitle: "Restore a backup", restoreConfirm: "Replace my data", restoreMade: "Made on", restoreUnknownDate: "date not recorded",
+      restoreFrom: "From", restoreGen1: "Lowstate 1 (notebook)", restoreGen2: "Lowstate 2", restoreTasks: "Tasks", restoreHabits: "Habits",
+      restoreNow: "You have now", restoreNowValue: "{tasks} tasks · {habits} habits",
+      restoreNoteDesktop: "Before replacing, a copy of your current data is kept in Lowstate's data folder (before-restore-…json).",
+      restoreNoteWeb: "Before replacing, a copy of your current data is downloaded.",
+      restoreNoCopy: "Couldn't keep a copy of your current data, so nothing was changed.",
+      restoreNoRoom: "The backup didn't fit in the app's storage. Your previous data was kept.",
+      "restoreErr-not-json": "This file isn't valid JSON.", "restoreErr-not-lowstate": "This file isn't a Lowstate backup.",
+      "restoreErr-newer": "This backup comes from a newer Lowstate. Update the app first.",
+      "restoreErr-empty": "This backup has no Lowstate data.", "restoreErr-corrupt": "This backup is damaged ({key}). Nothing was changed.",
       updateAvailable: "Update {version}", download: "Download", close: "Close", markDone: "Mark as done", markOpen: "Mark as not done",
       migratedNotice: "Your tasks from the notebook were brought into the planner.",
       weeklyGoals: "Weekly goals", goalPlaceholder: "+ Add a goal for this week", removeGoal: "Remove goal",
@@ -200,7 +215,7 @@
       quickCapture: "Captura rápida de tarefa", brainDump: "Captura no Brain Inbox", focusInput: "Focar no campo", closeCancel: "Fechar / cancelar",
       newTask: "Nova tarefa", newBrain: "Nova captura mental", addTask: "Adicionar tarefa", addCapture: "Adicionar captura",
       completeTask: "Concluir tarefa", reopenTask: "Reabrir tarefa", markProcessed: "Marcar como processada", markUnprocessed: "Marcar como pendente",
-      clearedTasks: "{count} tarefa(s) concluída(s) movida(s) para a Lixeira", backupSaved: "BACKUP SALVO",
+      clearedTasks: "{count} tarefa(s) concluída(s) movida(s) para a Lixeira", backupSaved: "Backup salvo: {file}", backupDownloaded: "Backup enviado para os seus downloads.", backupFailed: "Não foi possível gravar o arquivo de backup. Nada foi salvo.",
       viewWeek: "Semana", viewDay: "Dia", viewMonth: "Mês", viewHabits: "Hábitos", views: "Visões",
       toSchedule: "A agendar", overdueTitle: "Atrasadas", moveAllToday: "Tudo para hoje", moveToday: "Mover para hoje",
       inboxPlaceholder: "Anotar algo sem data…", inboxHint: "Dica: #categoria, !urgente, @amanhã, 14h", addInline: "Adicionar",
@@ -217,6 +232,21 @@
       newCategoryName: "Nova categoria", addCategory: "Adicionar", itemDeleted: "Movido para a Lixeira", itemRestored: "Restaurado",
       weekStartsOn: "Semana começa na", monday: "SEGUNDA", sunday: "DOMINGO", trashCount: "{count} item(ns) na Lixeira",
       restoreFailed: "Não foi possível restaurar — é um backup do Lowstate?", confirmRestore: "Substituir todos os dados atuais por este backup?",
+      saveRetry: "Tentar de novo", saveExport: "Exportar dados", saveLocalTitle: "Suas últimas mudanças não foram salvas.",
+      saveLocalBody: "O espaço do app está cheio ou bloqueado. Elas ficam aqui enquanto o Lowstate estiver aberto — tente de novo ou exporte seus dados.",
+      saveDiskTitle: "A cópia de segurança no disco falhou.",
+      saveDiskBody: "Suas mudanças estão salvas no app, mas a cópia durável não foi atualizada. Tente de novo ou exporte seus dados.",
+      saveAllGood: "Tudo salvo.", saveStillFailing: "Ainda não está salvando. Exporte seus dados para não perder nada.",
+      restoreTitle: "Restaurar um backup", restoreConfirm: "Substituir meus dados", restoreMade: "Feito em", restoreUnknownDate: "data não registrada",
+      restoreFrom: "Origem", restoreGen1: "Lowstate 1 (caderno)", restoreGen2: "Lowstate 2", restoreTasks: "Tarefas", restoreHabits: "Hábitos",
+      restoreNow: "Você tem agora", restoreNowValue: "{tasks} tarefas · {habits} hábitos",
+      restoreNoteDesktop: "Antes de substituir, uma cópia dos seus dados atuais fica guardada na pasta de dados do Lowstate (before-restore-…json).",
+      restoreNoteWeb: "Antes de substituir, uma cópia dos seus dados atuais é baixada.",
+      restoreNoCopy: "Não foi possível guardar uma cópia dos seus dados atuais, então nada foi alterado.",
+      restoreNoRoom: "O backup não coube no espaço do app. Seus dados anteriores foram mantidos.",
+      "restoreErr-not-json": "Este arquivo não é um JSON válido.", "restoreErr-not-lowstate": "Este arquivo não é um backup do Lowstate.",
+      "restoreErr-newer": "Este backup vem de um Lowstate mais novo. Atualize o app primeiro.",
+      "restoreErr-empty": "Este backup não tem dados do Lowstate.", "restoreErr-corrupt": "Este backup está danificado ({key}). Nada foi alterado.",
       updateAvailable: "Atualização {version}", download: "Baixar", close: "Fechar", markDone: "Marcar como feita", markOpen: "Marcar como não feita",
       migratedNotice: "Suas tarefas do caderno foram trazidas para o planner.",
       weeklyGoals: "Metas da semana", goalPlaceholder: "+ Adicionar uma meta para esta semana", removeGoal: "Remover meta",
@@ -364,7 +394,11 @@
 
   function setLanguage(next) {
     language = next === "pt" ? "pt" : "en";
-    root.localStorage?.setItem(LANGUAGE_KEY, language);
+    try {
+      root.localStorage?.setItem(LANGUAGE_KEY, language);
+    } catch {
+      // Storage full or blocked: the language still changes for this session.
+    }
     apply();
     return language;
   }

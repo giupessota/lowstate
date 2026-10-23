@@ -85,6 +85,12 @@
       </aside>
 
       <main class="stage">
+        <div class="save-alert" id="saveAlert" role="alert" hidden>
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4l9 16H3z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>
+          <p><strong id="saveAlertTitle"></strong> <span id="saveAlertBody"></span></p>
+          <button type="button" class="btn" id="saveRetry" data-i18n="saveRetry">Try again</button>
+          <button type="button" class="btn" id="saveExport" data-i18n="saveExport">Export data</button>
+        </div>
         <header class="topbar">
           <div class="range">
             <h1 id="rangeTitle"></h1>
@@ -723,6 +729,22 @@
     </dialog>
 
     <input type="file" id="importFile" accept="application/json,.json" hidden />
+
+    <dialog class="sheet restore-sheet" id="restoreDialog" aria-labelledby="restoreTitle">
+      <form class="sheet-body" id="restoreForm" method="dialog">
+        <header class="sheet-head">
+          <h2 id="restoreTitle" data-i18n="restoreTitle">Restore a backup</h2>
+        </header>
+        <dl class="restore-facts" id="restoreFacts"></dl>
+        <p class="restore-note" id="restoreNote"></p>
+        <p class="restore-error" id="restoreError" role="alert" hidden></p>
+        <footer class="sheet-foot">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="restoreCancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" id="restoreConfirm" data-i18n="restoreConfirm">Replace my data</button>
+        </footer>
+      </form>
+    </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite" hidden>
       <span id="toastText"></span>

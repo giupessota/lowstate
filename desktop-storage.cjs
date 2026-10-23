@@ -75,7 +75,31 @@ function saveSnapshot(filePath, backupPath, data, options = {}) {
   return payload;
 }
 
+// Before a backup is restored, the current data is kept as
+// "before-restore-<time>.json" next to the snapshot (newest five kept), in the
+// same format, so it can itself be restored later.
+const RESTORE_POINTS_KEPT = 5;
+function saveRestorePoint(directory, data, options = {}) {
+  const fileSystem = options.fileSystem || fs;
+  const now = options.now || new Date();
+  const stamp = now.toISOString().replace(/[:.]/g, "-").replace("T", "_").slice(0, 19);
+  const filePath = path.join(directory, `before-restore-${stamp}.json`);
+  const payload = { app: "lowstate", version: SNAPSHOT_VERSION, savedAt: now.toISOString(), data: sanitizeData(data) };
+  fileSystem.mkdirSync(directory, { recursive: true });
+  fileSystem.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  if (!readSnapshotFile(filePath, fileSystem)) throw new Error("Restore point could not be read back");
+  fileSystem.readdirSync(directory)
+    .filter((name) => /^before-restore-.*\.json$/.test(name))
+    .sort()
+    .slice(0, -RESTORE_POINTS_KEPT)
+    .forEach((name) => {
+      try { fileSystem.unlinkSync(path.join(directory, name)); } catch {}
+    });
+  return filePath;
+}
+
 module.exports = {
+  saveRestorePoint,
   SNAPSHOT_VERSION,
   MAX_SNAPSHOT_BYTES,
   isAppKey,
