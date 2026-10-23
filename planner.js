@@ -1123,7 +1123,7 @@
 
   // ---------- Mental load (perceived, not a stress measure) ----------
   // A rough 0–10 estimate of how full the day feels, from what the planner
-  // knows: open must-dos and urgent items, busy hours on the timeline,
+  // knows: the day's must-dos and urgent items, busy hours on the timeline,
   // overdue tasks (today only) and whether the last two days felt heavy.
   // Meetings count twice over: by the hours they take and by how chopped up
   // they leave the day (many calls, or three or more back to back).
@@ -1131,18 +1131,23 @@
   const HEAVY_MOODS = ["tiring", "stressed", "rough"];
 
   function mentalLoad(items, iso, { todayISO = iso, moods = {}, events = [] } = {}) {
-    const day = items.filter((item) => item.date === iso);
-    const open = day.filter((item) => !item.done && item.focus !== "later");
-    const must = open.filter((item) => item.focus === "must").length;
-    const could = open.filter((item) => item.focus === "could").length;
-    const urgent = open.filter((item) => item.priority === "urgent").length;
+    // The load is about how much the day holds, so finishing a task doesn't
+    // lower it: done tasks still count, only "Not today" is left out.
+    const day = items.filter((item) => item.date === iso && item.focus !== "later");
+    const must = day.filter((item) => item.focus === "must").length;
+    const could = day.filter((item) => item.focus === "could").length;
+    const urgent = day.filter((item) => item.priority === "urgent").length;
     const minutes = day
       .filter((item) => item.start && item.focus !== "later")
       .reduce((sum, item) => sum + (item.duration || 60), 0);
     const meetingMinutes = busyMinutes(events, iso);
     const { count: calls, streak } = callStats(events, iso);
     const backToBack = streak >= 3 ? streak : 0;
-    const overdue = iso === todayISO ? overdueItems(items, todayISO).length : 0;
+    // Overdue ones too: those still open plus those finished today.
+    const overdue = iso === todayISO
+      ? items.filter((item) => item.date && item.date < todayISO
+        && (!item.done || (item.doneAt && toISODate(new Date(item.doneAt)) === todayISO))).length
+      : 0;
     const date = parseISODate(iso);
     const heavyDays = date
       ? [1, 2].filter((back) => HEAVY_MOODS.includes(moods[toISODate(addDays(date, -back))])).length

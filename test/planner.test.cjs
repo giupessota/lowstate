@@ -179,7 +179,7 @@ test("mental load estimate grows with must-dos, busy hours, overdue and heavy da
     P.normalizeItem({ title: "old", date: "2026-10-19" }),
   ];
   const load = P.mentalLoad(busy, day, { todayISO: day, moods: { "2026-10-20": "stressed" } });
-  assert.deepEqual(load.factors, { must: 3, could: 2, urgent: 1, hours: 4, meetings: 0, calls: 0, backToBack: 0, overdue: 1, heavyDays: 1 });
+  assert.deepEqual(load.factors, { must: 4, could: 2, urgent: 1, hours: 4, meetings: 0, calls: 0, backToBack: 0, overdue: 1, heavyDays: 1 });
   assert.equal(load.score, 8);
   assert.equal(P.mentalLoad(busy, day, { todayISO: "2026-10-20" }).factors.overdue, 0);
   assert.equal(P.loadLevel(2), "light");
@@ -531,6 +531,24 @@ test("calendar events split into all-day and timed slices of a local day", () =>
   const load = P.mentalLoad([], "2026-11-03", { events: overlapping });
   assert.equal(load.factors.meetings, 3);
   assert.equal(load.score, 2);
+});
+
+test("finishing tasks doesn't lower the day's mental load", () => {
+  const day = "2026-10-21";
+  const now = new Date(2026, 9, 21, 15).getTime();
+  const items = [
+    P.normalizeItem({ id: "a", title: "a", date: day, focus: "must" }),
+    P.normalizeItem({ id: "b", title: "b", date: day, focus: "must", priority: "urgent" }),
+    P.normalizeItem({ id: "c", title: "c", date: day, start: "10:00", duration: 90 }),
+    P.normalizeItem({ id: "old", title: "old", date: "2026-10-19" }),
+  ];
+  const before = P.mentalLoad(items, day, { todayISO: day });
+  const done = ["a", "b", "c", "old"].reduce((list, id) => P.completeItem(list, id, day, now), items);
+  assert.ok(done.every((item) => item.done));
+  assert.deepEqual(P.mentalLoad(done, day, { todayISO: day }), before);
+  // An overdue task finished on an earlier day no longer weighs on today.
+  const earlier = items.map((item) => (item.id === "old" ? { ...item, done: true, doneAt: new Date(2026, 9, 20).getTime() } : item));
+  assert.equal(P.mentalLoad(earlier, day, { todayISO: day }).factors.overdue, 0);
 });
 
 test("a day chopped into many calls weighs more than one long meeting", () => {

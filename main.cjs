@@ -45,6 +45,11 @@ function createWindow() {
   window.on("close", (event) => {
     hideWindowOnClose(event, window, isQuitting);
   });
+  // Closing only hides the window, so reopening it (dock, tray, shortcut)
+  // tells the page to come back to today.
+  const opened = () => window?.webContents.send("window-opened");
+  window.on("show", opened);
+  window.on("restore", opened);
 }
 
 const DEFAULT_SHORTCUTS = {

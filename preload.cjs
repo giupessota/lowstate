@@ -31,5 +31,6 @@ contextBridge.exposeInMainWorld("desktopGadget", {
   onUpdateAvailable: (cb) => ipcRenderer.on("update-available", (_e, info) => cb(info)),
   notify: (payload) => ipcRenderer.send("notify", payload),
   onOpenDay: (cb) => ipcRenderer.on("open-day", (_e, iso, action, reminder) => cb(iso, action, reminder)),
-  onSnoozeReminder: (cb) => ipcRenderer.on("snooze-reminder", (_e, key) => cb(key))
+  onSnoozeReminder: (cb) => ipcRenderer.on("snooze-reminder", (_e, key) => cb(key)),
+  onWindowOpened: (cb) => ipcRenderer.on("window-opened", () => cb())
 });
