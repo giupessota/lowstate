@@ -3,6 +3,8 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("desktopStorage", {
   loadSnapshot: () => ipcRenderer.sendSync("storage-load"),
   saveSnapshot: (data) => ipcRenderer.sendSync("storage-save", data),
+  saveRestorePoint: (data) => ipcRenderer.sendSync("storage-restore-point", data),
+  saveBackup: (text, name) => ipcRenderer.invoke("backup-save", text, name),
 });
 
 contextBridge.exposeInMainWorld("desktopTheme", {

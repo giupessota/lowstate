@@ -107,6 +107,17 @@
     };
   }
 
+  // ---------- Day page modules ----------
+  // Secondary parts of the day page can be folded or put away; the timeline
+  // and the task groups always stay.
+  const DAY_MODULES = ["load", "water", "habits", "mood", "notes"];
+  const MODULE_STATES = ["open", "collapsed", "hidden"];
+
+  function normalizeDayModules(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return Object.fromEntries(DAY_MODULES.map((id) => [id, MODULE_STATES.includes(source[id]) ? source[id] : "open"]));
+  }
+
   // ---------- Search ----------
   const foldText = (text) => String(text || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
@@ -1399,6 +1410,8 @@
     createItem,
     moveItem,
     REPEATS,
+    DAY_MODULES,
+    normalizeDayModules,
     callStats,
     search,
     weekKeyToDate,

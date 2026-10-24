@@ -128,6 +128,15 @@
     dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
+    dayCapturePreview: $("dayCapturePreview"),
+    inboxCapturePreview: $("inboxCapturePreview"),
+    focusHelpBtn: $("focusHelpBtn"),
+    focusHelp: $("focusHelp"),
+    modulesHidden: $("modulesHidden"),
+    moodSum: $("moodSum"),
+    notesSum: $("notesSum"),
+    habitsSum: $("habitsSum"),
+    dayModulesChips: $("dayModulesChips"),
     searchDialog: $("searchDialog"),
     searchInput: $("searchInput"),
     searchResults: $("searchResults"),
@@ -206,6 +215,17 @@
     exportData: $("exportData"),
     importData: $("importData"),
     importFile: $("importFile"),
+    saveAlert: $("saveAlert"),
+    saveAlertTitle: $("saveAlertTitle"),
+    saveAlertBody: $("saveAlertBody"),
+    saveRetry: $("saveRetry"),
+    saveExport: $("saveExport"),
+    restoreDialog: $("restoreDialog"),
+    restoreForm: $("restoreForm"),
+    restoreFacts: $("restoreFacts"),
+    restoreNote: $("restoreNote"),
+    restoreError: $("restoreError"),
+    restoreCancel: $("restoreCancel"),
     trashSummary: $("trashSummary"),
     trashRestore: $("trashRestore"),
     trashEmpty: $("trashEmpty"),
@@ -344,6 +364,7 @@
       morningAt: Planner.isTime(savedSettings.morningAt) ? savedSettings.morningAt : "08:00",
       closureOn: savedSettings.closureOn !== false,
       closureAt: Planner.isTime(savedSettings.closureAt) ? savedSettings.closureAt : "21:30",
+      dayModules: Planner.normalizeDayModules(savedSettings.dayModules),
     },
     goals: Store.loadObject(KEYS.goals),
     notes: Store.loadObject(KEYS.notes),
@@ -503,19 +524,65 @@
   // Shared by the sidebar capture field and the per-day "+ Add" inputs.
   // fallbackStart is used when capturing on a timeline slot; a time typed in
   // the text still wins.
-  function capture(text, fallbackDate = null, fallbackStart = null) {
+  function captureFields(text, fallbackDate = null, fallbackStart = null) {
     const parsed = Planner.parseCapture(text);
     if (!parsed.title) return null;
     const start = parsed.start || fallbackStart;
     const date = parsed.date || fallbackDate || (start ? todayISO() : null);
-    return addItem({
+    return {
       title: parsed.title,
       date,
       start: date ? start : null,
       duration: date && start ? 60 : null,
       priority: parsed.priority,
-      category: resolveCategory(parsed.category),
-    });
+      category: parsed.category,
+    };
+  }
+
+  function capture(text, fallbackDate = null, fallbackStart = null) {
+    const fields = captureFields(text, fallbackDate, fallbackStart);
+    if (!fields) return null;
+    return addItem({ ...fields, category: resolveCategory(fields.category) });
+  }
+
+  // A quiet line under a capture field: an example while it's empty, then
+  // what the typed line will become — read by the same parser capture() uses.
+  function renderCapturePreview(input, preview, fallbackDate = null) {
+    const text = input.value;
+    if (!text.trim()) {
+      preview.textContent = document.activeElement === input ? t("captureExample") : "";
+      preview.classList.add("is-example");
+      return;
+    }
+    preview.classList.remove("is-example");
+    const fields = captureFields(text, fallbackDate);
+    if (!fields) {
+      preview.textContent = "";
+      return;
+    }
+    const parts = [];
+    if (!fields.date) parts.push(t("toSchedule"));
+    else {
+      const tomorrow = Core.toISODate(Planner.addDays(new Date(), 1));
+      parts.push(fields.date === todayISO() ? t("captureToday") : fields.date === tomorrow ? t("captureTomorrow")
+        : formatDate(Core.parseISODate(fields.date), { weekday: "short", day: "numeric", month: "short" }));
+      // The group comes from the same rule that files a new task (urgent → must).
+      parts.push(t(FOCUS_LABELS[Planner.normalizeItem({ title: fields.title, date: fields.date, priority: fields.priority }).focus]));
+    }
+    if (fields.start) parts.push(timeRange(fields));
+    if (fields.category) {
+      const wanted = Planner.slug(fields.category);
+      const existing = state.categories.find((category) => category.id === wanted || Planner.slug(category.name) === wanted);
+      parts.push(existing ? `#${existing.name}` : t("captureNewCategory", { name: `#${Planner.displayName(fields.category)}` }));
+    }
+    if (fields.priority === "urgent") parts.push(t("captureUrgent"));
+    preview.textContent = t("captureGoesTo", { list: parts.join(" · ") });
+  }
+
+  function wireCapturePreview(input, preview, fallbackDate) {
+    const update = () => renderCapturePreview(input, preview, fallbackDate());
+    ["input", "focus", "blur"].forEach((type) => input.addEventListener(type, update));
+    input.form?.addEventListener("submit", () => setTimeout(update, 0));
   }
 
   // ---------- rendering ----------
@@ -988,7 +1055,10 @@
         style: `top: ${top}px; --h: ${height}px; --lane: ${event.lane}; --lanes: ${event.lanes}; --lines: ${lines};${category ? ` --cat: ${category.color};` : ""}`,
       },
         checkButton(item.done, { "data-action": "toggle" }),
-        h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0", title: item.title },
+        h("div", {
+          class: "item-body", "data-action": "edit", role: "button", tabindex: "0",
+          title: `${item.title}\n${t("blockKeys")}`, "aria-keyshortcuts": "Alt+ArrowUp Alt+ArrowDown Alt+Shift+ArrowUp Alt+Shift+ArrowDown",
+        },
           h("span", { class: "block-time", text: timeRange(item) }),
           h("span", { class: "block-title", text: item.title })),
         h("span", { class: "block-resize", "aria-hidden": "true", title: t("resizeBlock") })));
@@ -1075,7 +1145,81 @@
     renderDayNotes();
     renderClosure(iso);
     renderMonthTabs(day);
+    applyDayModules();
   }
+
+  // ---------- day page modules ----------
+  const MODULE_NAMES = { load: "load", water: "water", habits: "viewHabits", mood: "dayMood", notes: "dayNotes" };
+  const moduleEl = (id) => els.dayView.querySelector(`[data-module="${id}"]`);
+
+  function applyDayModules() {
+    const modules = state.settings.dayModules;
+    Planner.DAY_MODULES.forEach((id) => {
+      const el = moduleEl(id);
+      if (!el) return;
+      el.classList.toggle("is-collapsed", modules[id] === "collapsed");
+      el.classList.toggle("is-off", modules[id] === "hidden");
+      el.querySelector("[data-module-toggle]")?.setAttribute("aria-expanded", String(modules[id] === "open"));
+    });
+    const hidden = Planner.DAY_MODULES.filter((id) => modules[id] === "hidden");
+    els.modulesHidden.hidden = hidden.length === 0;
+    els.modulesHidden.replaceChildren(...(hidden.length ? [
+      h("span", { text: t("modulesHiddenLine", { list: hidden.map((id) => t(MODULE_NAMES[id])).join(", ") }) }),
+      h("button", { type: "button", class: "link-btn", "data-modules-show": "", text: t("modulesShow") }),
+    ] : []));
+    // Small summaries for folded modules.
+    const iso = anchorISO();
+    const mood = state.moods[iso];
+    els.moodSum.textContent = mood ? t(`mood-${mood}`) : "";
+    const notes = (state.dayNotes[iso] || "").trim().split("\n")[0];
+    els.notesSum.textContent = notes.length > 40 ? `${notes.slice(0, 40)}…` : notes;
+    const pills = [...els.habitPills.querySelectorAll("[data-habit-cell]")];
+    els.habitsSum.textContent = pills.length
+      ? t("habitsSum", { done: pills.filter((pill) => pill.getAttribute("aria-pressed") === "true").length, total: pills.length })
+      : "";
+  }
+
+  function setDayModule(id, value) {
+    if (!Planner.DAY_MODULES.includes(id)) return;
+    state.settings.dayModules = { ...state.settings.dayModules, [id]: value };
+    persistSettings();
+    applyDayModules();
+    renderDayModuleChips();
+  }
+
+  function renderDayModuleChips() {
+    els.dayModulesChips.querySelectorAll("[data-day-module]").forEach((chip) => {
+      const on = state.settings.dayModules[chip.dataset.dayModule] !== "hidden";
+      chip.classList.toggle("active", on);
+      chip.setAttribute("aria-pressed", String(on));
+    });
+  }
+
+  els.dayView.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-module-toggle]");
+    const hide = event.target.closest("[data-module-hide]");
+    if (toggle) {
+      const id = toggle.dataset.moduleToggle;
+      setDayModule(id, state.settings.dayModules[id] === "collapsed" ? "open" : "collapsed");
+    } else if (hide) {
+      const id = hide.dataset.moduleHide;
+      setDayModule(id, "hidden");
+      toast(t("moduleHidden", { name: t(MODULE_NAMES[id]) }), t("undo"), () => setDayModule(id, "open"));
+      els.dayCaptureInput.focus({ preventScroll: true });
+    } else if (event.target.closest("[data-modules-show]")) {
+      state.settings.dayModules = Object.fromEntries(Object.entries(state.settings.dayModules)
+        .map(([id, value]) => [id, value === "hidden" ? "open" : value]));
+      persistSettings();
+      applyDayModules();
+      renderDayModuleChips();
+    }
+  });
+  els.dayModulesChips.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-day-module]");
+    if (!chip) return;
+    const id = chip.dataset.dayModule;
+    setDayModule(id, state.settings.dayModules[id] === "hidden" ? "open" : "hidden");
+  });
 
   // Mental load: the app's estimate as a ghost, the person's own rating
   // solid. Clicking a tick sets the rating; clicking it again clears it.
@@ -1107,7 +1251,10 @@
     // replaceChildren (unlike h) would print a null child as "null".
     els.loadMeter.replaceChildren(...[
       h("div", { class: "load-head", title: why },
-        h("span", { class: "load-title", text: t("load") }),
+        h("button", { type: "button", class: "module-toggle", "data-module-toggle": "load", "aria-expanded": "true" },
+          icon('<svg class="i chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg>'),
+          h("span", { class: "load-title", text: t("load") })),
+        h("button", { type: "button", class: "module-hide", "data-module-hide": "load", "aria-label": t("moduleHide-load"), title: t("moduleHide-load"), text: "×" }),
         h("span", { class: "load-reading" },
           h("strong", { class: "load-score", text: String(score) }),
           h("span", { class: "load-of", text: "/10" }),
@@ -1121,6 +1268,7 @@
   }
 
   const FOCUS_LABELS = { must: "focusMust", could: "focusCould", later: "focusLater" };
+  const FOCUS_EXPLAIN = { must: "explainMust", could: "explainCould", later: "explainLater" };
 
   function renderDayTasks(iso, items) {
     els.dayTasks.dataset.date = iso;
@@ -1130,7 +1278,7 @@
       const movable = focus === "later" && group.some((item) => !item.done);
       return h("section", { class: `focus-group focus-${focus}`, "data-focus": focus },
         h("h3", { class: "focus-head" },
-          h("span", { text: t(FOCUS_LABELS[focus]) }),
+          h("span", { text: t(FOCUS_LABELS[focus]), title: t(FOCUS_EXPLAIN[focus]) }),
           group.length ? h("span", { class: "focus-count", text: String(group.length) }) : null,
           h("button", { type: "button", class: "focus-add", "data-focus-add": focus, title: t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), "aria-label": t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), text: "+" }),
           movable ? h("button", { type: "button", class: "focus-action", "data-later-tomorrow": iso, text: t("allToTomorrow") }) : null),
@@ -1792,20 +1940,80 @@
     return [habit.start ? `${habit.start} · ${days}` : days];
   }
 
+  // Long sidebar lists show their first entries and the rest on request:
+  // rebuilding hundreds of overdue tasks on every change made the app slow.
+  const SIDE_LIST_LIMIT = 40;
+  const sideListOpen = { overdue: false, inbox: false };
+
+  function sideListEls(items, variant) {
+    const shown = sideListOpen[variant] ? items : items.slice(0, SIDE_LIST_LIMIT);
+    const rest = items.length - shown.length;
+    return [
+      ...shown.map((item) => itemEl(item, variant)),
+      rest > 0 ? h("li", { class: "side-more" },
+        h("button", { type: "button", class: "link-btn", "data-side-more": variant, text: t("showMore", { n: rest }) })) : null,
+    ].filter(Boolean);
+  }
+
   function renderSidebar() {
     els.dumpCount.textContent = state.dump.length || "";
     const overdue = Planner.overdueItems(state.items, todayISO());
     els.overdueSection.hidden = overdue.length === 0;
     els.overdueCount.textContent = overdue.length || "";
-    els.overdueList.replaceChildren(...overdue.map((item) => itemEl(item, "overdue")));
+    els.overdueList.replaceChildren(...sideListEls(overdue, "overdue"));
 
     const inbox = Planner.inboxItems(state.items);
     els.inboxCount.textContent = inbox.length || "";
-    els.inboxList.replaceChildren(...inbox.map((item) => itemEl(item, "inbox")));
+    els.inboxList.replaceChildren(...sideListEls(inbox, "inbox"));
     els.inboxEmpty.hidden = inbox.length > 0;
   }
 
+  document.addEventListener("click", (event) => {
+    const more = event.target.closest("[data-side-more]");
+    if (!more) return;
+    const list = more.closest(".side-list");
+    sideListOpen[more.dataset.sideMore] = true;
+    renderSidebar();
+    // Keyboard focus moves to the first entry that just appeared.
+    list?.querySelectorAll(".item .item-body")[SIDE_LIST_LIMIT]?.focus({ preventScroll: true });
+  });
+
+  // Re-rendering replaces lists, which would drop keyboard focus onto the
+  // page. This finds the same control again (same task, habit, button) by
+  // its data attributes, first inside the same static container.
+  const describeNode = (node) => [...node.attributes]
+    .filter((attribute) => attribute.name.startsWith("data-") && !attribute.name.startsWith("data-i18n"))
+    .map((attribute) => `[${attribute.name}="${CSS.escape(attribute.value)}"]`)
+    .join("");
+
+  function focusMemo() {
+    const active = document.activeElement;
+    if (!active || active === document.body || active.id || active.closest("dialog")) return null;
+    const host = active.closest("[data-id], [data-habit-cell], [data-event], [data-dump]");
+    const own = `${active.tagName.toLowerCase()}${describeNode(active)}`;
+    const selector = host && host !== active ? `${host.tagName.toLowerCase()}${describeNode(host)} ${own}` : own;
+    if (selector === active.tagName.toLowerCase()) return null;
+    return { zone: active.parentElement?.closest("[id]")?.id || null, selector };
+  }
+
+  function restoreFocus(memo) {
+    if (!memo || (document.activeElement && document.activeElement !== document.body)) return;
+    let target = null;
+    try {
+      target = (memo.zone && document.getElementById(memo.zone)?.querySelector(memo.selector)) || document.querySelector(memo.selector);
+    } catch {
+      return;
+    }
+    if (target && !target.closest("[hidden]")) target.focus({ preventScroll: true });
+  }
+
   function render() {
+    const memo = focusMemo();
+    renderViews();
+    restoreFocus(memo);
+  }
+
+  function renderViews() {
     els.brandYear.textContent = String(new Date().getFullYear());
     document.querySelectorAll(".nav-btn").forEach((button) => {
       const active = button.dataset.view === state.view;
@@ -1825,6 +2033,7 @@
     else if (state.view === "habits") renderHabitsView();
     else renderDump();
     renderSidebar();
+    renderSaveStatus();
   }
 
   function setView(view) {
@@ -2179,6 +2388,7 @@
   }
 
   function renderSettings() {
+    renderDayModuleChips();
     const customSwatch = els.settingsDialog.querySelector(".swatch-custom");
     const customColor = Store.getRaw(KEYS.coverColor);
     if (customColor) customSwatch.style.setProperty("--chosen", customColor);
@@ -2434,34 +2644,129 @@
     renderSettings();
   });
 
-  els.exportData.addEventListener("click", () => {
-    const payload = { app: "lowstate", version: 3, exportedAt: new Date().toISOString(), data: Store.collect() };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = h("a", { href: url, download: `lowstate-backup-${todayISO()}.json` });
+  // ---------- backup & restore ----------
+  function downloadJSON(text, name) {
+    const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+    const link = h("a", { href: url, download: name });
     document.body.append(link);
     link.click();
     link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast(t("backupSaved"));
-  });
+  }
+
+  // The desktop app writes through the system's save dialog and only then
+  // says "saved"; the browser can only hand the file to its downloads.
+  async function exportBackup() {
+    Store.flush();
+    const text = JSON.stringify(Store.backupPayload(), null, 2);
+    const name = `lowstate-backup-${todayISO()}.json`;
+    const storageApi = window.desktopStorage;
+    if (storageApi?.saveBackup) {
+      const result = await storageApi.saveBackup(text, name).catch(() => ({ ok: false }));
+      if (result?.ok) toast(t("backupSaved", { file: result.file }));
+      else if (!result?.canceled) toast(t("backupFailed"));
+      return;
+    }
+    downloadJSON(text, name);
+    toast(t("backupDownloaded"));
+  }
+
+  let restoreCandidate = null;
+
+  function restoreFact(label, value) {
+    return [h("dt", { text: label }), h("dd", { text: value })];
+  }
+
+  function openRestorePreview(backup) {
+    restoreCandidate = backup;
+    const { info } = backup;
+    const made = info.date
+      ? formatDate(new Date(info.date), { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      : t("restoreUnknownDate");
+    els.restoreFacts.replaceChildren(
+      ...restoreFact(t("restoreMade"), made),
+      ...restoreFact(t("restoreFrom"), t(info.generation === 1 ? "restoreGen1" : "restoreGen2")),
+      ...restoreFact(t("restoreTasks"), String(info.tasks)),
+      ...restoreFact(t("restoreHabits"), String(info.habits)),
+      ...restoreFact(t("restoreNow"), t("restoreNowValue", { tasks: state.items.length, habits: state.habits.length })));
+    els.restoreNote.textContent = t(window.desktopStorage?.saveRestorePoint ? "restoreNoteDesktop" : "restoreNoteWeb");
+    els.restoreError.hidden = true;
+    els.restoreDialog.showModal();
+  }
+
+  function restoreFailed(message) {
+    els.restoreError.textContent = message;
+    els.restoreError.hidden = false;
+  }
+
+  els.exportData.addEventListener("click", exportBackup);
   els.importData.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", async () => {
     const file = els.importFile.files[0];
+    els.importFile.value = "";
     if (!file) return;
+    let text;
     try {
-      const parsed = JSON.parse(await file.text());
-      const data = parsed && typeof parsed.data === "object" ? parsed.data : parsed;
-      const keys = Object.keys(data || {}).filter(Store.isAppKey);
-      if (!keys.length) throw new Error("No Lowstate data found");
-      if (!window.confirm(t("confirmRestore"))) return;
-      Store.replaceAll(Object.fromEntries(keys.map((key) => [key, data[key]])));
-      location.reload();
+      text = await file.text();
     } catch {
       toast(t("restoreFailed"));
-    } finally {
-      els.importFile.value = "";
+      return;
     }
+    const backup = Store.readBackup(text);
+    if (!backup.ok) {
+      toast(t(`restoreErr-${backup.error}`, { key: (backup.key || "").replace(/^(type-todo\.(planner\.)?|quest-log\.)/, "").replace(/\.v\d+$/, "") }));
+      return;
+    }
+    openRestorePreview(backup);
+  });
+  els.restoreCancel.addEventListener("click", () => els.restoreDialog.close());
+  els.restoreDialog.addEventListener("close", () => {
+    restoreCandidate = null;
+  });
+  els.restoreForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!restoreCandidate) return;
+    Store.flush();
+    // A copy of what's here now, before anything is replaced.
+    if (window.desktopStorage?.saveRestorePoint) {
+      if (!Store.keepRestorePoint().ok) {
+        restoreFailed(t("restoreNoCopy"));
+        return;
+      }
+    } else {
+      downloadJSON(JSON.stringify(Store.backupPayload(), null, 2), `lowstate-before-restore-${todayISO()}.json`);
+    }
+    const result = Store.replaceAll(restoreCandidate.data);
+    if (!result.ok) {
+      restoreFailed(t("restoreNoRoom"));
+      return;
+    }
+    location.reload();
+  });
+
+  // ---------- save status ----------
+  // A calm but persistent note when data isn't being kept, with a retry and
+  // a way to take the data out. Local failures matter most: shown first.
+  function renderSaveStatus(status = Store.getStatus()) {
+    const local = status.local === "failed";
+    const disk = status.desktop === "failed";
+    els.saveAlert.hidden = !local && !disk;
+    if (els.saveAlert.hidden) return;
+    els.saveAlert.classList.toggle("is-local", local);
+    els.saveAlertTitle.textContent = t(local ? "saveLocalTitle" : "saveDiskTitle");
+    els.saveAlertBody.textContent = t(local ? "saveLocalBody" : "saveDiskBody");
+  }
+  Store.onStatus(renderSaveStatus);
+  els.saveRetry.addEventListener("click", () => {
+    const status = Store.retry();
+    toast(t(status.local === "failed" || status.desktop === "failed" ? "saveStillFailing" : "saveAllGood"));
+  });
+  els.saveExport.addEventListener("click", exportBackup);
+  // The disk copy waits a moment to group writes; leaving writes it now.
+  window.addEventListener("pagehide", () => Store.flush());
+  window.addEventListener("beforeunload", () => Store.flush());
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") Store.flush();
   });
 
   // ---------- toast ----------
@@ -3179,6 +3484,13 @@
     renderMoodPicker(anchorISO());
   });
 
+  wireCapturePreview(els.dayCaptureInput, els.dayCapturePreview, () => anchorISO());
+  wireCapturePreview(els.inboxInput, els.inboxCapturePreview, () => null);
+  els.focusHelpBtn.addEventListener("click", () => {
+    els.focusHelp.hidden = !els.focusHelp.hidden;
+    els.focusHelpBtn.setAttribute("aria-expanded", String(!els.focusHelp.hidden));
+  });
+
   els.dayCaptureForm.addEventListener("submit", (event) => {
     event.preventDefault();
     if (capture(els.dayCaptureInput.value, anchorISO())) els.dayCaptureInput.value = "";
@@ -3276,6 +3588,26 @@
     }
     else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
     else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
+  });
+
+  // ---------- moving a timeline block by keyboard ----------
+  // Alt+↑/↓ moves a task 15 minutes; Alt+Shift+↑/↓ changes its duration.
+  els.timeline.addEventListener("keydown", (event) => {
+    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+    const block = event.target.closest(".block.item[data-id]");
+    const item = findItem(block?.dataset.id);
+    if (!item?.start) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = event.key === "ArrowUp" ? -15 : 15;
+    const start = Planner.timeToMinutes(item.start);
+    const duration = item.duration || 60;
+    const next = event.shiftKey
+      ? { ...item, duration: Math.min(1440 - start, Math.max(15, duration + step)) }
+      : { ...item, start: Planner.minutesToTime(Math.min(1440 - Math.min(duration, 15), Math.max(0, start + step))) };
+    if (next.start === item.start && next.duration === item.duration) return;
+    updateItem(next);
+    toast(`${item.title} · ${timeRange(next)}`);
   });
 
   // ---------- resizing a timeline block ----------

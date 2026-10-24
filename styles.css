@@ -290,6 +290,8 @@ svg.i {
 .inbox .side-list { flex: 1 1 auto; }
 .overdue .side-list { max-height: 210px; }
 .side-list:empty { display: none; }
+.side-more { display: flex; padding: 4px 8px; list-style: none; }
+.side-more .link-btn { margin-left: 0; }
 .side-section.drop-target .side-list, .side-section.drop-target .side-empty { border-radius: 8px; outline: 1.5px dashed rgba(239, 232, 216, .4); outline-offset: 2px; }
 .side-empty { margin: 0; padding: 0 4px; color: var(--cover-muted); font-size: 11.5px; font-style: italic; line-height: 1.45; opacity: .85; }
 
@@ -1034,6 +1036,30 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 }
 .day-capture:hover { border-bottom-color: color-mix(in srgb, var(--ink) 30%, transparent); }
 .day-capture:focus-within { border-bottom-color: var(--ink-2); }
+/* What a capture line will become (or an example while it's empty). */
+.capture-preview { min-height: 15px; margin: 4px 4px 0; color: var(--ink-2); font: 500 10.5px/1.4 var(--mono); letter-spacing: .02em; }
+.capture-preview.is-example { color: var(--muted); font-style: italic; }
+.capture-preview:empty { visibility: hidden; }
+.capture-preview.on-cover { min-height: 0; margin: -2px 6px 0; color: var(--cover-muted); }
+.capture-preview.on-cover:empty { display: none; }
+.focus-help-btn {
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font: 600 10.5px/1 var(--mono);
+  vertical-align: 2px;
+  cursor: pointer;
+}
+.focus-help-btn:hover, .focus-help-btn[aria-expanded="true"] { border-color: var(--ink-2); color: var(--ink); }
+.focus-help { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0 2px; padding: 10px 12px; border: 1px dashed var(--rule); border-radius: 8px; font-size: 12.5px; line-height: 1.4; }
+.focus-help[hidden] { display: none; }
+.focus-help dt { color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; align-self: baseline; }
+.focus-help dd { margin: 0; color: var(--ink-2); }
 .day-capture-mark { color: var(--muted); font-size: 14px; }
 .day-capture input { flex: 1; min-width: 0; padding: 7px 0; border: 0; outline: none; background: transparent; font-size: 14px; }
 .day-capture input::placeholder { color: var(--muted); font-style: italic; }
@@ -1586,6 +1612,84 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 .closed-mark { color: var(--indigo); font-weight: 600; }
 .closed-good { font-style: italic; }
 .closed-line .focus-action { margin-left: auto; }
+/* ===== Day page modules (fold or put away) ===== */
+.module-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 0 0 -2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.module-toggle .chevron { width: 12px; height: 12px; flex: none; opacity: .55; transition: transform .15s; }
+.module-toggle:hover .chevron, .module-toggle:focus-visible .chevron { opacity: 1; }
+.is-collapsed .module-toggle .chevron { transform: rotate(-90deg); }
+.module-hide {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font: 400 15px/1 var(--sans);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .15s;
+}
+[data-module]:hover .module-hide, .module-hide:focus-visible { opacity: 1; }
+.module-hide:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.section-title .module-hide { margin-left: auto; }
+.section-title .water-sum + .module-hide { margin-left: 4px; }
+.load-head .module-hide { margin-left: 0; align-self: center; }
+.module-sum { display: none; color: var(--muted); letter-spacing: .04em; text-transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-collapsed .module-sum:not(:empty) { display: inline; margin-left: auto; }
+.is-collapsed .module-sum:not(:empty) + .module-hide { margin-left: 4px; }
+[data-module].is-collapsed > :not(.section-title):not(.load-head) { display: none; }
+.load.is-collapsed { padding-block: 6px; }
+.notes.is-collapsed { flex: none; min-height: 0; }
+[data-module].is-off { display: none !important; }
+.modules-hidden { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 14px 0 0; color: var(--muted); font-size: 12px; }
+.modules-hidden[hidden] { display: none; }
+.modules-hidden .link-btn { margin: 0; color: var(--ink-2); text-decoration-color: var(--rule); cursor: pointer; }
+
+/* ===== Save status & restore ===== */
+.save-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border: 1px solid color-mix(in srgb, var(--yamabuki) 55%, var(--rule));
+  border-left: 4px solid var(--yamabuki);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--yamabuki) 12%, var(--paper));
+  color: var(--ink);
+  font-size: 13px;
+}
+.save-alert.is-local { border-color: color-mix(in srgb, var(--vermilion) 45%, var(--rule)); border-left-color: var(--vermilion); background: color-mix(in srgb, var(--vermilion) 9%, var(--paper)); }
+.save-alert[hidden] { display: none; }
+.save-alert .i { flex: none; width: 18px; height: 18px; color: var(--vermilion); }
+.save-alert p { flex: 1; min-width: 0; margin: 0; line-height: 1.4; }
+.save-alert span { color: var(--ink-2); }
+.save-alert .btn { flex: none; }
+dialog.sheet.restore-sheet { width: min(440px, calc(100vw - 32px)); }
+.restore-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 13.5px; }
+.restore-facts dt { color: var(--muted); font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; align-self: center; }
+.restore-facts dd { margin: 0; }
+.restore-facts dt:last-of-type, .restore-facts dd:last-of-type { padding-top: 6px; border-top: 1px dashed var(--rule); }
+.restore-note { margin: 0; color: var(--ink-2); font-size: 12.5px; line-height: 1.45; }
+.restore-error { margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--vermilion) 12%, transparent); color: var(--ink); font-size: 13px; }
+.restore-error[hidden] { display: none; }
+
 /* ===== Meeting details ===== */
 [data-event] { cursor: pointer; }
 .event-card {
@@ -2085,7 +2189,9 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
 
 /* ===== Smaller windows ===== */
 @media (max-width: 1100px) {
-  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: minmax(0, auto); overflow-y: auto; gap: 14px; }
+  /* Stacked pages take their content's height (the spread scrolls), so the
+     timeline can't spill over the page below. */
+  .spread, .day-view .spread, .month-spread { grid-template-columns: minmax(0, 1fr); grid-auto-rows: max-content; overflow-y: auto; gap: 14px; }
   .timeline { flex: none; height: 60vh; }
   .month-grid { grid-auto-rows: minmax(90px, auto); }
   .page-left, .page-right { border-radius: 12px; }
@@ -2103,6 +2209,16 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
   .inbox .side-list { max-height: 240px; }
   .stage { padding: 14px; }
   .topbar { flex-wrap: wrap; }
+}
+
+/* Short windows (the desktop app goes down to 560 px): the sidebar keeps
+   its footer reachable and the lists scroll instead of running into it. */
+@media (max-height: 680px) {
+  .sidebar { gap: 12px; overflow-y: auto; }
+  .side-section.inbox { flex: none; }
+  .inbox .side-list { max-height: 140px; }
+  .overdue .side-list { max-height: 112px; }
+  .side-empty { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
