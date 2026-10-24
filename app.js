@@ -128,6 +128,10 @@
     dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
+    dayCapturePreview: $("dayCapturePreview"),
+    inboxCapturePreview: $("inboxCapturePreview"),
+    focusHelpBtn: $("focusHelpBtn"),
+    focusHelp: $("focusHelp"),
     modulesHidden: $("modulesHidden"),
     moodSum: $("moodSum"),
     notesSum: $("notesSum"),
@@ -520,19 +524,65 @@
   // Shared by the sidebar capture field and the per-day "+ Add" inputs.
   // fallbackStart is used when capturing on a timeline slot; a time typed in
   // the text still wins.
-  function capture(text, fallbackDate = null, fallbackStart = null) {
+  function captureFields(text, fallbackDate = null, fallbackStart = null) {
     const parsed = Planner.parseCapture(text);
     if (!parsed.title) return null;
     const start = parsed.start || fallbackStart;
     const date = parsed.date || fallbackDate || (start ? todayISO() : null);
-    return addItem({
+    return {
       title: parsed.title,
       date,
       start: date ? start : null,
       duration: date && start ? 60 : null,
       priority: parsed.priority,
-      category: resolveCategory(parsed.category),
-    });
+      category: parsed.category,
+    };
+  }
+
+  function capture(text, fallbackDate = null, fallbackStart = null) {
+    const fields = captureFields(text, fallbackDate, fallbackStart);
+    if (!fields) return null;
+    return addItem({ ...fields, category: resolveCategory(fields.category) });
+  }
+
+  // A quiet line under a capture field: an example while it's empty, then
+  // what the typed line will become — read by the same parser capture() uses.
+  function renderCapturePreview(input, preview, fallbackDate = null) {
+    const text = input.value;
+    if (!text.trim()) {
+      preview.textContent = document.activeElement === input ? t("captureExample") : "";
+      preview.classList.add("is-example");
+      return;
+    }
+    preview.classList.remove("is-example");
+    const fields = captureFields(text, fallbackDate);
+    if (!fields) {
+      preview.textContent = "";
+      return;
+    }
+    const parts = [];
+    if (!fields.date) parts.push(t("toSchedule"));
+    else {
+      const tomorrow = Core.toISODate(Planner.addDays(new Date(), 1));
+      parts.push(fields.date === todayISO() ? t("captureToday") : fields.date === tomorrow ? t("captureTomorrow")
+        : formatDate(Core.parseISODate(fields.date), { weekday: "short", day: "numeric", month: "short" }));
+      // The group comes from the same rule that files a new task (urgent → must).
+      parts.push(t(FOCUS_LABELS[Planner.normalizeItem({ title: fields.title, date: fields.date, priority: fields.priority }).focus]));
+    }
+    if (fields.start) parts.push(timeRange(fields));
+    if (fields.category) {
+      const wanted = Planner.slug(fields.category);
+      const existing = state.categories.find((category) => category.id === wanted || Planner.slug(category.name) === wanted);
+      parts.push(existing ? `#${existing.name}` : t("captureNewCategory", { name: `#${Planner.displayName(fields.category)}` }));
+    }
+    if (fields.priority === "urgent") parts.push(t("captureUrgent"));
+    preview.textContent = t("captureGoesTo", { list: parts.join(" · ") });
+  }
+
+  function wireCapturePreview(input, preview, fallbackDate) {
+    const update = () => renderCapturePreview(input, preview, fallbackDate());
+    ["input", "focus", "blur"].forEach((type) => input.addEventListener(type, update));
+    input.form?.addEventListener("submit", () => setTimeout(update, 0));
   }
 
   // ---------- rendering ----------
@@ -1218,6 +1268,7 @@
   }
 
   const FOCUS_LABELS = { must: "focusMust", could: "focusCould", later: "focusLater" };
+  const FOCUS_EXPLAIN = { must: "explainMust", could: "explainCould", later: "explainLater" };
 
   function renderDayTasks(iso, items) {
     els.dayTasks.dataset.date = iso;
@@ -1227,7 +1278,7 @@
       const movable = focus === "later" && group.some((item) => !item.done);
       return h("section", { class: `focus-group focus-${focus}`, "data-focus": focus },
         h("h3", { class: "focus-head" },
-          h("span", { text: t(FOCUS_LABELS[focus]) }),
+          h("span", { text: t(FOCUS_LABELS[focus]), title: t(FOCUS_EXPLAIN[focus]) }),
           group.length ? h("span", { class: "focus-count", text: String(group.length) }) : null,
           h("button", { type: "button", class: "focus-add", "data-focus-add": focus, title: t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), "aria-label": t("addToGroup", { group: t(FOCUS_LABELS[focus]) }), text: "+" }),
           movable ? h("button", { type: "button", class: "focus-action", "data-later-tomorrow": iso, text: t("allToTomorrow") }) : null),
@@ -3431,6 +3482,13 @@
       persistMoodNotes();
     }
     renderMoodPicker(anchorISO());
+  });
+
+  wireCapturePreview(els.dayCaptureInput, els.dayCapturePreview, () => anchorISO());
+  wireCapturePreview(els.inboxInput, els.inboxCapturePreview, () => null);
+  els.focusHelpBtn.addEventListener("click", () => {
+    els.focusHelp.hidden = !els.focusHelp.hidden;
+    els.focusHelpBtn.setAttribute("aria-expanded", String(!els.focusHelp.hidden));
   });
 
   els.dayCaptureForm.addEventListener("submit", (event) => {

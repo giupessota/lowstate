@@ -1036,6 +1036,30 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 }
 .day-capture:hover { border-bottom-color: color-mix(in srgb, var(--ink) 30%, transparent); }
 .day-capture:focus-within { border-bottom-color: var(--ink-2); }
+/* What a capture line will become (or an example while it's empty). */
+.capture-preview { min-height: 15px; margin: 4px 4px 0; color: var(--ink-2); font: 500 10.5px/1.4 var(--mono); letter-spacing: .02em; }
+.capture-preview.is-example { color: var(--muted); font-style: italic; }
+.capture-preview:empty { visibility: hidden; }
+.capture-preview.on-cover { min-height: 0; margin: -2px 6px 0; color: var(--cover-muted); }
+.capture-preview.on-cover:empty { display: none; }
+.focus-help-btn {
+  width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0;
+  border: 1px solid var(--rule);
+  border-radius: 50%;
+  background: none;
+  color: var(--muted);
+  font: 600 10.5px/1 var(--mono);
+  vertical-align: 2px;
+  cursor: pointer;
+}
+.focus-help-btn:hover, .focus-help-btn[aria-expanded="true"] { border-color: var(--ink-2); color: var(--ink); }
+.focus-help { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; margin: 10px 0 2px; padding: 10px 12px; border: 1px dashed var(--rule); border-radius: 8px; font-size: 12.5px; line-height: 1.4; }
+.focus-help[hidden] { display: none; }
+.focus-help dt { color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; align-self: baseline; }
+.focus-help dd { margin: 0; color: var(--ink-2); }
 .day-capture-mark { color: var(--muted); font-size: 14px; }
 .day-capture input { flex: 1; min-width: 0; padding: 7px 0; border: 0; outline: none; background: transparent; font-size: 14px; }
 .day-capture input::placeholder { color: var(--muted); font-style: italic; }

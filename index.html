@@ -64,13 +64,14 @@
 
         <section class="side-section inbox" id="inboxSection">
           <div class="side-head">
-            <h2 data-i18n="toSchedule">To schedule</h2>
+            <h2 data-i18n="toSchedule" data-i18n-title="explainInbox">To schedule</h2>
             <span class="count" id="inboxCount"></span>
           </div>
           <form class="capture" id="inboxForm">
             <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
-            <input id="inboxInput" autocomplete="off" maxlength="200" data-i18n-placeholder="inboxPlaceholder" data-i18n-aria="newTask" data-i18n-title="inboxHint" />
+            <input id="inboxInput" autocomplete="off" maxlength="200" data-i18n-placeholder="inboxPlaceholder" data-i18n-aria="newTask" data-i18n-title="inboxHint" aria-describedby="inboxCapturePreview" />
           </form>
+          <p class="capture-preview on-cover" id="inboxCapturePreview" aria-live="polite"></p>
           <ul class="side-list" id="inboxList"></ul>
           <p class="side-empty" id="inboxEmpty" data-i18n="inboxEmpty"></p>
         </section>
@@ -142,6 +143,7 @@
               <header class="page-head">
                 <div class="week-mark">
                   <strong data-i18n="todayTasks">For this day</strong>
+                  <button type="button" class="focus-help-btn" id="focusHelpBtn" aria-expanded="false" aria-controls="focusHelp" data-i18n-aria="focusHelp" data-i18n-title="focusHelp">?</button>
                 </div>
                 <span class="day-head-side">
                   <span class="range-mark" id="dayProgress"></span>
@@ -151,12 +153,19 @@
                   </button>
                 </span>
               </header>
+              <dl class="focus-help" id="focusHelp" hidden>
+                <dt data-i18n="focusMust">Must do</dt><dd data-i18n="explainMust"></dd>
+                <dt data-i18n="focusCould">Could do</dt><dd data-i18n="explainCould"></dd>
+                <dt data-i18n="focusLater">Not today</dt><dd data-i18n="explainLater"></dd>
+                <dt data-i18n="toSchedule">To schedule</dt><dd data-i18n="explainInbox"></dd>
+              </dl>
               <p class="closed-line" id="closedLine" hidden></p>
               <section class="load" id="loadMeter" data-module="load" data-i18n-aria="load"></section>
               <form class="day-capture" id="dayCaptureForm">
                 <span class="day-capture-mark" aria-hidden="true">✎</span>
-                <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" data-i18n-title="dayCaptureHint" />
+                <input id="dayCaptureInput" maxlength="200" autocomplete="off" data-i18n-placeholder="dayCapturePlaceholder" data-i18n-aria="newTask" data-i18n-title="dayCaptureHint" aria-describedby="dayCapturePreview" />
               </form>
+              <p class="capture-preview" id="dayCapturePreview" aria-live="polite"></p>
               <div class="day-tasks focus-groups" id="dayTasks"></div>
               <section class="water" data-module="water">
                 <h2 class="section-title"><button type="button" class="module-toggle" data-module-toggle="water" aria-expanded="true"><svg class="i chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg><span data-i18n="water">Water</span></button><span class="water-sum" id="waterSum"></span><button type="button" class="module-hide" data-module-hide="water" data-i18n-aria="moduleHide-water" data-i18n-title="moduleHide-water">×</button></h2>

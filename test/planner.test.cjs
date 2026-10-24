@@ -707,3 +707,17 @@ test("default categories are localized but keep stable ids", () => {
   assert.deepEqual(P.defaultCategories("pt").map((category) => category.id), ["work", "personal", "health", "study"]);
   assert.equal(P.defaultCategories("pt")[2].name, "Saúde");
 });
+
+test("the capture examples shown in the app are what the parser understands", () => {
+  require("../i18n.js");
+  const { messages } = globalThis.LowstateI18n;
+  const now = new Date(2026, 9, 23, 9);
+  for (const language of ["en", "pt"]) {
+    const example = messages[language].captureExample.replace(/^(e\.g\.|ex\.:)\s*/, "");
+    const parsed = P.parseCapture(example, now);
+    assert.deepEqual(
+      [parsed.date, parsed.start, parsed.priority, Boolean(parsed.category), parsed.title],
+      ["2026-10-24", "14:00", "urgent", true, language === "en" ? "Dentist" : "Dentista"],
+      language);
+  }
+});
