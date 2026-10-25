@@ -79,9 +79,17 @@ switches to the week or the month when you want the bigger picture.
 
 **Same data on your computers** (desktop app)
 
-- Settings → General → *Same data on your computers*: pick a folder that a
-  cloud app keeps in step — Google Drive for desktop ("My Drive"), iCloud
-  Drive or OneDrive — on each computer. No account in Lowstate, no server.
+- Settings → General → *Same data on your computers*, either way:
+  - **Sign in with Google** (nothing to install — for a work computer):
+    Lowstate keeps its files in your Drive's hidden app folder
+    (`drive.appdata`, it can't see your other files). It needs a Google
+    Cloud project of yours, once: enable the Drive API, publish the OAuth
+    app (so the sign-in doesn't expire after 7 days), create a "Desktop
+    app" client and load its JSON in Lowstate. The client and the sign-in
+    are kept encrypted with the OS keychain, and requests use the system's
+    network settings (proxies included).
+  - **A folder** a cloud app keeps in step — Google Drive for desktop ("My
+    Drive"), iCloud Drive or OneDrive.
 - Each computer writes only its own file in `<folder>/Lowstate/devices/`
   and reads the others', so two computers never write the same file. Each
   key keeps when it last changed; the newest change wins. The first time a

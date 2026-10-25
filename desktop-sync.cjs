@@ -159,10 +159,11 @@ function readOthers(folder, device) {
   return names
     .filter((name) => name.endsWith(".json") && !name.startsWith(`${device}.`) && !name.startsWith(`${device} `))
     .map((name) => readJSONFile(path.join(syncDir(folder), name)))
-    .filter((file) => file && file.app === "lowstate" && file.version <= SYNC_VERSION && file.device && file.device !== device && isPlainObject(file.keys));
+    .filter((file) => isDeviceFile(file, device));
 }
 
-function writeOwn(folder, { device, name, platform, data, meta, now = Date.now() }) {
+// This computer's file: every synced key with its value and change time.
+function ownFile({ device, name, platform, data, meta, now = Date.now() }) {
   const keys = {};
   Object.entries(meta).forEach(([key, entry]) => {
     if (!isSyncedKey(key)) return;
@@ -171,9 +172,31 @@ function writeOwn(folder, { device, name, platform, data, meta, now = Date.now()
   Object.keys(data).forEach((key) => {
     if (isSyncedKey(key) && !keys[key]) keys[key] = { value: data[key], at: 0, by: device };
   });
-  writeJSONFile(path.join(syncDir(folder), `${device}.json`), {
-    app: "lowstate", version: SYNC_VERSION, device, name, platform, savedAt: now, keys,
-  });
+  return { app: "lowstate", version: SYNC_VERSION, device, name, platform, savedAt: now, keys };
+}
+
+const isDeviceFile = (file, device) => Boolean(file && file.app === "lowstate" && file.version <= SYNC_VERSION
+  && file.device && file.device !== device && isPlainObject(file.keys));
+
+function writeOwn(folder, details) {
+  writeJSONFile(path.join(syncDir(folder), `${details.device}.json`), ownFile(details));
+}
+
+// Where the files go: a folder a cloud app keeps in step. Other transports
+// (Google Drive through its API) have the same shape.
+function folderTransport(folder) {
+  return {
+    kind: "folder",
+    label: folder,
+    async readOthers(device) {
+      const others = readOthers(folder, device);
+      if (others === null && !fs.existsSync(folder)) throw Object.assign(new Error("unavailable"), { code: "unavailable" });
+      return others || [];
+    },
+    async writeOwn(file) {
+      writeJSONFile(path.join(syncDir(folder), `${file.device}.json`), file);
+    },
+  };
 }
 
 // Usual places of Google Drive for desktop, to offer as the folder.
@@ -210,45 +233,59 @@ function suggestFolders({ home, platform, exists = fs.existsSync, list = (dir) =
 // ---------- the sync engine used by the desktop app ----------
 //
 // `loadData`/`saveData` read and write the local snapshot's data; config and
-// change times live in two small files next to it.
-function createSync({ configFile, metaFile, loadData, saveData, restorePoint, hostname, platform, now = () => Date.now() }) {
+// change times live in two small files next to it. `transportFor(target)`
+// gives the place the files are exchanged with: { kind: "folder", folder }
+// or another kind the app provides (Google Drive).
+function createSync({ configFile, metaFile, loadData, saveData, restorePoint, hostname, platform, transportFor = defaultTransport, now = () => Date.now() }) {
   let config = readJSONFile(configFile) || {};
-  if (!config.device) {
-    config = { ...config, device: `d${now().toString(36)}${Math.random().toString(36).slice(2, 8)}` };
-    writeJSONFile(configFile, config);
-  }
+  // 2.5 kept only `folder`.
+  if (config.folder && !config.target) config = { ...config, target: { kind: "folder", folder: config.folder } };
+  if (!config.device) config = { ...config, device: `d${now().toString(36)}${Math.random().toString(36).slice(2, 8)}` };
+  writeJSONFile(configFile, config);
   let meta = readJSONFile(metaFile) || {};
   let last = loadData() || {};
-  let status = { state: config.folder ? "idle" : "off", lastSync: config.lastSync || null, error: null, others: [] };
+  let status = { state: config.target ? "idle" : "off", lastSync: config.lastSync || null, error: null, others: [] };
+  let running = Promise.resolve();
 
   const saveConfig = () => writeJSONFile(configFile, config);
   const saveMeta = () => writeJSONFile(metaFile, meta);
   const deviceName = () => config.name || hostname;
+  const transport = () => (config.target ? transportFor(config.target) : null);
 
   function info() {
-    return { folder: config.folder || null, device: config.device, name: deviceName(), ...status };
+    const target = config.target || null;
+    return {
+      target: target ? { kind: target.kind, label: target.kind === "folder" ? target.folder : target.label || null } : null,
+      folder: target?.kind === "folder" ? target.folder : null,
+      device: config.device,
+      name: deviceName(),
+      ...status,
+    };
   }
 
-  // Exchanges with the folder: takes in newer changes, writes this computer's
-  // file. Returns { incoming } (empty when nothing changed here).
-  function sync({ join = false } = {}) {
-    if (!config.folder) return { incoming: {} };
-    const others = readOthers(config.folder, config.device);
-    if (others === null && !fs.existsSync(config.folder)) {
-      status = { ...status, state: "unavailable", error: "unavailable" };
+  // Exchanges with the target: takes in newer changes, writes this
+  // computer's file. Resolves to { incoming } (empty when nothing changed).
+  async function exchange({ join = false } = {}) {
+    const place = transport();
+    if (!place) return { incoming: {} };
+    let others;
+    try {
+      others = await place.readOthers(config.device);
+    } catch (error) {
+      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "unavailable" };
       return { incoming: {} };
     }
     const firstTime = join || !config.joined;
-    if (firstTime && others?.length && restorePoint) restorePoint(last);
-    const result = combine({ data: last, meta }, others || [], { join: firstTime, device: config.device, now: now() });
+    if (firstTime && others.length && restorePoint) restorePoint(last);
+    const result = combine({ data: last, meta }, others, { join: firstTime, device: config.device, now: now() });
     if (Object.keys(result.incoming).length) saveData(result.data);
     last = result.data;
     meta = result.meta;
     saveMeta();
     try {
-      writeOwn(config.folder, { device: config.device, name: deviceName(), platform, data: last, meta, now: now() });
-    } catch {
-      status = { ...status, state: "unavailable", error: "write" };
+      await place.writeOwn(ownFile({ device: config.device, name: deviceName(), platform, data: last, meta, now: now() }));
+    } catch (error) {
+      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "write" };
       return { incoming: result.incoming };
     }
     config = { ...config, joined: true, lastSync: now() };
@@ -257,14 +294,22 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
       state: "idle",
       lastSync: config.lastSync,
       error: null,
-      others: (others || []).map((other) => ({ device: other.device, name: other.name || other.device, platform: other.platform || "", savedAt: other.savedAt || null })),
+      others: others.map((other) => ({ device: other.device, name: other.name || other.device, platform: other.platform || "", savedAt: other.savedAt || null })),
     };
     return { incoming: result.incoming };
   }
 
+  // One exchange at a time (a timer and a window focus can ask together).
+  function sync(options) {
+    const next = running.then(() => exchange(options));
+    running = next.catch(() => {});
+    return next;
+  }
+
   return {
     info,
-    get folder() { return config.folder || null; },
+    get active() { return Boolean(config.target); },
+    get folder() { return config.target?.kind === "folder" ? config.target.folder : null; },
     // Called after every local snapshot save.
     noteLocal(data) {
       meta = trackChanges(last, data, meta, config.device, now());
@@ -272,18 +317,25 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
       saveMeta();
     },
     sync,
-    connect(folder) {
-      config = { ...config, folder, joined: false };
+    connect(target) {
+      const next = typeof target === "string" ? { kind: "folder", folder: target } : target;
+      const { folder: _old, ...rest } = config;
+      config = { ...rest, target: next, joined: false };
       saveConfig();
       return sync({ join: true });
     },
     disconnect() {
-      const { folder: _folder, joined: _joined, ...rest } = config;
+      const { folder: _folder, target: _target, joined: _joined, ...rest } = config;
       config = rest;
       saveConfig();
       status = { state: "off", lastSync: null, error: null, others: [] };
     },
   };
+}
+
+function defaultTransport(target) {
+  if (target?.kind === "folder") return folderTransport(target.folder);
+  throw new Error(`No transport for ${target?.kind}`);
 }
 
 module.exports = {
@@ -295,6 +347,9 @@ module.exports = {
   combine,
   readOthers,
   writeOwn,
+  ownFile,
+  isDeviceFile,
+  folderTransport,
   suggestFolders,
   createSync,
 };

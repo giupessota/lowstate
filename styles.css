@@ -1733,6 +1733,13 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 .sync-label { color: var(--muted); font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; align-self: center; }
 .sync-warn { margin: 0; padding: 6px 9px; border-radius: 7px; background: color-mix(in srgb, var(--yamabuki) 16%, transparent); font-size: 12.5px; }
 .sync-box .field-hint { margin: 0; }
+.sync-way { margin: 6px 0 0; color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.sync-way:first-child { margin-top: 0; }
+.sync-google { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px dashed var(--rule); border-radius: 8px; }
+.sync-steps summary { color: var(--ink-2); font-size: 12.5px; cursor: pointer; }
+.sync-steps ol { margin: 6px 0 4px; padding-left: 20px; color: var(--ink-2); font-size: 12.5px; line-height: 1.5; }
+.sync-steps li + li { margin-top: 3px; }
+.sync-console { margin: 0 0 4px; color: var(--ink-2); text-decoration-color: var(--rule); cursor: pointer; }
 dialog.sheet.restore-sheet { width: min(440px, calc(100vw - 32px)); }
 .restore-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 13.5px; }
 .restore-facts dt { color: var(--muted); font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; align-self: center; }
