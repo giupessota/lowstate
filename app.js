@@ -2787,35 +2787,71 @@
     return h("p", { class: "sync-fact" }, h("span", { class: "sync-label", text: label }), h("span", { text: value }));
   }
 
+  let googleWaiting = false;
+  const GOOGLE_CONSOLE = "https://console.cloud.google.com/";
+
+  function googleBlock(info) {
+    const google = info.google || {};
+    if (googleWaiting) {
+      return h("div", { class: "sync-google" },
+        h("p", { class: "field-hint", text: t("syncGoogleWaiting") }),
+        h("div", { class: "btn-row" }, h("button", { type: "button", class: "btn ghost", "data-sync-google-cancel": "", text: t("cancel") })));
+    }
+    if (google.configured) {
+      return h("div", { class: "sync-google" },
+        h("div", { class: "btn-row" },
+          h("button", { type: "button", class: "btn primary", "data-sync-google-login": "", text: t("syncGoogleLogin") }),
+          h("button", { type: "button", class: "btn ghost", "data-sync-google-client": "", text: t("syncGoogleOtherFile") })));
+    }
+    return h("div", { class: "sync-google" },
+      h("p", { class: "field-hint", text: t("syncGoogleIntro") }),
+      h("details", { class: "sync-steps" },
+        h("summary", { text: t("syncGoogleHow") }),
+        h("ol", {}, ...t("syncGoogleSteps").split("|").map((step) => h("li", { text: step }))),
+        h("button", { type: "button", class: "link-btn sync-console", "data-sync-console": "", text: "console.cloud.google.com ↗" })),
+      h("div", { class: "btn-row" }, h("button", { type: "button", class: "btn", "data-sync-google-client": "", text: t("syncGoogleFile") })));
+  }
+
   function renderSync() {
     els.syncRow.hidden = !syncApi;
     if (!syncApi || !syncInfo) return;
     const info = syncInfo;
-    if (!info.folder) {
+    if (!info.target) {
       const suggestions = info.suggestions || [];
       // replaceChildren (unlike h) would print a null child as "null".
       els.syncBox.replaceChildren(...[
+        h("p", { class: "sync-way", text: t("syncWayGoogle") }),
+        googleBlock(info),
+        h("p", { class: "sync-way", text: t("syncWayFolder") }),
         suggestions.length ? null : h("p", { class: "field-hint", text: t("syncNoDrive") }),
         h("div", { class: "btn-row" },
-          ...suggestions.map((entry) => h("button", { type: "button", class: "btn primary", "data-sync-use": entry.path, title: entry.path, text: t(SYNC_KINDS[entry.kind] || "syncChoose") })),
+          ...suggestions.map((entry) => h("button", { type: "button", class: "btn", "data-sync-use": entry.path, title: entry.path, text: t(SYNC_KINDS[entry.kind] || "syncChoose") })),
           h("button", { type: "button", class: "btn", "data-sync-choose": "", text: t(suggestions.length ? "syncChooseOther" : "syncChoose") })),
         h("p", { class: "field-hint", text: t("syncKept") }),
       ].filter(Boolean));
       return;
     }
     const others = info.others || [];
-    els.syncBox.replaceChildren(
-      syncFact(t("syncFolder"), info.folder),
-      info.state === "unavailable"
-        ? h("p", { class: "sync-warn", text: t("syncUnavailable") })
-        : syncFact(t("syncLast"), syncWhen(info.lastSync)),
+    const google = info.target.kind === "google";
+    els.syncBox.replaceChildren(...[
+      google
+        ? syncFact(t("syncWhere"), `Google Drive${info.google?.account ? ` · ${info.google.account}` : ""}`)
+        : syncFact(t("syncFolder"), info.folder),
+      info.state === "auth"
+        ? h("p", { class: "sync-warn", text: t("syncGoogleSignedOut") })
+        : info.state === "unavailable"
+          ? h("p", { class: "sync-warn", text: t(google ? "syncGoogleUnavailable" : "syncUnavailable") })
+          : syncFact(t("syncLast"), syncWhen(info.lastSync)),
       others.length
         ? syncFact(t("syncOthers"), others.map((other) => `${other.name}${other.platform ? ` (${platformName(other.platform)})` : ""} · ${syncWhen(other.savedAt)}`).join(", "))
-        : h("p", { class: "field-hint", text: t("syncNoOthers") }),
+        : h("p", { class: "field-hint", text: t(google ? "syncNoOthersGoogle" : "syncNoOthers") }),
       h("div", { class: "btn-row" },
-        h("button", { type: "button", class: "btn", "data-sync-now": "", text: t("syncNow") }),
+        info.state === "auth" && google
+          ? h("button", { type: "button", class: "btn primary", "data-sync-google-login": "", text: t("syncGoogleLogin") })
+          : h("button", { type: "button", class: "btn", "data-sync-now": "", text: t("syncNow") }),
         h("button", { type: "button", class: "btn ghost", "data-sync-stop": "", text: t("syncStop") })),
-      h("p", { class: "field-hint", text: t("syncKept") }));
+      h("p", { class: "field-hint", text: t("syncKept") }),
+    ].filter(Boolean));
   }
 
   async function syncCall(call) {
@@ -2825,6 +2861,7 @@
       // Keep the last known state.
     }
     renderSync();
+    return syncInfo;
   }
 
   if (syncApi) {
@@ -2853,7 +2890,28 @@
         syncConnecting = true;
         await syncCall(() => (use ? syncApi.use(use.dataset.syncUse) : syncApi.choose()));
         syncConnecting = false;
-        if (syncInfo?.folder) toast(t("syncConnected"));
+        if (syncInfo?.target) toast(t("syncConnected"));
+      } else if (event.target.closest("[data-sync-google-client]")) {
+        const info = await syncCall(() => syncApi.googleClient());
+        if (info?.error) toast(t(`syncGoogleErr-${info.error}`));
+        else if (!info?.canceled) toast(t("syncGoogleFileOk"));
+      } else if (event.target.closest("[data-sync-google-login]")) {
+        googleWaiting = true;
+        renderSync();
+        syncConnecting = true;
+        const info = await syncCall(() => syncApi.googleLogin({
+          doneTitle: t("syncGoogleDoneTitle"), doneText: t("syncGoogleDoneText"),
+          failTitle: t("syncGoogleFailTitle"), failText: t("syncGoogleFailText"),
+        }));
+        syncConnecting = false;
+        googleWaiting = false;
+        renderSync();
+        if (info?.error) toast(t(`syncGoogleErr-${info.error}`));
+        else if (info?.target) toast(t("syncConnected"));
+      } else if (event.target.closest("[data-sync-google-cancel]")) {
+        await syncApi.googleCancel();
+      } else if (event.target.closest("[data-sync-console]")) {
+        desktop?.openExternal?.(GOOGLE_CONSOLE);
       } else if (event.target.closest("[data-sync-now]")) {
         await syncCall(() => syncApi.now());
       } else if (event.target.closest("[data-sync-stop]")) {

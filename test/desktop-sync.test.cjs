@@ -71,7 +71,7 @@ function computer(folder, name, initial = {}) {
   };
 }
 
-test("two computers sharing a folder: first join keeps both sides, then changes travel", (t) => {
+test("two computers sharing a folder: first join keeps both sides, then changes travel", async (t) => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), "lowstate-drive-"));
   const win = computer(folder, "win", {
     [ITEMS]: JSON.stringify([{ id: "w1", title: "Relatório" }]),
@@ -87,13 +87,13 @@ test("two computers sharing a folder: first join keeps both sides, then changes 
   t.after(() => { win.cleanup(); mac.cleanup(); fs.rmSync(folder, { recursive: true, force: true }); });
 
   // Windows connects first: nothing to take in, its file is written.
-  assert.deepEqual(win.sync.connect(folder).incoming, {});
+  assert.deepEqual((await win.sync.connect(folder)).incoming, {});
   assert.equal(win.restorePoints.length, 0);
 
   // The Mac joins: both computers' tasks and notes are kept, a copy of the
   // Mac's data was saved first, and the shortcuts stay as they were.
   mac.tick(100);
-  const joined = mac.sync.connect(folder);
+  const joined = await mac.sync.connect(folder);
   assert.equal(mac.restorePoints.length, 1);
   assert.deepEqual(JSON.parse(mac.data[ITEMS]).map((item) => item.id).sort(), ["m1", "w1"]);
   assert.deepEqual(Object.keys(JSON.parse(mac.data[NOTES])).sort(), ["2026-10-20", "2026-10-21"]);
@@ -104,7 +104,7 @@ test("two computers sharing a folder: first join keeps both sides, then changes 
 
   // Windows picks up the combined data.
   win.tick(200);
-  win.sync.sync();
+  await win.sync.sync();
   assert.deepEqual(JSON.parse(win.data[ITEMS]).map((item) => item.id).sort(), ["m1", "w1"]);
   assert.equal(win.data[SHORTCUTS], '{"capture":"Ctrl+Shift+N"}');
 
@@ -112,24 +112,24 @@ test("two computers sharing a folder: first join keeps both sides, then changes 
   // Windows reaches the Mac, and removing a key travels too.
   mac.tick(300);
   mac.edit({ [THEME]: "light" });
-  mac.sync.sync();
+  await mac.sync.sync();
   win.tick(400);
-  assert.deepEqual(win.sync.sync().incoming, { [THEME]: "light" });
+  assert.deepEqual((await win.sync.sync()).incoming, { [THEME]: "light" });
   win.edit({ [ITEMS]: JSON.stringify([{ id: "w1", title: "Relatório", done: true }]), [NOTES]: null });
-  win.sync.sync();
+  await win.sync.sync();
   mac.tick(500);
-  const back = mac.sync.sync().incoming;
+  const back = (await mac.sync.sync()).incoming;
   assert.deepEqual(Object.keys(back).sort(), [NOTES, ITEMS].sort());
   assert.equal(mac.data[NOTES], undefined);
   assert.equal(JSON.parse(mac.data[ITEMS])[0].done, true);
   // Nothing new: nothing comes in.
-  assert.deepEqual(mac.sync.sync().incoming, {});
+  assert.deepEqual((await mac.sync.sync()).incoming, {});
 });
 
-test("an unavailable folder is reported and nothing local changes", (t) => {
+test("an unavailable folder is reported and nothing local changes", async (t) => {
   const mac = computer("/nowhere", "mac", { [THEME]: "dark" });
   t.after(() => mac.cleanup());
-  mac.sync.connect(path.join(os.tmpdir(), "lowstate-missing-folder-xyz"));
+  await mac.sync.connect(path.join(os.tmpdir(), "lowstate-missing-folder-xyz"));
   assert.equal(mac.sync.info().state, "unavailable");
   assert.equal(mac.data[THEME], "dark");
   mac.sync.disconnect();
@@ -147,4 +147,23 @@ test("Google Drive folders are suggested on macOS and Windows", () => {
   assert.deepEqual(mac, [{ kind: "google", path: "/Users/g/Library/CloudStorage/GoogleDrive-g@gmail.com/Meu Drive" }]);
   const win = suggestFolders({ home: "C:\\Users\\g", platform: "win32", exists: (candidate) => candidate === "G:\\My Drive" });
   assert.deepEqual(win, [{ kind: "google", path: "G:\\My Drive" }]);
+});
+
+test("a 2.5 folder setting keeps working after the update", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lowstate-upgrade-"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "lowstate-upgrade-drive-"));
+  t.after(() => { fs.rmSync(dir, { recursive: true, force: true }); fs.rmSync(folder, { recursive: true, force: true }); });
+  fs.writeFileSync(path.join(dir, "sync.json"), JSON.stringify({ device: "dold", folder, joined: true }));
+  const sync = createSync({
+    configFile: path.join(dir, "sync.json"),
+    metaFile: path.join(dir, "sync-meta.json"),
+    loadData: () => ({ [THEME]: "dark" }),
+    saveData: () => {},
+    hostname: "pc",
+    platform: "win32",
+  });
+  assert.equal(sync.active, true);
+  assert.deepEqual(sync.info().target, { kind: "folder", label: folder });
+  await sync.sync();
+  assert.ok(fs.existsSync(path.join(folder, "Lowstate", "devices", "dold.json")));
 });

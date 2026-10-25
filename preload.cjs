@@ -14,6 +14,9 @@ contextBridge.exposeInMainWorld("desktopSync", {
   use: (folder) => ipcRenderer.invoke("sync-use", folder),
   now: () => ipcRenderer.invoke("sync-now"),
   stop: () => ipcRenderer.invoke("sync-stop"),
+  googleClient: () => ipcRenderer.invoke("sync-google-client"),
+  googleLogin: (pages) => ipcRenderer.invoke("sync-google-login", pages),
+  googleCancel: () => ipcRenderer.invoke("sync-google-cancel"),
   onIncoming: (cb) => ipcRenderer.on("sync-incoming", (_e, changes, info) => cb(changes, info)),
   onStatus: (cb) => ipcRenderer.on("sync-status", (_e, info) => cb(info)),
 });

@@ -1,6 +1,6 @@
 {
   "name": "lowstate-desktop",
-  "version": "2.5.1",
+  "version": "2.6.0",
   "private": true,
   "description": "Lowstate — lower your mental entropy. A calm weekly planner for Windows and macOS.",
   "author": "Giuliana Pessota",
@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test",
-    "check": "node --check app.js && node --check core.js && node --check planner.js && node --check storage.js && node --check desktop-storage.cjs && node --check desktop-lifecycle.cjs && node --check desktop-calendars.cjs && node --check desktop-sync.cjs && node --check i18n.js && node --check main.cjs && node --check preload.cjs && node --test",
+    "check": "node --check app.js && node --check core.js && node --check planner.js && node --check storage.js && node --check desktop-storage.cjs && node --check desktop-lifecycle.cjs && node --check desktop-calendars.cjs && node --check desktop-sync.cjs && node --check desktop-google.cjs && node --check i18n.js && node --check main.cjs && node --check preload.cjs && node --test",
     "dist:mac": "electron-builder --mac --publish=never",
     "dist:win": "electron-builder --win --publish=never"
   },
@@ -26,6 +26,7 @@
       "desktop-lifecycle.cjs",
       "desktop-calendars.cjs",
       "desktop-sync.cjs",
+      "desktop-google.cjs",
       "index.html",
       "styles.css",
       "storage.js",

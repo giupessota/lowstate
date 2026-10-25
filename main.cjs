@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
 const { execFile } = require("child_process");
 const fs = require("fs");
 const https = require("https");
@@ -7,7 +7,10 @@ const path = require("path");
 const { loadSnapshot, saveSnapshot, saveRestorePoint } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
 const { createCalendarStore, isMeetingUrl } = require("./desktop-calendars.cjs");
-const { createSync, suggestFolders } = require("./desktop-sync.cjs");
+const { createSync, folderTransport, suggestFolders } = require("./desktop-sync.cjs");
+const {
+  GoogleError, readClientFile, pkce, authUrl, waitForCode, exchangeCode, createGoogleAuth, createDriveClient, driveTransport,
+} = require("./desktop-google.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
@@ -116,7 +119,7 @@ ipcMain.on("storage-save", (event, data) => {
     const paths = desktopStoragePaths();
     const snapshot = saveSnapshot(paths.current, paths.backup, data);
     event.returnValue = { ok: true, savedAt: snapshot.savedAt };
-    if (syncEngine?.folder) {
+    if (syncEngine?.active) {
       syncEngine.noteLocal(snapshot.data);
       scheduleSync();
     }
@@ -126,14 +129,66 @@ ipcMain.on("storage-save", (event, data) => {
   }
 });
 
-// ---------- same data on several computers (a synced folder) ----------
+// ---------- same data on several computers ----------
+// Either a folder a cloud app keeps in step, or Google Drive through its API
+// (for computers where the Drive app can't be installed).
 let syncEngine = null;
 let syncOverwrite = [];
 let syncTimer = null;
+let googleTransportCache = null;
+let googleLogin = null;
 const SYNC_DELAY = 2000;
 const SYNC_INTERVAL = 30 * 1000;
+const STARTUP_SYNC_WAIT = 4000;
 
-function initSync() {
+const syncDirectory = () => path.dirname(desktopStoragePaths().current);
+const googleFile = () => path.join(syncDirectory(), "sync-google.json");
+const netFetch = (url, options) => net.fetch(url, options);
+
+// The OAuth client and refresh token, encrypted like the calendar links.
+function readGoogle() {
+  let raw = {};
+  try {
+    raw = JSON.parse(fs.readFileSync(googleFile(), "utf8")) || {};
+  } catch {
+    raw = {};
+  }
+  const open = (value, parse) => {
+    try {
+      return value ? (parse ? JSON.parse(decryptSecret(value)) : decryptSecret(value)) : null;
+    } catch {
+      return null;
+    }
+  };
+  return { client: open(raw.client, true), refreshToken: open(raw.token, false), account: raw.account || null };
+}
+
+function writeGoogle({ client, refreshToken, account }) {
+  const value = {
+    client: client ? encryptSecret(JSON.stringify(client)) : undefined,
+    token: refreshToken ? encryptSecret(refreshToken) : undefined,
+    account: account || undefined,
+  };
+  fs.mkdirSync(syncDirectory(), { recursive: true });
+  fs.writeFileSync(googleFile(), JSON.stringify(value), { mode: 0o600 });
+  googleTransportCache = null;
+}
+
+function googleTransport() {
+  if (googleTransportCache) return googleTransportCache;
+  const { client, refreshToken, account } = readGoogle();
+  if (!client || !refreshToken) {
+    const signedOut = async () => { throw new GoogleError("auth"); };
+    return { kind: "google", label: account, readOthers: signedOut, writeOwn: signedOut };
+  }
+  googleTransportCache = driveTransport({
+    drive: createDriveClient({ fetch: netFetch, auth: createGoogleAuth({ fetch: netFetch, client, refreshToken }) }),
+    label: account,
+  });
+  return googleTransportCache;
+}
+
+async function initSync() {
   const paths = desktopStoragePaths();
   const directory = path.dirname(paths.current);
   syncEngine = createSync({
@@ -144,29 +199,44 @@ function initSync() {
     restorePoint: (data) => saveRestorePoint(directory, data),
     hostname: os.hostname().replace(/\.local$/, ""),
     platform: process.platform,
+    transportFor: (target) => (target.kind === "google" ? googleTransport() : folderTransport(target.folder)),
   });
-  // Before the page loads, so it starts with the other computer's changes.
-  if (syncEngine.folder) syncOverwrite = Object.keys(syncSafely().incoming);
+  if (!syncEngine.active) return;
+  // Before the page loads, so it starts with the other computer's changes —
+  // but a slow network doesn't hold the window back: what arrives later is
+  // handed to the page once it's ready.
+  const startup = syncSafely();
+  const early = await Promise.race([startup, new Promise((resolve) => setTimeout(() => resolve(null), STARTUP_SYNC_WAIT))]);
+  if (early) {
+    syncOverwrite = Object.keys(early.incoming);
+    return;
+  }
+  startup.then(({ incoming }) => {
+    if (!Object.keys(incoming).length) return;
+    const send = () => window?.webContents.send("sync-incoming", incoming, syncEngine.info());
+    if (window?.webContents.isLoading()) window.webContents.once("did-finish-load", send);
+    else send();
+  });
 }
 
-function syncSafely(options) {
+async function syncSafely(options) {
   try {
-    return syncEngine.sync(options);
+    return await syncEngine.sync(options);
   } catch (error) {
     console.error("Sync failed:", error);
     return { incoming: {} };
   }
 }
 
-// Exchanges with the folder and hands anything new to the page.
-function runSync() {
+// Exchanges with the target and hands anything new to the page.
+async function runSync() {
   clearTimeout(syncTimer);
   syncTimer = null;
-  if (!syncEngine?.folder) return;
-  const { incoming } = syncSafely();
+  if (!syncEngine?.active) return;
+  const { incoming } = await syncSafely();
   if (!window) return;
   if (Object.keys(incoming).length) window.webContents.send("sync-incoming", incoming, syncEngine.info());
-  window.webContents.send("sync-status", syncEngine.info());
+  window.webContents.send("sync-status", syncPayload());
 }
 
 function scheduleSync() {
@@ -174,14 +244,16 @@ function scheduleSync() {
 }
 
 function syncPayload() {
+  const { client, refreshToken, account } = readGoogle();
   return {
     ...syncEngine.info(),
     suggestions: suggestFolders({ home: os.homedir(), platform: process.platform }),
+    google: { configured: Boolean(client), signedIn: Boolean(refreshToken), account },
   };
 }
 
-function connectSync(folder) {
-  const { incoming } = syncEngine.connect(folder);
+async function connectSync(target) {
+  const { incoming } = await syncEngine.connect(target);
   if (Object.keys(incoming).length) window?.webContents.send("sync-incoming", incoming, syncEngine.info());
   return syncPayload();
 }
@@ -194,18 +266,74 @@ ipcMain.handle("sync-choose", async () => {
     defaultPath: suggestion || os.homedir(),
   });
   if (choice.canceled || !choice.filePaths[0]) return syncPayload();
-  return connectSync(choice.filePaths[0]);
+  return connectSync({ kind: "folder", folder: choice.filePaths[0] });
 });
 ipcMain.handle("sync-use", (_event, folder) => {
   const allowed = suggestFolders({ home: os.homedir(), platform: process.platform }).map((entry) => entry.path);
-  return allowed.includes(folder) ? connectSync(folder) : syncPayload();
+  return allowed.includes(folder) ? connectSync({ kind: "folder", folder }) : syncPayload();
 });
-ipcMain.handle("sync-now", () => {
-  runSync();
+
+// The "client_secret_….json" downloaded from Google Cloud.
+ipcMain.handle("sync-google-client", async () => {
+  const choice = await dialog.showOpenDialog(window, {
+    properties: ["openFile"],
+    filters: [{ name: "JSON", extensions: ["json"] }],
+    defaultPath: app.getPath("downloads"),
+  });
+  if (choice.canceled || !choice.filePaths[0]) return { ...syncPayload(), canceled: true };
+  try {
+    const client = readClientFile(fs.readFileSync(choice.filePaths[0], "utf8"));
+    writeGoogle({ ...readGoogle(), client });
+    return syncPayload();
+  } catch (error) {
+    return { ...syncPayload(), error: error.code || "not-client" };
+  }
+});
+
+// Signs in in the default browser and connects to Drive.
+ipcMain.handle("sync-google-login", async (_event, pages) => {
+  const current = readGoogle();
+  if (!current.client) return { ...syncPayload(), error: "no-client" };
+  googleLogin?.cancel();
+  const { verifier, challenge, state } = pkce();
+  const login = waitForCode({ state, pages: pages && typeof pages === "object" ? pages : {} });
+  googleLogin = login;
+  try {
+    const redirectUri = await login.ready;
+    await shell.openExternal(authUrl({ clientId: current.client.clientId, redirectUri, challenge, state }));
+    const code = await login.code;
+    const tokens = await exchangeCode({ fetch: netFetch, client: current.client, code, verifier, redirectUri });
+    let account = null;
+    try {
+      const auth = createGoogleAuth({ fetch: netFetch, client: current.client, refreshToken: tokens.refreshToken });
+      account = await createDriveClient({ fetch: netFetch, auth }).account();
+    } catch {
+      // The address is only shown; syncing works without it.
+    }
+    writeGoogle({ client: current.client, refreshToken: tokens.refreshToken, account });
+    focusWindow();
+    return connectSync({ kind: "google", label: account });
+  } catch (error) {
+    focusWindow();
+    return { ...syncPayload(), error: error.code || "failed" };
+  } finally {
+    if (googleLogin === login) googleLogin = null;
+  }
+});
+ipcMain.handle("sync-google-cancel", () => {
+  googleLogin?.cancel();
+  return syncPayload();
+});
+
+ipcMain.handle("sync-now", async () => {
+  await runSync();
   return syncPayload();
 });
 ipcMain.handle("sync-stop", () => {
+  const wasGoogle = syncEngine.info().target?.kind === "google";
   syncEngine.disconnect();
+  // Stopping Google sync signs out here (the client file stays).
+  if (wasGoogle) writeGoogle({ client: readGoogle().client });
   return syncPayload();
 });
 
@@ -356,7 +484,7 @@ app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
   }
   await migrateLegacyProfile();
-  initSync();
+  await initSync();
   createWindow();
   setInterval(runSync, SYNC_INTERVAL);
   window.on("focus", runSync);
@@ -525,7 +653,7 @@ ipcMain.on("open-meeting", (_event, url) => {
   if (typeof url === "string" && isMeetingUrl(url)) shell.openExternal(url);
 });
 ipcMain.on("open-external", (_event, url) => {
-  if (typeof url === "string" && url.startsWith("https://github.com/")) shell.openExternal(url);
+  if (typeof url === "string" && (url.startsWith("https://github.com/") || url.startsWith("https://console.cloud.google.com/"))) shell.openExternal(url);
 });
 
 // The renderer owns the persisted shortcut preferences (localStorage); this
