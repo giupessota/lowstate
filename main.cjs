@@ -145,6 +145,20 @@ const syncDirectory = () => path.dirname(desktopStoragePaths().current);
 const googleFile = () => path.join(syncDirectory(), "sync-google.json");
 const netFetch = (url, options) => net.fetch(url, options);
 
+// The app's own Google client, when the build carries one (google-client.json,
+// written in CI from a secret); otherwise the person loads their file.
+let builtInClient;
+function builtInGoogleClient() {
+  if (builtInClient !== undefined) return builtInClient;
+  try {
+    const client = JSON.parse(fs.readFileSync(path.join(__dirname, "google-client.json"), "utf8"));
+    builtInClient = client?.clientId && client?.clientSecret ? client : null;
+  } catch {
+    builtInClient = null;
+  }
+  return builtInClient;
+}
+
 // The OAuth client and refresh token, encrypted like the calendar links.
 function readGoogle() {
   let raw = {};
@@ -160,12 +174,13 @@ function readGoogle() {
       return null;
     }
   };
-  return { client: open(raw.client, true), refreshToken: open(raw.token, false), account: raw.account || null };
+  return { client: open(raw.client, true) || builtInGoogleClient(), refreshToken: open(raw.token, false), account: raw.account || null };
 }
 
 function writeGoogle({ client, refreshToken, account }) {
   const value = {
-    client: client ? encryptSecret(JSON.stringify(client)) : undefined,
+    // The built-in client isn't copied into the file.
+    client: client && client !== builtInGoogleClient() ? encryptSecret(JSON.stringify(client)) : undefined,
     token: refreshToken ? encryptSecret(refreshToken) : undefined,
     account: account || undefined,
   };
@@ -248,7 +263,7 @@ function syncPayload() {
   return {
     ...syncEngine.info(),
     suggestions: suggestFolders({ home: os.homedir(), platform: process.platform }),
-    google: { configured: Boolean(client), signedIn: Boolean(refreshToken), account },
+    google: { configured: Boolean(client), builtIn: Boolean(builtInGoogleClient()), signedIn: Boolean(refreshToken), account },
   };
 }
 

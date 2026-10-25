@@ -2799,9 +2799,10 @@
     }
     if (google.configured) {
       return h("div", { class: "sync-google" },
+        google.builtIn ? h("p", { class: "field-hint", text: t("syncGoogleBuiltIn") }) : null,
         h("div", { class: "btn-row" },
           h("button", { type: "button", class: "btn primary", "data-sync-google-login": "", text: t("syncGoogleLogin") }),
-          h("button", { type: "button", class: "btn ghost", "data-sync-google-client": "", text: t("syncGoogleOtherFile") })));
+          google.builtIn ? null : h("button", { type: "button", class: "btn ghost", "data-sync-google-client": "", text: t("syncGoogleOtherFile") })));
     }
     return h("div", { class: "sync-google" },
       h("p", { class: "field-hint", text: t("syncGoogleIntro") }),

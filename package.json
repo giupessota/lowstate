@@ -27,6 +27,7 @@
       "desktop-calendars.cjs",
       "desktop-sync.cjs",
       "desktop-google.cjs",
+      "google-client.json",
       "index.html",
       "styles.css",
       "storage.js",
