@@ -77,6 +77,20 @@ switches to the week or the month when you want the bigger picture.
   Reminders (macOS asks for permission the first time); brain dump thoughts
   can be sorted into the list
 
+**Same data on your computers** (desktop app)
+
+- Settings → General → *Same data on your computers*: pick a folder that a
+  cloud app keeps in step — Google Drive for desktop ("My Drive"), iCloud
+  Drive or OneDrive — on each computer. No account in Lowstate, no server.
+- Each computer writes only its own file in `<folder>/Lowstate/devices/`
+  and reads the others', so two computers never write the same file. Each
+  key keeps when it last changed; the newest change wins. The first time a
+  computer joins, tasks, habits, notes and lists from both sides are added
+  together, and a `before-restore-…json` copy of its data is kept first.
+- Keyboard shortcuts, "always on top" and the calendars' secret links stay
+  on each computer. Changes from the other computer show up when you come
+  back to the window (or with *Update*, if you're using it).
+
 **Everything else**
 
 - Search everything you wrote (⌘K or `/`): tasks, day notes, brain dump,

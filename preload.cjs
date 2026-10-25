@@ -7,6 +7,17 @@ contextBridge.exposeInMainWorld("desktopStorage", {
   saveBackup: (text, name) => ipcRenderer.invoke("backup-save", text, name),
 });
 
+// Same data on several computers through a synced folder (Google Drive…).
+contextBridge.exposeInMainWorld("desktopSync", {
+  get: () => ipcRenderer.invoke("sync-get"),
+  choose: () => ipcRenderer.invoke("sync-choose"),
+  use: (folder) => ipcRenderer.invoke("sync-use", folder),
+  now: () => ipcRenderer.invoke("sync-now"),
+  stop: () => ipcRenderer.invoke("sync-stop"),
+  onIncoming: (cb) => ipcRenderer.on("sync-incoming", (_e, changes, info) => cb(changes, info)),
+  onStatus: (cb) => ipcRenderer.on("sync-status", (_e, info) => cb(info)),
+});
+
 contextBridge.exposeInMainWorld("desktopTheme", {
   setCover: (cover) => ipcRenderer.send("cover-changed", cover)
 });

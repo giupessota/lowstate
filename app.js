@@ -7,6 +7,7 @@
   const I18n = window.LowstateI18n;
   const desktop = window.desktopGadget || null;
   const calendarsApi = window.desktopCalendars || null;
+  const syncApi = window.desktopSync || null;
 
   const KEYS = {
     items: "type-todo.planner.items.v1",
@@ -142,6 +143,11 @@
     dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
+    syncRow: $("syncRow"),
+    syncBox: $("syncBox"),
+    syncAlert: $("syncAlert"),
+    syncAlertText: $("syncAlertText"),
+    syncReload: $("syncReload"),
     dayCapturePreview: $("dayCapturePreview"),
     inboxCapturePreview: $("inboxCapturePreview"),
     focusHelpBtn: $("focusHelpBtn"),
@@ -2408,6 +2414,7 @@
 
   function renderSettings() {
     renderDayModuleChips();
+    renderSync();
     const customSwatch = els.settingsDialog.querySelector(".swatch-custom");
     const customColor = Store.getRaw(KEYS.coverColor);
     if (customColor) customSwatch.style.setProperty("--chosen", customColor);
@@ -2762,6 +2769,99 @@
     }
     location.reload();
   });
+
+  // ---------- same data on several computers ----------
+  let syncInfo = null;
+  let syncConnecting = false;
+  const SYNC_KINDS = { google: "syncUseGoogle", icloud: "syncUseIcloud", onedrive: "syncUseOnedrive" };
+  const platformName = (platform) => (platform === "win32" ? "Windows" : platform === "darwin" ? "Mac" : platform || "");
+
+  function syncWhen(ms) {
+    if (!ms) return t("syncNever");
+    const date = new Date(ms);
+    const day = Core.toISODate(date) === todayISO() ? "" : `${formatDate(date, { day: "numeric", month: "short" })} `;
+    return `${day}${clockTime(date)}`;
+  }
+
+  function syncFact(label, value) {
+    return h("p", { class: "sync-fact" }, h("span", { class: "sync-label", text: label }), h("span", { text: value }));
+  }
+
+  function renderSync() {
+    els.syncRow.hidden = !syncApi;
+    if (!syncApi || !syncInfo) return;
+    const info = syncInfo;
+    if (!info.folder) {
+      const suggestions = info.suggestions || [];
+      // replaceChildren (unlike h) would print a null child as "null".
+      els.syncBox.replaceChildren(...[
+        suggestions.length ? null : h("p", { class: "field-hint", text: t("syncNoDrive") }),
+        h("div", { class: "btn-row" },
+          ...suggestions.map((entry) => h("button", { type: "button", class: "btn primary", "data-sync-use": entry.path, title: entry.path, text: t(SYNC_KINDS[entry.kind] || "syncChoose") })),
+          h("button", { type: "button", class: "btn", "data-sync-choose": "", text: t(suggestions.length ? "syncChooseOther" : "syncChoose") })),
+        h("p", { class: "field-hint", text: t("syncKept") }),
+      ].filter(Boolean));
+      return;
+    }
+    const others = info.others || [];
+    els.syncBox.replaceChildren(
+      syncFact(t("syncFolder"), info.folder),
+      info.state === "unavailable"
+        ? h("p", { class: "sync-warn", text: t("syncUnavailable") })
+        : syncFact(t("syncLast"), syncWhen(info.lastSync)),
+      others.length
+        ? syncFact(t("syncOthers"), others.map((other) => `${other.name}${other.platform ? ` (${platformName(other.platform)})` : ""} · ${syncWhen(other.savedAt)}`).join(", "))
+        : h("p", { class: "field-hint", text: t("syncNoOthers") }),
+      h("div", { class: "btn-row" },
+        h("button", { type: "button", class: "btn", "data-sync-now": "", text: t("syncNow") }),
+        h("button", { type: "button", class: "btn ghost", "data-sync-stop": "", text: t("syncStop") })),
+      h("p", { class: "field-hint", text: t("syncKept") }));
+  }
+
+  async function syncCall(call) {
+    try {
+      syncInfo = await call();
+    } catch {
+      // Keep the last known state.
+    }
+    renderSync();
+  }
+
+  if (syncApi) {
+    syncCall(() => syncApi.get());
+    syncApi.onStatus((info) => {
+      syncInfo = { ...syncInfo, ...info };
+      renderSync();
+    });
+    // Changes from another computer: in the page's store at once; the page
+    // reloads to show them — right away when nobody is looking at it,
+    // otherwise when the person chooses.
+    syncApi.onIncoming((changes, info) => {
+      Store.applyIncoming(changes);
+      const from = (info?.others || []).slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0]?.name;
+      if (syncConnecting || !document.hasFocus()) {
+        location.reload();
+        return;
+      }
+      els.syncAlertText.textContent = t("syncIncoming", { device: from || t("syncOtherComputer") });
+      els.syncAlert.hidden = false;
+    });
+    els.syncReload.addEventListener("click", () => location.reload());
+    els.syncBox.addEventListener("click", async (event) => {
+      const use = event.target.closest("[data-sync-use]");
+      if (use || event.target.closest("[data-sync-choose]")) {
+        syncConnecting = true;
+        await syncCall(() => (use ? syncApi.use(use.dataset.syncUse) : syncApi.choose()));
+        syncConnecting = false;
+        if (syncInfo?.folder) toast(t("syncConnected"));
+      } else if (event.target.closest("[data-sync-now]")) {
+        await syncCall(() => syncApi.now());
+      } else if (event.target.closest("[data-sync-stop]")) {
+        await syncCall(() => syncApi.stop());
+        toast(t("syncStopped"));
+      }
+    });
+  }
 
   // ---------- save status ----------
   // A calm but persistent note when data isn't being kept, with a retry and

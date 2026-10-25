@@ -2,10 +2,12 @@ const { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell, Menu, Notifi
 const { execFile } = require("child_process");
 const fs = require("fs");
 const https = require("https");
+const os = require("os");
 const path = require("path");
 const { loadSnapshot, saveSnapshot, saveRestorePoint } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
 const { createCalendarStore, isMeetingUrl } = require("./desktop-calendars.cjs");
+const { createSync, suggestFolders } = require("./desktop-sync.cjs");
 const iconPath = path.join(__dirname, "assets", "icon-512.png");
 
 let window;
@@ -75,7 +77,9 @@ function desktopStoragePaths() {
 // damaged or reset profile can be rebuilt on the next launch.
 ipcMain.on("storage-load", (event) => {
   const paths = desktopStoragePaths();
-  event.returnValue = loadSnapshot(paths.current, paths.backup);
+  // Keys that just came from another computer replace what the page has.
+  event.returnValue = { ...loadSnapshot(paths.current, paths.backup), overwrite: syncOverwrite };
+  syncOverwrite = [];
 });
 
 ipcMain.on("storage-restore-point", (event, data) => {
@@ -112,10 +116,97 @@ ipcMain.on("storage-save", (event, data) => {
     const paths = desktopStoragePaths();
     const snapshot = saveSnapshot(paths.current, paths.backup, data);
     event.returnValue = { ok: true, savedAt: snapshot.savedAt };
+    if (syncEngine?.folder) {
+      syncEngine.noteLocal(snapshot.data);
+      scheduleSync();
+    }
   } catch (error) {
     console.error("Could not persist Lowstate data snapshot:", error);
     event.returnValue = { ok: false };
   }
+});
+
+// ---------- same data on several computers (a synced folder) ----------
+let syncEngine = null;
+let syncOverwrite = [];
+let syncTimer = null;
+const SYNC_DELAY = 2000;
+const SYNC_INTERVAL = 30 * 1000;
+
+function initSync() {
+  const paths = desktopStoragePaths();
+  const directory = path.dirname(paths.current);
+  syncEngine = createSync({
+    configFile: path.join(directory, "sync.json"),
+    metaFile: path.join(directory, "sync-meta.json"),
+    loadData: () => loadSnapshot(paths.current, paths.backup).data,
+    saveData: (data) => saveSnapshot(paths.current, paths.backup, data),
+    restorePoint: (data) => saveRestorePoint(directory, data),
+    hostname: os.hostname().replace(/\.local$/, ""),
+    platform: process.platform,
+  });
+  // Before the page loads, so it starts with the other computer's changes.
+  if (syncEngine.folder) syncOverwrite = Object.keys(syncSafely().incoming);
+}
+
+function syncSafely(options) {
+  try {
+    return syncEngine.sync(options);
+  } catch (error) {
+    console.error("Sync failed:", error);
+    return { incoming: {} };
+  }
+}
+
+// Exchanges with the folder and hands anything new to the page.
+function runSync() {
+  clearTimeout(syncTimer);
+  syncTimer = null;
+  if (!syncEngine?.folder) return;
+  const { incoming } = syncSafely();
+  if (!window) return;
+  if (Object.keys(incoming).length) window.webContents.send("sync-incoming", incoming, syncEngine.info());
+  window.webContents.send("sync-status", syncEngine.info());
+}
+
+function scheduleSync() {
+  if (!syncTimer) syncTimer = setTimeout(runSync, SYNC_DELAY);
+}
+
+function syncPayload() {
+  return {
+    ...syncEngine.info(),
+    suggestions: suggestFolders({ home: os.homedir(), platform: process.platform }),
+  };
+}
+
+function connectSync(folder) {
+  const { incoming } = syncEngine.connect(folder);
+  if (Object.keys(incoming).length) window?.webContents.send("sync-incoming", incoming, syncEngine.info());
+  return syncPayload();
+}
+
+ipcMain.handle("sync-get", () => syncPayload());
+ipcMain.handle("sync-choose", async () => {
+  const suggestion = suggestFolders({ home: os.homedir(), platform: process.platform })[0]?.path;
+  const choice = await dialog.showOpenDialog(window, {
+    properties: ["openDirectory", "createDirectory"],
+    defaultPath: suggestion || os.homedir(),
+  });
+  if (choice.canceled || !choice.filePaths[0]) return syncPayload();
+  return connectSync(choice.filePaths[0]);
+});
+ipcMain.handle("sync-use", (_event, folder) => {
+  const allowed = suggestFolders({ home: os.homedir(), platform: process.platform }).map((entry) => entry.path);
+  return allowed.includes(folder) ? connectSync(folder) : syncPayload();
+});
+ipcMain.handle("sync-now", () => {
+  runSync();
+  return syncPayload();
+});
+ipcMain.handle("sync-stop", () => {
+  syncEngine.disconnect();
+  return syncPayload();
 });
 
 async function migrateLegacyProfile() {
@@ -265,7 +356,10 @@ app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
   }
   await migrateLegacyProfile();
+  initSync();
   createWindow();
+  setInterval(runSync, SYNC_INTERVAL);
+  window.on("focus", runSync);
   createTray();
   registerShortcuts(shortcuts);
   setTimeout(checkForUpdate, 2000);

@@ -258,3 +258,21 @@ test("restore: success replaces the data, writes the snapshot, and keeps a resto
   assert.equal(durable.loadArray("type-todo.planner.items.v1").length, 4);
   assert.deepEqual(storage.createStorage(new MemoryStorage(), null).keepRestorePoint(), { ok: false, error: "unsupported" });
 });
+
+test("synced changes: the disk copy's keys from another computer replace local ones on start", () => {
+  const local = new MemoryStorage({ "type-todo.theme.v1": "light", "type-todo.planner.notes.v1": "{}", "type-todo.planner.items.v1": "[]" });
+  const durable = storage.createStorage(local, {
+    loadSnapshot: () => ({
+      data: { "type-todo.theme.v1": "dark", "type-todo.planner.items.v1": "[]" },
+      overwrite: ["type-todo.theme.v1", "type-todo.planner.notes.v1"],
+    }),
+    saveSnapshot: () => ({ ok: true }),
+  }, manualTimers());
+  assert.equal(local.getItem("type-todo.theme.v1"), "dark");
+  assert.equal(local.getItem("type-todo.planner.notes.v1"), null);
+  // While running, incoming changes go straight into the page's store.
+  durable.applyIncoming({ "type-todo.theme.v1": "light", "type-todo.planner.goals.v1": '{"w":1}', foreign: "x" });
+  assert.equal(local.getItem("type-todo.theme.v1"), "light");
+  assert.equal(local.getItem("type-todo.planner.goals.v1"), '{"w":1}');
+  assert.equal(local.getItem("foreign"), null);
+});
