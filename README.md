@@ -126,6 +126,9 @@ switches to the week or the month when you want the bigger picture.
 
 ## Download
 
+Privacy policy: [giupessota.github.io/lowstate/privacy.html](https://giupessota.github.io/lowstate/privacy.html)
+
+
 - **Web app:** [giupessota.github.io/lowstate](https://giupessota.github.io/lowstate/) — open it and click **Install** in the browser's address bar.
 - **Windows / macOS installer:** [latest release](https://github.com/giupessota/lowstate/releases/latest)
 
