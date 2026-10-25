@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <title>Lowstate · Privacidade / Privacy</title>
+    <style>
+      :root { --paper: #f7f3ea; --ink: #2a2620; --ink-2: #5b554b; --rule: #ddd5c4; --accent: #34508a; }
+      @media (prefers-color-scheme: dark) { :root { --paper: #1d1c1a; --ink: #ece6da; --ink-2: #b3ab9c; --rule: #3a3731; --accent: #8ea5d8; } }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+      main { max-width: 720px; margin: 0 auto; padding: 48px 20px 64px; }
+      h1 { margin: 0 0 4px; font-size: 28px; }
+      h2 { margin: 36px 0 8px; font-size: 19px; }
+      p, li { color: var(--ink-2); }
+      a { color: var(--accent); }
+      .lang { display: flex; gap: 12px; margin: 0 0 28px; font-size: 14px; }
+      .updated { margin: 0 0 24px; font-size: 14px; }
+      hr { margin: 48px 0; border: 0; border-top: 1px dashed var(--rule); }
+      code { font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Lowstate</h1>
+      <nav class="lang"><a href="#pt">Português</a><a href="#en">English</a><a href="./">Abrir o app / Open the app</a></nav>
+
+      <section id="pt" lang="pt-BR">
+        <h2>Política de privacidade</h2>
+        <p class="updated">Atualizada em 25 de outubro de 2026.</p>
+        <p>O Lowstate é um planner pessoal que funciona no seu computador (app para macOS e Windows) ou no navegador. Ele não tem servidores próprios, não cria contas, não usa análise de uso nem publicidade e não vende nem compartilha dados com ninguém.</p>
+
+        <h2>Onde ficam os seus dados</h2>
+        <p>Tudo o que você escreve — tarefas, notas, hábitos, humor, água, lista de compras — fica guardado no seu próprio computador. No app desktop há também uma cópia de segurança num arquivo local. Backups que você exporta vão para onde você escolher.</p>
+
+        <h2>Google Drive (opcional)</h2>
+        <p>Se você ligar “Os mesmos dados nos seus computadores” e entrar com o Google, o Lowstate usa a Google Drive API apenas com a permissão <code>drive.appdata</code>. Ela dá acesso somente a uma pasta escondida, exclusiva do Lowstate, no seu Drive — o Lowstate <strong>não</strong> vê, lê nem altera os seus outros arquivos.</p>
+        <ul>
+          <li>Nessa pasta, cada computador guarda um arquivo com os dados do Lowstate, para que os seus computadores fiquem iguais.</li>
+          <li>Os dados vão direto do seu computador para a sua conta Google; não passam por nenhum servidor do Lowstate.</li>
+          <li>O acesso ao Google fica guardado no seu computador, criptografado pelo sistema (Keychain no macOS, DPAPI no Windows).</li>
+          <li>O uso de dados recebidos das APIs do Google segue a <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de Dados do Usuário dos Serviços de API do Google</a>, incluindo os requisitos de Uso Limitado.</li>
+        </ul>
+
+        <h2>Calendários e lembretes</h2>
+        <p>Os links de calendário que você cola (iCal) ficam só no computador, criptografados, e servem apenas para ler os seus eventos. O envio da lista de compras para o app Lembretes, no Mac, acontece só quando você pede.</p>
+
+        <h2>Como remover o acesso e apagar os dados</h2>
+        <ul>
+          <li>No Lowstate: Configurações → Geral → “Parar de sincronizar”.</li>
+          <li>No Google: <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> → Lowstate → remover acesso.</li>
+          <li>Para apagar a pasta escondida do Drive: drive.google.com → Configurações → Gerenciar apps → Lowstate → “Excluir dados ocultos do app”.</li>
+          <li>Os dados locais são apagados ao remover o app e a pasta “Lowstate Data”.</li>
+        </ul>
+
+        <h2>Contato</h2>
+        <p>Dúvidas: <a href="https://github.com/giupessota/lowstate/issues">github.com/giupessota/lowstate/issues</a>.</p>
+      </section>
+
+      <hr />
+
+      <section id="en" lang="en">
+        <h2>Privacy policy</h2>
+        <p class="updated">Updated October 25, 2026.</p>
+        <p>Lowstate is a personal planner that runs on your computer (macOS and Windows app) or in the browser. It has no servers of its own, creates no accounts, uses no analytics or advertising, and doesn't sell or share data with anyone.</p>
+
+        <h2>Where your data lives</h2>
+        <p>Everything you write — tasks, notes, habits, mood, water, shopping list — is stored on your own computer. The desktop app also keeps a safety copy in a local file. Backups you export go wherever you choose.</p>
+
+        <h2>Google Drive (optional)</h2>
+        <p>If you turn on “Same data on your computers” and sign in with Google, Lowstate uses the Google Drive API with the <code>drive.appdata</code> permission only. It gives access to a hidden folder in your Drive that only Lowstate can use — Lowstate does <strong>not</strong> see, read or change your other files.</p>
+        <ul>
+          <li>In that folder, each computer keeps one file with Lowstate's data, so your computers stay the same.</li>
+          <li>Data goes straight from your computer to your Google account; it never passes through a Lowstate server.</li>
+          <li>The Google sign-in is kept on your computer, encrypted by the operating system (Keychain on macOS, DPAPI on Windows).</li>
+          <li>Lowstate's use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API Services User Data Policy</a>, including the Limited Use requirements.</li>
+        </ul>
+
+        <h2>Calendars and reminders</h2>
+        <p>Calendar links you paste (iCal) stay on the computer, encrypted, and are only used to read your events. Sending the shopping list to Reminders on a Mac only happens when you ask.</p>
+
+        <h2>Removing access and deleting data</h2>
+        <ul>
+          <li>In Lowstate: Settings → General → “Stop syncing”.</li>
+          <li>At Google: <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a> → Lowstate → remove access.</li>
+          <li>To delete the hidden Drive folder: drive.google.com → Settings → Manage apps → Lowstate → “Delete hidden app data”.</li>
+          <li>Local data is deleted by removing the app and its “Lowstate Data” folder.</li>
+        </ul>
+
+        <h2>Contact</h2>
+        <p>Questions: <a href="https://github.com/giupessota/lowstate/issues">github.com/giupessota/lowstate/issues</a>.</p>
+      </section>
+    </main>
+  </body>
+</html>
