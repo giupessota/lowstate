@@ -178,28 +178,30 @@ function writeOwn(folder, { device, name, platform, data, meta, now = Date.now()
 
 // Usual places of Google Drive for desktop, to offer as the folder.
 function suggestFolders({ home, platform, exists = fs.existsSync, list = (dir) => fs.readdirSync(dir) }) {
+  // Paths in the style of the computer asked about, whichever one runs this.
+  const { join } = platform === "win32" ? path.win32 : path.posix;
   const found = [];
   const drives = ["My Drive", "Meu Drive", "Mi unidad"];
   if (platform === "darwin") {
-    const cloud = path.join(home, "Library", "CloudStorage");
+    const cloud = join(home, "Library", "CloudStorage");
     try {
       list(cloud).filter((entry) => entry.startsWith("GoogleDrive-")).forEach((entry) => {
         drives.forEach((drive) => {
-          const candidate = path.join(cloud, entry, drive);
+          const candidate = join(cloud, entry, drive);
           if (exists(candidate)) found.push({ kind: "google", path: candidate });
         });
       });
     } catch {
       // No CloudStorage folder: nothing installed.
     }
-    const icloud = path.join(home, "Library", "Mobile Documents", "com~apple~CloudDocs");
+    const icloud = join(home, "Library", "Mobile Documents", "com~apple~CloudDocs");
     if (exists(icloud)) found.push({ kind: "icloud", path: icloud });
   } else if (platform === "win32") {
     "DEFGHIJ".split("").forEach((letter) => drives.forEach((drive) => {
       const candidate = `${letter}:\\${drive}`;
       if (exists(candidate)) found.push({ kind: "google", path: candidate });
     }));
-    const oneDrive = path.join(home, "OneDrive");
+    const oneDrive = join(home, "OneDrive");
     if (exists(oneDrive)) found.push({ kind: "onedrive", path: oneDrive });
   }
   return found;
