@@ -23,6 +23,7 @@
     habitLog: "type-todo.planner.habitlog.v1",
     closures: "type-todo.planner.closures.v1",
     dump: "type-todo.planner.dump.v1",
+    shopping: "type-todo.planner.shopping.v1",
     dumpMigrated: "type-todo.planner.dump-migrated.v1",
     legacyBrain: "type-todo.brain-inbox.v1",
     migrated: "type-todo.planner.migrated.v1",
@@ -41,7 +42,7 @@
   const SVG_NS = "http://www.w3.org/2000/svg";
   const TAB_COLORS = ["--indigo", "--vermilion", "--matcha", "--yamabuki", "--fuji", "--asagi"];
   const DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 180, 240];
-  const VIEWS = ["day", "week", "month", "habits", "dump"];
+  const VIEWS = ["day", "week", "month", "habits", "dump", "shopping"];
 
   const $ = (id) => document.getElementById(id);
   const els = {
@@ -119,6 +120,19 @@
     habitDetail: $("habitDetail"),
     closeDayBtn: $("closeDayBtn"),
     dumpView: $("dumpView"),
+    shoppingView: $("shoppingView"),
+    shopCount: $("shopCount"),
+    shopProgress: $("shopProgress"),
+    shopClear: $("shopClear"),
+    shopForm: $("shopForm"),
+    shopInput: $("shopInput"),
+    shopGroups: $("shopGroups"),
+    shopEmpty: $("shopEmpty"),
+    shopAgain: $("shopAgain"),
+    shopAgainEmpty: $("shopAgainEmpty"),
+    shopCopy: $("shopCopy"),
+    shopReminders: $("shopReminders"),
+    shopSendHint: $("shopSendHint"),
     dumpCount: $("dumpCount"),
     dumpForm: $("dumpForm"),
     dumpInput: $("dumpInput"),
@@ -379,6 +393,7 @@
     closures: Store.loadObject(KEYS.closures),
     // Brain dump: thoughts waiting to be sorted, [{ id, text, createdAt }].
     dump: Store.loadArray(KEYS.dump).filter((note) => note && typeof note.text === "string" && note.text.trim()),
+    shopping: Planner.normalizeShopping(Store.loadObject(KEYS.shopping)),
     // Read-only events from subscribed calendars (desktop only).
     calendars: [],
     events: [],
@@ -403,6 +418,7 @@
   };
 
   const persistDump = () => Store.save(KEYS.dump, state.dump);
+  const persistShopping = () => Store.save(KEYS.shopping, state.shopping);
 
   // Unsorted notes from the 1.x Brain Inbox come over once (the old key is
   // left untouched).
@@ -796,10 +812,10 @@
     const view = state.view;
     els.rangeSub.textContent = "";
     els.weekProgress.hidden = true;
-    els.navControls.hidden = view === "dump";
+    els.navControls.hidden = view === "dump" || view === "shopping";
     const now = new Date();
-    if (view === "dump") {
-      els.rangeTitle.textContent = t("dumpTitle");
+    if (view === "dump" || view === "shopping") {
+      els.rangeTitle.textContent = t(view === "dump" ? "dumpTitle" : "shopTitle");
       return;
     }
 
@@ -1957,6 +1973,7 @@
 
   function renderSidebar() {
     els.dumpCount.textContent = state.dump.length || "";
+    els.shopCount.textContent = state.shopping.items.filter((item) => !item.done).length || "";
     const overdue = Planner.overdueItems(state.items, todayISO());
     els.overdueSection.hidden = overdue.length === 0;
     els.overdueCount.textContent = overdue.length || "";
@@ -2026,11 +2043,13 @@
     els.monthView.hidden = state.view !== "month";
     els.habitsView.hidden = state.view !== "habits";
     els.dumpView.hidden = state.view !== "dump";
+    els.shoppingView.hidden = state.view !== "shopping";
     renderTopbar();
     if (state.view === "day") renderDayView();
     else if (state.view === "week") renderSpread();
     else if (state.view === "month") renderMonthView();
     else if (state.view === "habits") renderHabitsView();
+    else if (state.view === "shopping") renderShopping();
     else renderDump();
     renderSidebar();
     renderSaveStatus();
@@ -2971,7 +2990,7 @@
       h("span", { class: "dump-when", text: shortDate(Core.toISODate(new Date(note.createdAt))) }),
       h("span", { class: "dump-text", text: note.text }),
       h("span", { class: "dump-actions" },
-        ...[["today", "dumpToday"], ["tomorrow", "dumpTomorrow"], ["inbox", "dumpInbox"], ["note", "dumpNote"]].map(([action, key]) => h("button", {
+        ...[["today", "dumpToday"], ["tomorrow", "dumpTomorrow"], ["inbox", "dumpInbox"], ["note", "dumpNote"], ["shop", "dumpShop"]].map(([action, key]) => h("button", {
           type: "button",
           class: "dump-action",
           "data-dump-action": action,
@@ -2985,6 +3004,130 @@
     setView("dump");
     els.dumpInput.focus();
   }
+
+  // ---------- shopping list ----------
+  function renderShopping() {
+    const { items } = state.shopping;
+    const done = items.filter((item) => item.done).length;
+    els.shopProgress.textContent = items.length ? t("shopInCart", { done, total: items.length }) : "";
+    els.shopClear.hidden = done === 0;
+    els.shopEmpty.hidden = items.length > 0;
+    els.shopGroups.replaceChildren(...Planner.shoppingGroups(state.shopping).map((group) => h("section", { class: "shop-group", "data-section": group.section },
+      h("h2", { class: "section-title", text: t(`shop-${group.section}`) }),
+      h("ul", { class: "shop-items" }, group.items.map((item) => h("li", { class: `shop-item${item.done ? " is-done" : ""}`, "data-shop": item.id },
+        checkButton(item.done, { "data-shop-toggle": item.id }),
+        h("span", { class: "shop-name" }, item.qty ? h("span", { class: "shop-qty", text: item.qty }) : null, item.name),
+        h("button", { type: "button", class: "shop-section", "data-shop-section": item.id, title: t("shopMove", { name: item.name }), "aria-label": t("shopMove", { name: item.name }), text: t(`shop-${item.section}`) }),
+        h("button", { type: "button", class: "module-hide shop-remove", "data-shop-remove": item.id, title: t("shopRemove", { name: item.name }), "aria-label": t("shopRemove", { name: item.name }), text: "×" })))))));
+
+    const again = Planner.frequentShopping(state.shopping);
+    els.shopAgainEmpty.hidden = again.length > 0;
+    els.shopAgain.replaceChildren(...again.map((entry) => h("span", { class: "shop-chip" },
+      h("button", { type: "button", class: "shop-chip-add", "data-shop-again": entry.name, text: `+ ${entry.name}` }),
+      h("button", { type: "button", class: "shop-chip-forget", "data-shop-forget": entry.key, title: t("shopForget", { name: entry.name }), "aria-label": t("shopForget", { name: entry.name }), text: "×" }))));
+
+    const reminders = Boolean(desktop?.sendToReminders);
+    els.shopReminders.hidden = !reminders;
+    els.shopSendHint.textContent = reminders ? t("shopRemindersHint", { list: t("shopRemindersList") }) : "";
+  }
+
+  function setShopping(next) {
+    state.shopping = next;
+    persistShopping();
+    renderShopping();
+    renderSidebar();
+  }
+
+  const pendingShopping = () => state.shopping.items.filter((item) => !item.done);
+  const shoppingLine = (item) => (item.qty ? `${item.qty} ${item.name}` : item.name);
+
+  els.shopForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!Planner.parseShoppingText(els.shopInput.value).length) return;
+    setShopping(Planner.addShopping(state.shopping, els.shopInput.value));
+    els.shopInput.value = "";
+    els.shopInput.focus();
+  });
+
+  // Aisle choices, in the same small menu as the habit states.
+  function openShopSectionMenu(button) {
+    closeStateMenu();
+    const item = state.shopping.items.find((candidate) => candidate.id === button.dataset.shopSection);
+    if (!item) return;
+    const menu = h("div", { class: "state-menu shop-menu", role: "menu" },
+      ...Planner.SHOPPING_SECTIONS.map((section) => h("button", {
+        type: "button",
+        role: "menuitemradio",
+        "aria-checked": String(item.section === section),
+        class: `state-option${item.section === section ? " active" : ""}`,
+        "data-shop-move": section,
+        "data-shop-id": item.id,
+      }, t(`shop-${section}`))));
+    document.body.append(menu);
+    const rect = button.getBoundingClientRect();
+    const below = rect.bottom + 6 + menu.offsetHeight < innerHeight;
+    menu.style.left = `${Math.min(Math.max(8, rect.left), innerWidth - menu.offsetWidth - 8)}px`;
+    menu.style.top = `${below ? rect.bottom + 6 : Math.max(8, rect.top - menu.offsetHeight - 6)}px`;
+    menu.querySelector(".state-option.active, .state-option")?.focus();
+  }
+
+  document.addEventListener("click", (event) => {
+    const move = event.target.closest("[data-shop-move]");
+    if (move) {
+      closeStateMenu();
+      setShopping(Planner.updateShoppingItem(state.shopping, move.dataset.shopId, { section: move.dataset.shopMove }));
+      return;
+    }
+    if (!event.target.closest("#shoppingView")) return;
+    const toggle = event.target.closest("[data-shop-toggle]");
+    const section = event.target.closest("[data-shop-section]");
+    const remove = event.target.closest("[data-shop-remove]");
+    const again = event.target.closest("[data-shop-again]");
+    const forget = event.target.closest("[data-shop-forget]");
+    if (toggle) setShopping(Planner.toggleShopping(state.shopping, toggle.dataset.shopToggle));
+    else if (section) openShopSectionMenu(section);
+    else if (remove) {
+      const before = state.shopping;
+      const item = before.items.find((candidate) => candidate.id === remove.dataset.shopRemove);
+      setShopping(Planner.removeShopping(state.shopping, remove.dataset.shopRemove));
+      toast(t("shopRemoved", { name: item?.name || "" }), t("undo"), () => setShopping(before));
+    } else if (again) setShopping(Planner.addShopping(state.shopping, again.dataset.shopAgain));
+    else if (forget) setShopping(Planner.forgetShopping(state.shopping, forget.dataset.shopForget));
+  });
+
+  els.shopClear.addEventListener("click", () => {
+    const before = state.shopping;
+    const n = before.items.filter((item) => item.done).length;
+    setShopping(Planner.clearBought(state.shopping));
+    toast(t("shopCleared", { n }), t("undo"), () => setShopping(before));
+  });
+
+  els.shopCopy.addEventListener("click", async () => {
+    if (!pendingShopping().length) {
+      toast(t("shopNothingToSend"));
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(Planner.shoppingText(state.shopping, (section) => t(`shop-${section}`)));
+      toast(t("shopCopied"));
+    } catch {
+      toast(t("shopCopyFailed"));
+    }
+  });
+
+  els.shopReminders.addEventListener("click", async () => {
+    const items = pendingShopping();
+    if (!items.length) {
+      toast(t("shopNothingToSend"));
+      return;
+    }
+    const list = t("shopRemindersList");
+    els.shopReminders.disabled = true;
+    const result = await desktop.sendToReminders(list, items.map(shoppingLine)).catch(() => ({ ok: false, error: "failed" }));
+    els.shopReminders.disabled = false;
+    if (result?.ok) toast(result.added ? t("shopRemindersDone", { n: result.added, list }) : t("shopRemindersNone", { list }));
+    else toast(t(result?.error === "denied" ? "shopRemindersDenied" : "shopRemindersFailed"));
+  });
 
   // ---------- meeting details ----------
   // Clicking a meeting shows what the calendar knows about it, with a way
@@ -3077,7 +3220,7 @@
 
   // ---------- search ----------
   const SEARCH_LABELS = {
-    task: "searchTasks", habit: "searchHabits", dump: "viewDump", dayNote: "searchDayNotes",
+    task: "searchTasks", habit: "searchHabits", shopping: "searchShopping", dump: "viewDump", dayNote: "searchDayNotes",
     closure: "searchClosures", mood: "searchMoods", weekNote: "searchWeekNotes",
   };
   let searchResults = [];
@@ -3093,7 +3236,7 @@
 
   function runSearch() {
     searchResults = Planner.search({
-      items: state.items, habits: state.habits, dump: state.dump, dayNotes: state.dayNotes,
+      items: state.items, habits: state.habits, shopping: state.shopping, dump: state.dump, dayNotes: state.dayNotes,
       closures: state.closures, moodNotes: state.moodNotes, weekNotes: state.notes,
     }, els.searchInput.value);
     searchIndex = 0;
@@ -3111,7 +3254,7 @@
       if (result.kind !== searchResults[index - 1]?.kind) nodes.push(h("h3", { class: "search-group", text: t(SEARCH_LABELS[result.kind]) }));
       const meta = result.kind === "weekNote" ? t("searchWeekOf", { date: searchDate(result.date) })
         : result.kind === "task" && !result.date ? t("dumpInbox")
-          : result.kind === "habit" ? "" : searchDate(result.date);
+          : result.kind === "habit" || result.kind === "shopping" ? "" : searchDate(result.date);
       const active = index === searchIndex;
       nodes.push(h("button", {
         type: "button", role: "option", "aria-selected": String(active), "data-index": index,
@@ -3154,6 +3297,9 @@
     } else if (result.kind === "habit") {
       setView("habits");
       openHabitDetail(result.id);
+    } else if (result.kind === "shopping") {
+      setView("shopping");
+      flash(els.shopGroups.querySelector(`[data-shop="${CSS.escape(result.id)}"]`));
     } else if (result.kind === "dump") {
       setView("dump");
       flash(els.dumpList.querySelector(`[data-dump="${CSS.escape(result.id)}"]`));
@@ -3208,6 +3354,10 @@
       const date = action === "today" ? today : action === "tomorrow" ? Core.toISODate(Planner.addDays(Core.parseISODate(today), 1)) : null;
       const parsed = Planner.parseCapture(note.text);
       capture(note.text, parsed.date ? null : date);
+    } else if (action === "shop") {
+      state.shopping = Planner.addShopping(state.shopping, note.text);
+      persistShopping();
+      render();
     } else if (action === "note") {
       const current = state.dayNotes[today] || "";
       state.dayNotes = { ...state.dayNotes, [today]: `${current}${current && !current.endsWith("\n") ? "\n" : ""}• ${note.text}` };
@@ -3575,7 +3725,7 @@
       if (event.key === "Escape") event.target.blur();
       return;
     }
-    const views = { 1: "day", 2: "week", 3: "month", 4: "habits", 5: "dump" };
+    const views = { 1: "day", 2: "week", 3: "month", 4: "habits", 5: "dump", 6: "shopping" };
     if (views[event.key]) setView(views[event.key]);
     else if (event.key === "n" || event.key === "N") {
       event.preventDefault();
@@ -3586,8 +3736,8 @@
       event.preventDefault();
       openSearch();
     }
-    else if (state.view !== "dump" && event.key === "ArrowLeft") shift(-1);
-    else if (state.view !== "dump" && event.key === "ArrowRight") shift(1);
+    else if (state.view !== "dump" && state.view !== "shopping" && event.key === "ArrowLeft") shift(-1);
+    else if (state.view !== "dump" && state.view !== "shopping" && event.key === "ArrowRight") shift(1);
   });
 
   // ---------- moving a timeline block by keyboard ----------

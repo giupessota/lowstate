@@ -107,6 +107,179 @@
     };
   }
 
+  // ---------- Shopping list ----------
+  // One list, grouped by the aisles of a typical Brazilian supermarket. The
+  // app guesses the aisle from the name and remembers what was bought
+  // before (and any aisle the person picked), so frequent things come back
+  // with one click.
+  const SHOPPING_SECTIONS = ["produce", "bakery", "dairy", "meat", "pantry", "frozen", "drinks", "cleaning", "personal", "pharmacy", "pets", "other"];
+  const SECTION_WORDS = {
+    produce: "banana, maca, laranja, limao, alface, tomate, cebola, alho, batata, cenoura, abobrinha, brocolis, pepino, pimentao, fruta, verdura, legume, mamao, manga, uva, morango, abacate, couve, espinafre, rucula, salsinha, cebolinha, coentro, gengibre, melancia, melao, abacaxi, beterraba, mandioca, kiwi, pera, apple, orange, lemon, lime, lettuce, tomato, onion, garlic, potato, carrot, fruit, vegetable, avocado, spinach, grape, strawberry",
+    bakery: "pao, paes, bisnaguinha, bolo, torrada, croissant, baguete, sonho, bread, cake, bagel, toast",
+    dairy: "leite, queijo, iogurte, manteiga, requeijao, creme de leite, nata, ovo, margarina, mussarela, presunto, milk, cheese, yogurt, butter, cream, egg, ham",
+    meat: "carne, frango, peixe, linguica, salsicha, bacon, file, patinho, alcatra, picanha, tilapia, salmao, camarao, peito de frango, carne moida, meat, chicken, fish, sausage, beef, pork, salmon, turkey, shrimp",
+    pantry: "arroz, feijao, macarrao, farinha, acucar, sal, oleo, azeite, cafe, cha, molho, atum, sardinha, milho, ervilha, aveia, granola, biscoito, bolacha, cereal, chocolate, achocolatado, fuba, tempero, vinagre, maionese, ketchup, mostarda, mel, geleia, lentilha, grao de bico, pipoca, leite de coco, rice, beans, pasta, flour, sugar, salt, oil, olive oil, coffee, tea, sauce, cookie, oats, honey, jam, tuna, popcorn",
+    frozen: "sorvete, congelado, lasanha, nuggets, pizza, ice cream, frozen",
+    drinks: "agua, suco, refrigerante, cerveja, vinho, coca, guarana, energetico, agua de coco, water, juice, soda, beer, wine",
+    cleaning: "detergente, sabao, sabao em po, amaciante, desinfetante, agua sanitaria, esponja, saco de lixo, papel toalha, alcool, multiuso, vassoura, limpador, detergent, bleach, sponge, trash bag, paper towel",
+    personal: "shampoo, xampu, condicionador, sabonete, pasta de dente, creme dental, escova de dente, desodorante, papel higienico, absorvente, fio dental, barbeador, lamina, hidratante, protetor solar, cotonete, toothpaste, toothbrush, deodorant, toilet paper, conditioner, razor, sunscreen",
+    pharmacy: "remedio, dipirona, paracetamol, ibuprofeno, vitamina, curativo, band-aid, soro, termometro, medicine, vitamin, painkiller",
+    pets: "racao, areia de gato, petisco, pet food, dog food, cat food, litter",
+  };
+  const SECTION_KEYWORDS = Object.entries(SECTION_WORDS)
+    .flatMap(([section, words]) => words.split(",").map((phrase) => [phrase.trim(), section]));
+
+  // The keyword found earliest in the name decides (the main noun comes
+  // first: "sorvete de morango"), the longest one on a tie ("agua
+  // sanitaria" over "agua"). Plurals (-s, -es, -ões, -ães) are understood.
+  function guessShoppingSection(name) {
+    const text = ` ${foldText(name).replace(/[^a-z0-9 -]/g, " ").replace(/\s+/g, " ").trim()} `;
+    let best = null;
+    SECTION_KEYWORDS.forEach(([phrase, section]) => {
+      const forms = [phrase, `${phrase}s`, `${phrase}es`, phrase.replace(/ao$/, "oes"), phrase.replace(/ao$/, "aes")];
+      const at = Math.min(...forms.map((form) => ` ${form} `).map((form) => {
+        const index = text.indexOf(form);
+        return index < 0 ? Infinity : index;
+      }));
+      if (at === Infinity) return;
+      if (!best || at < best.at || (at === best.at && phrase.length > best.length)) best = { at, length: phrase.length, section };
+    });
+    return best ? best.section : "other";
+  }
+
+  const QTY_UNIT = "(?:kg|g|mg|l|lt|ml|un|und|dz|pct|pcts|cx|x|latas?|pacotes?|garrafas?|caixas?|duzias?|macos?|rolos?|potes?|cans?|packs?|bottles?|boxes|box)";
+  const LEADING_QTY = new RegExp(`^(\\d+(?:[.,]\\d+)?(?:\\s*${QTY_UNIT})?)\\.?\\s+(?:(?:de|of)\\s+)?(.+)$`, "i");
+  const TRAILING_QTY = new RegExp(`^(.+?)\\s+(?:x\\s?(\\d+)|(\\d+(?:[.,]\\d+)?(?:\\s*${QTY_UNIT})?))$`, "i");
+
+  // "2 leite", "leite x2", "1kg batata", "batata 1 kg" → { name, qty }. A
+  // leading "comprar"/"buy" (a thought sent from the brain dump) is dropped.
+  function parseShoppingLine(text) {
+    let name = String(text || "").replace(/^\s*(?:[-•*·]|\[\s?\])\s*/, "").replace(/\s+/g, " ").trim()
+      .replace(/^(?:comprar|compra|buy|get)\s+(?=\S)/i, "");
+    let qty = "";
+    const lead = name.match(LEADING_QTY);
+    const trail = !lead && name.match(TRAILING_QTY);
+    if (lead) {
+      qty = lead[1].replace(/\s*x$/i, "").replace(/\s+/g, " ");
+      name = lead[2];
+    } else if (trail) {
+      name = trail[1];
+      qty = (trail[2] || trail[3]).replace(/\s+/g, " ");
+    }
+    name = name.trim().slice(0, 80);
+    return name ? { name: name.charAt(0).toUpperCase() + name.slice(1), qty: qty.slice(0, 16) } : null;
+  }
+
+  // Several things at once: one per line or separated by commas.
+  const parseShoppingText = (text) => String(text || "").split(/[\n,;]+/).map(parseShoppingLine).filter(Boolean);
+
+  function normalizeShopping(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const items = (Array.isArray(source.items) ? source.items : [])
+      .filter((item) => item && typeof item.name === "string" && item.name.trim())
+      .map((item) => ({
+        id: typeof item.id === "string" && item.id ? item.id : newId(),
+        name: item.name.trim().slice(0, 80),
+        qty: typeof item.qty === "string" ? item.qty.slice(0, 16) : "",
+        section: SHOPPING_SECTIONS.includes(item.section) ? item.section : guessShoppingSection(item.name),
+        done: item.done === true,
+        addedAt: Number.isFinite(item.addedAt) ? item.addedAt : 0,
+      }));
+    const history = {};
+    Object.entries(source.history && typeof source.history === "object" ? source.history : {}).forEach(([key, entry]) => {
+      if (!entry || typeof entry.name !== "string") return;
+      history[key] = {
+        name: entry.name.slice(0, 80),
+        section: SHOPPING_SECTIONS.includes(entry.section) ? entry.section : "other",
+        count: Math.max(1, Math.floor(Number(entry.count) || 1)),
+        last: Number.isFinite(entry.last) ? entry.last : 0,
+      };
+    });
+    return { items, history };
+  }
+
+  const shoppingKey = (name) => foldText(name).replace(/\s+/g, " ").trim();
+
+  // Adds each line; something already on the list isn't repeated (it is
+  // unticked and its quantity updated instead).
+  function addShopping(shopping, text, now = Date.now()) {
+    let { items, history } = normalizeShopping(shopping);
+    history = { ...history };
+    parseShoppingText(text).forEach(({ name, qty }) => {
+      const key = shoppingKey(name);
+      const known = history[key];
+      const existing = items.find((item) => shoppingKey(item.name) === key);
+      if (existing) {
+        items = items.map((item) => (item === existing ? { ...item, done: false, qty: qty || item.qty } : item));
+      } else {
+        items = [...items, { id: newId(), name, qty, section: known?.section || guessShoppingSection(name), done: false, addedAt: now }];
+      }
+      history[key] = { name, section: known?.section || existing?.section || guessShoppingSection(name), count: (known?.count || 0) + 1, last: now };
+    });
+    return { items, history };
+  }
+
+  function updateShoppingItem(shopping, id, changes) {
+    const { items, history } = normalizeShopping(shopping);
+    const target = items.find((item) => item.id === id);
+    if (!target) return { items, history };
+    const next = { ...target, ...changes };
+    const key = shoppingKey(target.name);
+    // A chosen aisle is remembered for the next time.
+    const remembered = changes.section && history[key] ? { ...history, [key]: { ...history[key], section: changes.section } } : history;
+    return { items: items.map((item) => (item.id === id ? next : item)), history: remembered };
+  }
+
+  const toggleShopping = (shopping, id) => {
+    const item = normalizeShopping(shopping).items.find((candidate) => candidate.id === id);
+    return item ? updateShoppingItem(shopping, id, { done: !item.done }) : normalizeShopping(shopping);
+  };
+  const removeShopping = (shopping, id) => {
+    const { items, history } = normalizeShopping(shopping);
+    return { items: items.filter((item) => item.id !== id), history };
+  };
+  const clearBought = (shopping) => {
+    const { items, history } = normalizeShopping(shopping);
+    return { items: items.filter((item) => !item.done), history };
+  };
+  const forgetShopping = (shopping, key) => {
+    const { items, history } = normalizeShopping(shopping);
+    const { [key]: _gone, ...rest } = history;
+    return { items, history: rest };
+  };
+
+  // The list in aisle order, pending first within each aisle.
+  function shoppingGroups(shopping) {
+    const { items } = normalizeShopping(shopping);
+    return SHOPPING_SECTIONS
+      .map((section) => ({
+        section,
+        items: items.filter((item) => item.section === section)
+          .sort((a, b) => Number(a.done) - Number(b.done) || a.addedAt - b.addedAt),
+      }))
+      .filter((group) => group.items.length);
+  }
+
+  // What is usually bought and isn't on the list right now.
+  function frequentShopping(shopping, limit = 18) {
+    const { items, history } = normalizeShopping(shopping);
+    const pending = new Set(items.filter((item) => !item.done).map((item) => shoppingKey(item.name)));
+    return Object.entries(history)
+      .filter(([key]) => !pending.has(key))
+      .sort((a, b) => b[1].count - a[1].count || b[1].last - a[1].last)
+      .slice(0, limit)
+      .map(([key, entry]) => ({ key, ...entry }));
+  }
+
+  // Plain text to paste in a message.
+  function shoppingText(shopping, label = (section) => section) {
+    return shoppingGroups(shopping)
+      .map((group) => ({ ...group, items: group.items.filter((item) => !item.done) }))
+      .filter((group) => group.items.length)
+      .map((group) => [`${label(group.section)}:`, ...group.items.map((item) => `- ${item.qty ? `${item.qty} ` : ""}${item.name}`)].join("\n"))
+      .join("\n\n");
+  }
+
   // ---------- Day page modules ----------
   // Secondary parts of the day page can be folded or put away; the timeline
   // and the task groups always stay.
@@ -145,7 +318,7 @@
 
   // Everything written in the planner, searched by words (accents and case
   // ignored, every word must appear). Newest first within each kind.
-  const SEARCH_KINDS = ["task", "habit", "dump", "dayNote", "closure", "mood", "weekNote"];
+  const SEARCH_KINDS = ["task", "habit", "shopping", "dump", "dayNote", "closure", "mood", "weekNote"];
 
   function search(sources, query, limit = 40) {
     const terms = foldText(query).split(/\s+/).filter(Boolean);
@@ -161,6 +334,9 @@
     });
     (sources.habits || []).forEach((habit) => {
       if (matches(habit.name)) out.push({ kind: "habit", id: habit.id, title: habit.name, snippet: "", date: null });
+    });
+    (sources.shopping?.items || []).forEach((item) => {
+      if (matches(item.name)) out.push({ kind: "shopping", id: item.id, title: item.qty ? `${item.qty} ${item.name}` : item.name, snippet: "", date: null, done: item.done });
     });
     (sources.dump || []).forEach((note) => {
       if (matches(note.text)) out.push({ kind: "dump", id: note.id, title: note.text, snippet: "", date: toISODate(new Date(note.createdAt)) });
@@ -1410,6 +1586,20 @@
     createItem,
     moveItem,
     REPEATS,
+    SHOPPING_SECTIONS,
+    guessShoppingSection,
+    parseShoppingLine,
+    parseShoppingText,
+    normalizeShopping,
+    addShopping,
+    updateShoppingItem,
+    toggleShopping,
+    removeShopping,
+    clearBought,
+    forgetShopping,
+    shoppingGroups,
+    frequentShopping,
+    shoppingText,
     DAY_MODULES,
     normalizeDayModules,
     callStats,

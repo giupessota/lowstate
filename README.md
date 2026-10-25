@@ -66,6 +66,17 @@ switches to the week or the month when you want the bigger picture.
 - A monthly page of dots with gentle states — done, a little, rest — plus a
   detail panel with streaks and patterns
 
+**Shopping list**
+
+- A notebook page of its own (`6`): type several things at once ("2 milk,
+  bread, 1kg potatoes"), and each lands in its supermarket aisle (guessed
+  from the name; click the aisle to change it, and it's remembered)
+- "Always buying" brings frequent things back with one click; bought items
+  are ticked off and cleared together
+- Copy the list as text, or on macOS send what's left to buy to Apple
+  Reminders (macOS asks for permission the first time); brain dump thoughts
+  can be sorted into the list
+
 **Everything else**
 
 - Search everything you wrote (⌘K or `/`): tasks, day notes, brain dump,
@@ -210,7 +221,7 @@ completely.
 
 **In-app (while the window is focused):**
 
-- `1` `2` `3` `4` `5`: Day, Week, Month, Habits, Brain dump
+- `1` `2` `3` `4` `5` `6`: Day, Week, Month, Habits, Brain dump, Shopping
 - `←` `→`: previous / next day, week or month
 - `T`: back to today
 - `B`: brain dump
