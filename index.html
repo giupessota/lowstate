@@ -96,6 +96,11 @@
           <button type="button" class="btn" id="saveRetry" data-i18n="saveRetry">Try again</button>
           <button type="button" class="btn" id="saveExport" data-i18n="saveExport">Export data</button>
         </div>
+        <div class="save-alert sync-alert" id="syncAlert" role="status" hidden>
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 13.7-5.6M20 12a8 8 0 0 1-13.7 5.6"/><path d="M18 3v4h-4M6 21v-4h4"/></svg>
+          <p id="syncAlertText"></p>
+          <button type="button" class="btn" id="syncReload" data-i18n="syncReload">Update</button>
+        </div>
         <header class="topbar">
           <div class="range">
             <h1 id="rangeTitle"></h1>
@@ -772,6 +777,10 @@
         </section>
 
         <section class="set-group" data-tab="general">
+          <div class="set-row stacked sync-row" id="syncRow" hidden>
+            <span><span data-i18n="syncTitle">Same data on your computers</span> <small class="set-hint" data-i18n="syncHint"></small></span>
+            <div class="sync-box" id="syncBox"></div>
+          </div>
           <h3 data-i18n="data">Data</h3>
           <div class="set-row">
             <span></span>

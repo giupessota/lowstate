@@ -117,8 +117,13 @@
       const data = snapshot?.data;
       if (!data || typeof data !== "object") return false;
       let restored = false;
+      // Keys another computer changed (synced folder) replace local ones.
+      const overwrite = new Set(Array.isArray(snapshot.overwrite) ? snapshot.overwrite.filter(isAppKey) : []);
+      overwrite.forEach((key) => {
+        if (typeof data[key] !== "string" && writeLocal(key, null)) restored = true;
+      });
       Object.entries(data).forEach(([key, value]) => {
-        if (isAppKey(key) && typeof value === "string" && storage.getItem(key) === null) {
+        if (isAppKey(key) && typeof value === "string" && (overwrite.has(key) || storage.getItem(key) === null)) {
           if (writeLocal(key, value)) restored = true;
         }
       });
@@ -196,6 +201,17 @@
     setStatus({ local: "ok" });
     const desktop = desktopStorage?.saveSnapshot ? persist().ok : true;
     return { ok: true, desktop };
+  }
+
+  // Changes from another computer, already in the disk copy: only the page's
+  // store takes them (the app reloads to show them).
+  function applyIncoming(changes) {
+    if (!storage || !changes || typeof changes !== "object") return false;
+    Object.entries(changes).forEach(([key, value]) => {
+      if (isAppKey(key)) writeLocal(key, typeof value === "string" ? value : null);
+    });
+    setStatus({ local: pending.size ? "failed" : "ok" });
+    return true;
   }
 
   function getRawStored(key) {
@@ -357,6 +373,7 @@
     setRaw,
     removeRaw,
     replaceAll,
+    applyIncoming,
     readBackup,
     backupPayload,
     keepRestorePoint,
