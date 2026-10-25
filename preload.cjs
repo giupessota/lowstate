@@ -29,6 +29,9 @@ contextBridge.exposeInMainWorld("desktopGadget", {
   setShortcuts: (map) => ipcRenderer.invoke("update-shortcuts", map),
   openExternal: (url) => ipcRenderer.send("open-external", url),
   openMeeting: (url) => ipcRenderer.send("open-meeting", url),
+  sendToReminders: process.platform === "darwin"
+    ? (list, names) => ipcRenderer.invoke("reminders-export", list, names)
+    : undefined,
   onQuickCapture: (cb) => ipcRenderer.on("quick-capture", (_e, mode) => cb(mode)),
   onUpdateAvailable: (cb) => ipcRenderer.on("update-available", (_e, info) => cb(info)),
   notify: (payload) => ipcRenderer.send("notify", payload),

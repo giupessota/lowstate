@@ -721,3 +721,52 @@ test("the capture examples shown in the app are what the parser understands", ()
       language);
   }
 });
+
+test("shopping: the aisle is guessed from the name, the main noun first", () => {
+  const cases = {
+    Leite: "dairy", "Água sanitária": "cleaning", Água: "drinks", "Papel higiênico": "personal", "Pão francês": "bakery",
+    "Ração do Thor": "pets", Bananas: "produce", Limões: "produce", "Pasta de dente": "personal", "Peito de frango": "meat",
+    "Creme de leite": "dairy", "Sorvete de morango": "frozen", "Leite de coco": "pantry", Pizza: "frozen", "Algo raro": "other",
+  };
+  for (const [name, section] of Object.entries(cases)) assert.equal(P.guessShoppingSection(name), section, name);
+});
+
+test("shopping: quantities before or after the name, several things at once", () => {
+  assert.deepEqual(P.parseShoppingLine("2 leite"), { name: "Leite", qty: "2" });
+  assert.deepEqual(P.parseShoppingLine("leite x2"), { name: "Leite", qty: "2" });
+  assert.deepEqual(P.parseShoppingLine("batata 1 kg"), { name: "Batata", qty: "1 kg" });
+  assert.deepEqual(P.parseShoppingLine("3 latas de atum"), { name: "Atum", qty: "3 latas" });
+  assert.deepEqual(P.parseShoppingLine("500g de carne moída"), { name: "Carne moída", qty: "500g" });
+  assert.deepEqual(P.parseShoppingLine("- pão"), { name: "Pão", qty: "" });
+  assert.deepEqual(P.parseShoppingLine("comprar 2 pilhas"), { name: "Pilhas", qty: "2" });
+  assert.deepEqual(P.parseShoppingLine("Compra"), { name: "Compra", qty: "" });
+  assert.equal(P.parseShoppingLine("   "), null);
+  assert.deepEqual(P.parseShoppingText("leite, pão\n2 ovos;  ").map((line) => line.name), ["Leite", "Pão", "Ovos"]);
+});
+
+test("shopping: adding, ticking, clearing and what comes back", () => {
+  let list = P.addShopping({}, "2 leite, pão, detergente", 1);
+  assert.deepEqual(P.shoppingGroups(list).map((group) => [group.section, group.items.map((item) => item.name)]),
+    [["bakery", ["Pão"]], ["dairy", ["Leite"]], ["cleaning", ["Detergente"]]]);
+  // The same thing isn't added twice; a new quantity wins.
+  list = P.addShopping(list, "leite x3", 2);
+  assert.equal(list.items.filter((item) => item.name === "Leite").length, 1);
+  assert.equal(list.items.find((item) => item.name === "Leite").qty, "3");
+  const bread = list.items.find((item) => item.name === "Pão");
+  list = P.toggleShopping(list, bread.id);
+  assert.equal(P.shoppingGroups(list)[0].items[0].done, true);
+  // A chosen aisle is remembered next time.
+  const soap = list.items.find((item) => item.name === "Detergente");
+  list = P.updateShoppingItem(list, soap.id, { section: "other" });
+  list = P.clearBought(list);
+  assert.deepEqual(list.items.map((item) => item.name), ["Leite", "Detergente"]);
+  list = P.removeShopping(list, soap.id);
+  assert.deepEqual(P.frequentShopping(list).map((entry) => [entry.name, entry.count]), [["Pão", 1], ["Detergente", 1]]);
+  list = P.addShopping(list, "detergente", 3);
+  assert.equal(list.items.find((item) => item.name === "Detergente").section, "other");
+  assert.deepEqual(P.frequentShopping(list).map((entry) => entry.name), ["Pão"]);
+  assert.deepEqual(P.frequentShopping(P.forgetShopping(list, "pao")), []);
+  assert.equal(P.shoppingText(list, (section) => section.toUpperCase()), "DAIRY:\n- 3 Leite\n\nOTHER:\n- Detergente");
+  assert.deepEqual(P.normalizeShopping("junk"), { items: [], history: {} });
+  assert.deepEqual(P.search({ shopping: list }, "leite").map((result) => [result.kind, result.title]), [["shopping", "3 Leite"]]);
+});

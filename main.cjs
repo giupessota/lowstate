@@ -1,4 +1,5 @@
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
+const { execFile } = require("child_process");
 const fs = require("fs");
 const https = require("https");
 const path = require("path");
@@ -381,6 +382,50 @@ ipcMain.on("notify", (_event, payload) => {
 
 ipcMain.on("hide-window", () => { if (window) window.hide(); });
 ipcMain.on("set-always-on-top", (_event, on) => { if (window) window.setAlwaysOnTop(!!on, "floating"); });
+// "Send to Reminders" on the shopping list (macOS): adds what's still to buy
+// to a list in Apple's Reminders, skipping what is already there. Names are
+// passed as arguments, never pasted into the script. macOS asks once for
+// permission to control Reminders.
+const REMINDERS_SCRIPT = `on run argv
+  set listName to item 1 of argv
+  tell application "Reminders"
+    if not (exists list listName) then make new list with properties {name:listName}
+    set target to list listName
+    set existing to name of (reminders of target whose completed is false)
+    set added to 0
+    repeat with index from 2 to count of argv
+      set itemName to item index of argv
+      if existing does not contain itemName then
+        make new reminder at end of target with properties {name:itemName}
+        set added to added + 1
+      end if
+    end repeat
+    return added
+  end tell
+end run`;
+
+ipcMain.handle("reminders-export", (_event, listName, names) => {
+  if (process.platform !== "darwin") return { ok: false, error: "unsupported" };
+  const items = (Array.isArray(names) ? names : [])
+    .filter((name) => typeof name === "string")
+    .map((name) => name.trim().slice(0, 120))
+    .filter(Boolean)
+    .slice(0, 200);
+  if (!items.length) return { ok: false, error: "empty" };
+  const list = String(listName || "").trim().slice(0, 60) || "Lowstate";
+  return new Promise((resolve) => {
+    execFile("osascript", ["-e", REMINDERS_SCRIPT, list, ...items], { timeout: 60000 }, (error, stdout, stderr) => {
+      if (error) {
+        const denied = /-1743|not allowed|não tem permissão|not authori[sz]ed/i.test(`${stderr} ${error.message}`);
+        if (!denied) console.error("Could not send to Reminders:", stderr || error.message);
+        resolve({ ok: false, error: denied ? "denied" : "failed" });
+        return;
+      }
+      resolve({ ok: true, added: Number.parseInt(String(stdout).trim(), 10) || 0, list });
+    });
+  });
+});
+
 // "Join call" in a meeting's details: only known video-call hosts.
 ipcMain.on("open-meeting", (_event, url) => {
   if (typeof url === "string" && isMeetingUrl(url)) shell.openExternal(url);

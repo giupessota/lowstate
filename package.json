@@ -43,7 +43,12 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}",
       "target": [
         "dmg"
-      ]
+      ],
+      "entitlements": "desktop/entitlements.mac.plist",
+      "entitlementsInherit": "desktop/entitlements.mac.plist",
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "Lowstate adds your shopping list to Reminders when you ask it to. / O Lowstate coloca sua lista de compras no Lembretes quando você pede."
+      }
     },
     "win": {
       "icon": "assets/icon.ico",
