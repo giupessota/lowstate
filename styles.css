@@ -514,11 +514,18 @@ svg.i {
   background-position: 22px 22px;
 }
 .page-right {
+  --fold: rgba(60, 45, 20, .14);
   border-radius: 3px 12px 12px 3px;
-  background-position: 0 22px;
+  /* The fold's shadow is a background layer, not a pseudo-element: the
+     right page scrolls (day, dump, habits), and a positioned shadow would
+     scroll away with the content and stop halfway down. */
+  background-image: linear-gradient(270deg, transparent, var(--fold)), var(--grid-image);
+  background-size: 26px 100%, var(--grid-size) var(--grid-size);
+  background-repeat: no-repeat, repeat;
+  background-position: 0 0, 0 22px;
 }
 /* The fold between the two pages */
-.page-left::after, .page-right::before {
+.page-left::after {
   content: "";
   position: absolute;
   top: 0;
@@ -527,9 +534,9 @@ svg.i {
   pointer-events: none;
 }
 .page-left::after { right: 0; background: linear-gradient(90deg, transparent, rgba(60, 45, 20, .1)); }
-.page-right::before { left: 0; background: linear-gradient(270deg, transparent, rgba(60, 45, 20, .14)); }
+
 :root[data-theme="dark"] .page-left::after { background: linear-gradient(90deg, transparent, rgba(0, 0, 0, .35)); }
-:root[data-theme="dark"] .page-right::before { background: linear-gradient(270deg, transparent, rgba(0, 0, 0, .4)); }
+:root[data-theme="dark"] .page-right { --fold: rgba(0, 0, 0, .4); }
 
 .page-head {
   position: relative;
@@ -893,7 +900,22 @@ svg.i {
 }
 .hour-label { width: var(--labels); flex: none; padding-top: 3px; color: var(--muted); font: 500 10.5px var(--mono); }
 .hour-row.is-covered .hour-label { visibility: hidden; }
-.hour-slot { flex: 1; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: copy; }
+.hour-slots { display: flex; flex: 1; flex-direction: column; }
+.hour-slot { flex: 1; width: 100%; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: copy; touch-action: none; }
+/* The period being chosen by dragging across half hours. */
+.slot-pick {
+  position: absolute;
+  left: var(--labels);
+  right: 0;
+  z-index: 5;
+  padding: 2px 8px;
+  border: 1.5px solid color-mix(in srgb, var(--indigo) 60%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--indigo) 12%, transparent);
+  color: var(--indigo);
+  font: 500 10.5px var(--mono);
+  pointer-events: none;
+}
 .hour-slot:hover { background: color-mix(in srgb, var(--highlight) 22%, transparent); }
 
 .block {
@@ -2290,7 +2312,8 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
   .timeline { flex: none; height: 60vh; }
   .month-grid { grid-auto-rows: minmax(90px, auto); }
   .page-left, .page-right { border-radius: 12px; }
-  .page-left::after, .page-right::before, .month-tabs { display: none; }
+  .page-left::after, .month-tabs { display: none; }
+  .page-right { background-image: var(--grid-image); background-size: var(--grid-size) var(--grid-size); background-repeat: repeat; background-position: 0 22px; }
   .days { overflow: visible; }
   .notes { min-height: 220px; }
 }
