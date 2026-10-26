@@ -3880,10 +3880,12 @@
     els.closeDayBtn.hidden = Boolean(closed) || (iso !== todayISO() && iso !== yesterday);
     els.closedLine.hidden = !closed;
     if (closed) {
-      els.closedLine.replaceChildren(
+      // replaceChildren (unlike h) would print a null child as "null".
+      els.closedLine.replaceChildren(...[
         h("span", { class: "closed-mark", text: `✓ ${t("closedLine")}` }),
         closed.good ? h("span", { class: "closed-good", text: `“${closed.good}”` }) : null,
-        h("button", { type: "button", class: "focus-action", id: "reopenClosure", text: t("closedReopen") }));
+        h("button", { type: "button", class: "focus-action", id: "reopenClosure", text: t("closedReopen") }),
+      ].filter(Boolean));
     }
   }
 
