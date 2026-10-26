@@ -391,7 +391,7 @@
     categories: initial.categories,
     settings: {
       weekStart: savedSettings.weekStart === 0 ? 0 : 1,
-      holidays: savedSettings.holidays === "off" ? "off" : "br",
+      holidays: Planner.normalizeHolidayRegions(savedSettings.holidays),
       quotes: Planner.QUOTE_STYLES.includes(savedSettings.quotes) ? savedSettings.quotes : "proverbs",
       waterUnit: savedSettings.waterUnit === "liters" ? "liters" : "glasses",
       glassMl: Planner.CONTAINER_SIZES.includes(savedSettings.glassMl) ? savedSettings.glassMl : 250,
@@ -837,7 +837,7 @@
     return classes.join(" ");
   }
 
-  const holidayFor = (iso) => (state.settings.holidays === "br" ? Planner.holidayName(iso, I18n.language) : null);
+  const holidayFor = (iso) => Planner.holidayName(iso, I18n.language, state.settings.holidays);
 
   // Fills a page footer with the chosen style's quote, or hides it.
   function showQuote(el, n) {
@@ -2582,7 +2582,9 @@
     };
     els.settingsDialog.querySelectorAll(".seg").forEach((seg) => {
       seg.querySelectorAll("button").forEach((button) => {
-        const active = button.dataset.value === values[seg.dataset.setting];
+        const value = values[seg.dataset.setting];
+        // Holidays: several regions can be on at once.
+        const active = Array.isArray(value) ? value.includes(button.dataset.value) : button.dataset.value === value;
         button.classList.toggle("active", active);
         button.setAttribute("aria-pressed", String(active));
       });
@@ -2623,7 +2625,9 @@
       persistSettings();
       render();
     } else if (setting === "holidays") {
-      state.settings.holidays = value === "off" ? "off" : "br";
+      // Brazil and the US switch on and off independently.
+      const regions = state.settings.holidays;
+      state.settings.holidays = Planner.normalizeHolidayRegions(regions.includes(value) ? regions.filter((region) => region !== value) : [...regions, value]);
       persistSettings();
       render();
     } else if (setting === "quotes") {

@@ -900,11 +900,89 @@
     return holidays;
   }
 
-  function holidayName(iso, language = "en") {
+  // ---------- US federal holidays ----------
+  const US_HOLIDAY_NAMES = {
+    newYear: { pt: "Ano-Novo", en: "New Year's Day" },
+    mlk: { pt: "Dia de Martin Luther King Jr.", en: "Martin Luther King Jr. Day" },
+    presidents: { pt: "Dia dos Presidentes", en: "Presidents' Day" },
+    memorial: { pt: "Memorial Day", en: "Memorial Day" },
+    juneteenth: { pt: "Juneteenth", en: "Juneteenth" },
+    independence: { pt: "Independência dos EUA", en: "Independence Day" },
+    labor: { pt: "Labor Day", en: "Labor Day" },
+    columbus: { pt: "Dia de Colombo", en: "Columbus Day" },
+    veterans: { pt: "Dia dos Veteranos", en: "Veterans Day" },
+    thanksgiving: { pt: "Ação de Graças", en: "Thanksgiving" },
+    christmas: { pt: "Natal", en: "Christmas" },
+  };
+  const OBSERVED = { pt: "folga", en: "observed" };
+
+  // The n-th weekday (0 = Sunday) of a month (0-based); n = -1 is the last.
+  function nthWeekday(year, month, weekday, n) {
+    if (n < 0) {
+      const last = new Date(year, month + 1, 0);
+      return addDays(last, -((last.getDay() - weekday + 7) % 7));
+    }
+    const first = new Date(year, month, 1);
+    return addDays(first, ((weekday - first.getDay() + 7) % 7) + (n - 1) * 7);
+  }
+
+  const usHolidayCache = new Map();
+
+  // Federal holidays, plus the weekday off when a fixed one falls on a
+  // weekend (Saturday → Friday, Sunday → Monday). Returns Map<ISO, key>,
+  // observed days as "key:observed".
+  function usHolidays(year) {
+    if (usHolidayCache.has(year)) return usHolidayCache.get(year);
+    const holidays = new Map();
+    const fixed = [[0, 1, "newYear"], [6, 4, "independence"], [10, 11, "veterans"], [11, 25, "christmas"]];
+    if (year >= 2021) fixed.push([5, 19, "juneteenth"]);
+    // Next year's New Year can be observed on this year's December 31.
+    [...fixed.map(([month, day, key]) => [year, month, day, key]), [year + 1, 0, 1, "newYear"]].forEach(([y, month, day, key]) => {
+      const date = new Date(y, month, day);
+      if (y === year) holidays.set(toISODate(date), key);
+      const weekday = date.getDay();
+      const observed = weekday === 6 ? addDays(date, -1) : weekday === 0 ? addDays(date, 1) : null;
+      if (observed && observed.getFullYear() === year) holidays.set(toISODate(observed), `${key}:observed`);
+    });
+    [[0, 1, 3, "mlk"], [1, 1, 3, "presidents"], [4, 1, -1, "memorial"], [8, 1, 1, "labor"], [9, 1, 2, "columbus"], [10, 4, 4, "thanksgiving"]]
+      .forEach(([month, weekday, n, key]) => holidays.set(toISODate(nthWeekday(year, month, weekday, n)), key));
+    usHolidayCache.set(year, holidays);
+    return holidays;
+  }
+
+  const HOLIDAY_REGIONS = ["br", "us"];
+
+  // Older settings kept "br" or "off"; now a list of regions.
+  function normalizeHolidayRegions(value) {
+    if (value === "off") return [];
+    if (typeof value === "string") return HOLIDAY_REGIONS.includes(value) ? [value] : ["br"];
+    if (!Array.isArray(value)) return ["br"];
+    return HOLIDAY_REGIONS.filter((region) => value.includes(region));
+  }
+
+  // The day's holiday names for the chosen regions; with both, US ones say
+  // so, and the same name twice (Christmas) is shown once.
+  function holidayName(iso, language = "en", regions = ["br"]) {
     const date = parseISODate(iso);
     if (!date) return null;
-    const key = brazilHolidays(date.getFullYear()).get(iso);
-    return key ? HOLIDAY_NAMES[key][language] || HOLIDAY_NAMES[key].en : null;
+    const chosen = normalizeHolidayRegions(regions);
+    const names = [];
+    if (chosen.includes("br")) {
+      const key = brazilHolidays(date.getFullYear()).get(iso);
+      if (key) names.push(HOLIDAY_NAMES[key][language] || HOLIDAY_NAMES[key].en);
+    }
+    if (chosen.includes("us")) {
+      const entry = usHolidays(date.getFullYear()).get(iso);
+      if (entry) {
+        const [key, observed] = entry.split(":");
+        let name = US_HOLIDAY_NAMES[key][language] || US_HOLIDAY_NAMES[key].en;
+        if (observed) name += ` (${OBSERVED[language] || OBSERVED.en})`;
+        if (chosen.includes("br")) name += language === "pt" ? " (EUA)" : " (US)";
+        const plain = US_HOLIDAY_NAMES[key][language] || US_HOLIDAY_NAMES[key].en;
+        if (!names.some((existing) => existing === plain || (key === "newYear" && !observed && chosen.includes("br")))) names.push(name);
+      }
+    }
+    return names.length ? names.join(" · ") : null;
   }
 
   // ---------- Page quotes ----------
@@ -1687,6 +1765,8 @@
     easterSunday,
     brazilHolidays,
     holidayName,
+    usHolidays,
+    normalizeHolidayRegions,
     quoteFor,
     dayOfYear,
     daysInYear,
