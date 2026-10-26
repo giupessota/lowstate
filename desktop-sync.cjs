@@ -278,7 +278,7 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
     try {
       others = await place.readOthers(config.device);
     } catch (error) {
-      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "unavailable" };
+      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "unavailable", detail: String(error.message || error).slice(0, 200) };
       return { incoming: {} };
     }
     const firstTime = join || !config.joined;
@@ -291,7 +291,7 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
     try {
       await place.writeOwn(ownFile({ device: config.device, name: deviceName(), platform, data: last, meta, now: now() }));
     } catch (error) {
-      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "write" };
+      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "write", detail: String(error.message || error).slice(0, 200) };
       return { incoming: result.incoming };
     }
     config = { ...config, joined: true, lastSync: now() };
@@ -300,6 +300,7 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
       state: "idle",
       lastSync: config.lastSync,
       error: null,
+      detail: null,
       others: others.map((other) => ({ device: other.device, name: other.name || other.device, platform: other.platform || "", savedAt: other.savedAt || null })),
     };
     return { incoming: result.incoming };

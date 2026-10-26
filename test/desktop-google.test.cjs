@@ -176,6 +176,7 @@ test("Drive trouble leaves local data alone and is reported", async (t) => {
   });
   await sync.connect({ kind: "google" });
   assert.equal(sync.info().state, "unavailable");
+  assert.match(sync.info().detail, /fetch failed/);
   const google = fakeGoogle();
   const signedOut = createSync({
     configFile: path.join(dir, "sync2.json"),

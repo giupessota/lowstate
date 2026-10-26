@@ -2841,7 +2841,7 @@
       info.state === "auth"
         ? h("p", { class: "sync-warn", text: t("syncGoogleSignedOut") })
         : info.state === "unavailable"
-          ? h("p", { class: "sync-warn", text: t(google ? "syncGoogleUnavailable" : "syncUnavailable") })
+          ? h("p", { class: "sync-warn", text: `${t(google ? "syncGoogleUnavailable" : "syncUnavailable")}${info.detail ? ` (${info.detail})` : ""}` })
           : syncFact(t("syncLast"), syncWhen(info.lastSync)),
       others.length
         ? syncFact(t("syncOthers"), others.map((other) => `${other.name}${other.platform ? ` (${platformName(other.platform)})` : ""} · ${syncWhen(other.savedAt)}`).join(", "))

@@ -243,19 +243,48 @@ async function syncSafely(options) {
   }
 }
 
-// Exchanges with the target and hands anything new to the page.
-async function runSync() {
+// A small local log of every exchange ("sync.log" next to the data), so a
+// sync that doesn't happen can be explained: when, what came in, and why it
+// failed.
+function syncLog(line) {
+  try {
+    const file = path.join(syncDirectory(), "sync.log");
+    let text = "";
+    try {
+      text = fs.readFileSync(file, "utf8");
+    } catch {
+      // First line.
+    }
+    const lines = `${text}${new Date().toISOString()} ${line}\n`.split("\n").filter(Boolean).slice(-300);
+    fs.writeFileSync(file, `${lines.join("\n")}\n`, { mode: 0o600 });
+  } catch {
+    // Logging never gets in the way.
+  }
+}
+
+let syncRetry = null;
+
+// Exchanges with the target and hands anything new to the page. A failed
+// exchange (no network yet after waking up…) is tried again in 10 s.
+async function runSync(reason = "timer") {
   clearTimeout(syncTimer);
   syncTimer = null;
   if (!syncEngine?.active) return;
   const { incoming } = await syncSafely();
+  const info = syncEngine.info();
+  const changed = Object.keys(incoming);
+  syncLog(info.state === "idle"
+    ? `${reason}: ok${changed.length ? ` · in: ${changed.map((key) => key.replace(/^type-todo\.(planner\.)?/, "")).join(", ")}` : ""} · others: ${(info.others || []).map((other) => `${other.name}@${new Date(other.savedAt).toISOString().slice(11, 19)}`).join(", ") || "none"}`
+    : `${reason}: ${info.state} (${info.error}) ${info.detail || ""}`);
+  clearTimeout(syncRetry);
+  syncRetry = info.state === "unavailable" ? setTimeout(() => runSync("retry"), 10 * 1000) : null;
   if (!window) return;
   if (Object.keys(incoming).length) window.webContents.send("sync-incoming", incoming, syncEngine.info());
   window.webContents.send("sync-status", syncPayload());
 }
 
 function scheduleSync() {
-  if (!syncTimer) syncTimer = setTimeout(runSync, SYNC_DELAY);
+  if (!syncTimer) syncTimer = setTimeout(() => runSync("change"), SYNC_DELAY);
 }
 
 function syncPayload() {
@@ -341,7 +370,7 @@ ipcMain.handle("sync-google-cancel", () => {
 });
 
 ipcMain.handle("sync-now", async () => {
-  await runSync();
+  await runSync("button");
   return syncPayload();
 });
 ipcMain.handle("sync-stop", () => {
@@ -561,12 +590,13 @@ app.whenReady().then(async () => {
   await migrateLegacyProfile();
   await initSync();
   createWindow();
-  setInterval(runSync, SYNC_INTERVAL);
-  window.on("focus", runSync);
+  syncLog(`start: ${syncEngine.info().state}`);
+  setInterval(() => runSync("timer"), SYNC_INTERVAL);
+  window.on("focus", () => runSync("focus"));
   watchInbox();
   // Waking up or unlocking: the other computer may have moved on meanwhile.
-  powerMonitor.on("resume", runSync);
-  powerMonitor.on("unlock-screen", runSync);
+  powerMonitor.on("resume", () => runSync("wake"));
+  powerMonitor.on("unlock-screen", () => runSync("unlock"));
   createTray();
   registerShortcuts(shortcuts);
   setTimeout(checkForUpdate, 2000);

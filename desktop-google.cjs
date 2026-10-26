@@ -133,8 +133,8 @@ async function postForm(fetch, url, fields) {
       body: new URLSearchParams(fields).toString(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
     }));
-  } catch {
-    throw new GoogleError("unavailable");
+  } catch (error) {
+    throw new GoogleError("unavailable", error.code === "unavailable" ? error.message : `network: ${error.message || error}`);
   }
   const body = await withTimeout(response.json()).catch(() => ({}));
   if (!response.ok) throw new GoogleError(body.error === "invalid_grant" || body.error === "invalid_client" ? "auth" : "unavailable", body.error);
@@ -187,8 +187,8 @@ function createDriveClient({ fetch, auth }) {
         headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT),
       }));
-    } catch {
-      throw new GoogleError("unavailable");
+    } catch (error) {
+      throw new GoogleError("unavailable", error.code === "unavailable" ? error.message : `network: ${error.message || error}`);
     }
     if (response.status === 401 && retry) {
       auth.invalidate();
