@@ -101,6 +101,7 @@ test("parseCapture understands time, date, urgency and category", () => {
     start: "14:30",
     priority: "urgent",
     category: "HEALTH",
+    categories: ["HEALTH"],
   });
   assert.equal(P.parseCapture("Gym 7h", NOW).start, "07:00");
   assert.equal(P.parseCapture("Standup 9h30", NOW).start, "09:30");
@@ -414,6 +415,36 @@ test("day page modules default to open and keep only known states", () => {
   assert.deepEqual(P.normalizeDayModules({ water: "hidden", mood: "collapsed", load: "gone", timeline: "hidden" }),
     { load: "open", water: "hidden", habits: "open", mood: "collapsed", notes: "open" });
   assert.deepEqual(P.normalizeDayModules([1]), P.normalizeDayModules({}));
+});
+
+test("several hashtags: the first is the main category, all are kept", () => {
+  const parsed = P.parseCapture("Revisar deck #trabalho #jun @amanhã 14h", new Date(2026, 9, 26, 9));
+  assert.deepEqual([parsed.title, parsed.category, parsed.categories, parsed.date, parsed.start],
+    ["Revisar deck", "TRABALHO", ["TRABALHO", "JUN"], "2026-10-27", "14:00"]);
+  assert.deepEqual(P.parseCapture("Ligar #família").categories, ["FAMÍLIA"]);
+  assert.deepEqual(P.parseCapture("Sem categoria").categories, []);
+  assert.deepEqual(P.parseCapture("#a #a #b x").categories, ["A", "B"]);
+  const item = P.normalizeItem({ title: "t", category: "trabalho", tags: ["jun", "trabalho", "jun", 3] });
+  assert.deepEqual(item.tags, ["jun"]);
+  assert.deepEqual(P.itemTags(item), ["trabalho", "jun"]);
+  assert.deepEqual(P.normalizeItem({ title: "old" }).tags, []);
+});
+
+test("searching by hashtag finds tasks by any of their categories", () => {
+  const categories = [{ id: "trabalho", name: "Trabalho" }, { id: "jun", name: "Jun" }, { id: "saude", name: "Saúde" }];
+  const items = [
+    P.normalizeItem({ id: "a", title: "Revisar deck", category: "trabalho", tags: ["jun"] }),
+    P.normalizeItem({ id: "b", title: "Planilha", category: "trabalho" }),
+    P.normalizeItem({ id: "c", title: "Dentista", category: "saude" }),
+    P.normalizeItem({ id: "d", title: "Ligar pro Jun", notes: "sobre #jun" }),
+  ];
+  const ids = (query) => P.search({ items, categories, dayNotes: { "2026-10-26": "falar com #jun" } }, query).map((r) => r.id);
+  assert.deepEqual(ids("#jun"), ["a", "d", "2026-10-26"]);
+  assert.deepEqual(ids("#trabalho"), ["a", "b"]);
+  assert.deepEqual(ids("#trabalho #jun"), ["a"]);
+  assert.deepEqual(ids("#trab planilha"), ["b"]);
+  assert.deepEqual(ids("#saude"), ["c"]);
+  assert.deepEqual(ids("#"), []);
 });
 
 test("search finds words anywhere, ignoring accents and case", () => {

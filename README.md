@@ -110,7 +110,10 @@ switches to the week or the month when you want the bigger picture.
 **Everything else**
 
 - Search everything you wrote (⌘K or `/`): tasks, day notes, brain dump,
-  what went well, habits and week notes
+  what went well, habits and week notes; `#category` finds everything with
+  that hashtag, and clicking a task's category stamp does the same
+- Tasks can have several categories (`#work #jun`): the first one is the
+  main one (its color), all of them are searchable
 - Repeating tasks (daily, weekdays, weekly, every two weeks, monthly,
   yearly); the next one appears when you finish the current one
 - Desktop reminders for tasks, habits and meetings, with a 10-minute snooze,

@@ -557,14 +557,16 @@
       start: date ? start : null,
       duration: date && start ? 60 : null,
       priority: parsed.priority,
-      category: parsed.category,
+      categories: parsed.categories,
     };
   }
 
   function capture(text, fallbackDate = null, fallbackStart = null) {
     const fields = captureFields(text, fallbackDate, fallbackStart);
     if (!fields) return null;
-    return addItem({ ...fields, category: resolveCategory(fields.category) });
+    const { categories, ...rest } = fields;
+    const ids = [...new Set(categories.map(resolveCategory).filter(Boolean))];
+    return addItem({ ...rest, category: ids[0] || null, tags: ids.slice(1) });
   }
 
   // A quiet line under a capture field: an example while it's empty, then
@@ -592,11 +594,11 @@
       parts.push(t(FOCUS_LABELS[Planner.normalizeItem({ title: fields.title, date: fields.date, priority: fields.priority }).focus]));
     }
     if (fields.start) parts.push(timeRange(fields));
-    if (fields.category) {
-      const wanted = Planner.slug(fields.category);
+    fields.categories.forEach((name) => {
+      const wanted = Planner.slug(name);
       const existing = state.categories.find((category) => category.id === wanted || Planner.slug(category.name) === wanted);
-      parts.push(existing ? `#${existing.name}` : t("captureNewCategory", { name: `#${Planner.displayName(fields.category)}` }));
-    }
+      parts.push(existing ? `#${existing.name}` : t("captureNewCategory", { name: `#${Planner.displayName(name)}` }));
+    });
     if (fields.priority === "urgent") parts.push(t("captureUrgent"));
     preview.textContent = t("captureGoesTo", { list: parts.join(" · ") });
   }
@@ -644,7 +646,16 @@
     if (item.priority === "urgent") classes.push("is-urgent");
     if (item.focus === "later" && item.date) classes.push("is-later");
 
-    const stamp = category ? h("span", { class: "stamp", text: category.name }) : null;
+    // One stamp per category; clicking one searches that hashtag.
+    const stamp = Planner.itemTags(item).map(categoryById).filter(Boolean).map((tag) => h("span", {
+      class: "stamp",
+      role: "button",
+      tabindex: "0",
+      "data-tag-search": tag.name,
+      title: t("searchTag", { tag: tag.name }),
+      style: `--cat: ${tag.color}`,
+      text: tag.name,
+    }));
     // Urgent items get a little "!" seal.
     const seal = item.priority === "urgent"
       ? h("span", { class: "seal", title: t("urgentToggle"), "aria-label": t("urgentToggle"), role: "img" }, "!")
@@ -2117,16 +2128,21 @@
     els.itemStart.disabled = !draft.date;
     els.itemDuration.disabled = !draft.start;
 
+    // Several categories can be on: the first one chosen is the main one
+    // (its color marks the task).
+    const chosen = Planner.itemTags(draft);
     const noneChip = h("button", {
       type: "button",
-      class: `chip${draft.category ? "" : " active"}`,
+      class: `chip${chosen.length ? "" : " active"}`,
       "data-category": "",
+      "aria-pressed": String(!chosen.length),
       text: t("noneCategory"),
     });
     els.categoryChips.replaceChildren(noneChip, ...state.categories.map((category) => h("button", {
       type: "button",
-      class: `chip${draft.category === category.id ? " active" : ""}`,
+      class: `chip${chosen.includes(category.id) ? " active" : ""}${chosen[0] === category.id && chosen.length > 1 ? " is-main" : ""}`,
       "data-category": category.id,
+      "aria-pressed": String(chosen.includes(category.id)),
       style: `--cat: ${category.color}`,
     }, h("i"), category.name)));
 
@@ -2193,10 +2209,16 @@
     commit();
   }
 
+  function setDraftTags(ids) {
+    const unique = [...new Set(ids.filter(Boolean))];
+    state.draft.category = unique[0] || null;
+    state.draft.tags = unique.slice(1);
+  }
+
   function addCategoryFromEditor() {
     const name = els.newCategoryInput.value.trim();
     if (!name) return;
-    state.draft.category = resolveCategory(name);
+    setDraftTags([...Planner.itemTags(state.draft), resolveCategory(name)]);
     els.newCategoryInput.value = "";
     renderEditor();
   }
@@ -2257,7 +2279,9 @@
     }
     const chip = event.target.closest("[data-category]");
     if (chip) {
-      state.draft.category = chip.dataset.category || null;
+      const id = chip.dataset.category;
+      const chosen = Planner.itemTags(state.draft);
+      setDraftTags(!id ? [] : chosen.includes(id) ? chosen.filter((tag) => tag !== id) : [...chosen, id]);
       renderEditor();
     }
   });
@@ -3486,7 +3510,7 @@
 
   function runSearch() {
     searchResults = Planner.search({
-      items: state.items, habits: state.habits, shopping: state.shopping, dump: state.dump, dayNotes: state.dayNotes,
+      items: state.items, categories: state.categories, habits: state.habits, shopping: state.shopping, dump: state.dump, dayNotes: state.dayNotes,
       closures: state.closures, moodNotes: state.moodNotes, weekNotes: state.notes,
     }, els.searchInput.value);
     searchIndex = 0;
@@ -3520,9 +3544,9 @@
     els.searchResults.querySelector(".active")?.scrollIntoView({ block: "nearest" });
   }
 
-  function openSearch() {
+  function openSearch(query = "") {
     if (document.querySelector("dialog[open]:not(#searchDialog)")) return;
-    els.searchInput.value = "";
+    els.searchInput.value = query;
     runSearch();
     if (!els.searchDialog.open) els.searchDialog.showModal();
     els.searchInput.focus();
@@ -3563,7 +3587,23 @@
     }
   }
 
-  els.searchBtn.addEventListener("click", openSearch);
+  els.searchBtn.addEventListener("click", () => openSearch());
+  // A category stamp on a task opens the search for that hashtag.
+  const searchTag = (stamp) => openSearch(`#${Planner.slug(stamp.dataset.tagSearch)} `);
+  document.addEventListener("click", (event) => {
+    const stamp = event.target.closest("[data-tag-search]");
+    if (!stamp) return;
+    event.preventDefault();
+    event.stopPropagation();
+    searchTag(stamp);
+  }, true);
+  document.addEventListener("keydown", (event) => {
+    const stamp = event.target.closest?.("[data-tag-search]");
+    if (!stamp || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    searchTag(stamp);
+  }, true);
   els.searchInput.addEventListener("input", runSearch);
   els.searchInput.addEventListener("keydown", (event) => {
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
