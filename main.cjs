@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, powerMonitor, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
 const { execFile } = require("child_process");
 const fs = require("fs");
 const https = require("https");
@@ -143,7 +143,21 @@ const STARTUP_SYNC_WAIT = 4000;
 
 const syncDirectory = () => path.dirname(desktopStoragePaths().current);
 const googleFile = () => path.join(syncDirectory(), "sync-google.json");
-const netFetch = (url, options) => net.fetch(url, options);
+// Chromium's network stack first (it follows the system's proxy settings,
+// as on a work PC); if it fails outright — on macOS, launched from the Dock,
+// it was seen failing with net::ERR_FAILED while Node's own fetch worked —
+// Node's fetch is tried. Bodies are strings, so a request can be sent twice.
+async function netFetch(url, options) {
+  try {
+    return await net.fetch(url, options);
+  } catch (chromiumError) {
+    try {
+      return await fetch(url, options);
+    } catch (nodeError) {
+      throw new Error(`${chromiumError.message}; ${nodeError.cause?.code || nodeError.message}`);
+    }
+  }
+}
 
 // The app's own Google client, when the build carries one (google-client.json,
 // written in CI from a secret); otherwise the person loads their file.
@@ -243,19 +257,48 @@ async function syncSafely(options) {
   }
 }
 
-// Exchanges with the target and hands anything new to the page.
-async function runSync() {
+// A small local log of every exchange ("sync.log" next to the data), so a
+// sync that doesn't happen can be explained: when, what came in, and why it
+// failed.
+function syncLog(line) {
+  try {
+    const file = path.join(syncDirectory(), "sync.log");
+    let text = "";
+    try {
+      text = fs.readFileSync(file, "utf8");
+    } catch {
+      // First line.
+    }
+    const lines = `${text}${new Date().toISOString()} ${line}\n`.split("\n").filter(Boolean).slice(-300);
+    fs.writeFileSync(file, `${lines.join("\n")}\n`, { mode: 0o600 });
+  } catch {
+    // Logging never gets in the way.
+  }
+}
+
+let syncRetry = null;
+
+// Exchanges with the target and hands anything new to the page. A failed
+// exchange (no network yet after waking up…) is tried again in 10 s.
+async function runSync(reason = "timer") {
   clearTimeout(syncTimer);
   syncTimer = null;
   if (!syncEngine?.active) return;
   const { incoming } = await syncSafely();
+  const info = syncEngine.info();
+  const changed = Object.keys(incoming);
+  syncLog(info.state === "idle"
+    ? `${reason}: ok${changed.length ? ` · in: ${changed.map((key) => key.replace(/^type-todo\.(planner\.)?/, "")).join(", ")}` : ""} · others: ${(info.others || []).map((other) => `${other.name}@${new Date(other.savedAt).toISOString().slice(11, 19)}`).join(", ") || "none"}`
+    : `${reason}: ${info.state} (${info.error}) ${info.detail || ""}`);
+  clearTimeout(syncRetry);
+  syncRetry = info.state === "unavailable" ? setTimeout(() => runSync("retry"), 10 * 1000) : null;
   if (!window) return;
   if (Object.keys(incoming).length) window.webContents.send("sync-incoming", incoming, syncEngine.info());
   window.webContents.send("sync-status", syncPayload());
 }
 
 function scheduleSync() {
-  if (!syncTimer) syncTimer = setTimeout(runSync, SYNC_DELAY);
+  if (!syncTimer) syncTimer = setTimeout(() => runSync("change"), SYNC_DELAY);
 }
 
 function syncPayload() {
@@ -341,7 +384,7 @@ ipcMain.handle("sync-google-cancel", () => {
 });
 
 ipcMain.handle("sync-now", async () => {
-  await runSync();
+  await runSync("button");
   return syncPayload();
 });
 ipcMain.handle("sync-stop", () => {
@@ -350,6 +393,66 @@ ipcMain.handle("sync-stop", () => {
   // Stopping Google sync signs out here (the client file stays).
   if (wasGoogle) writeGoogle({ client: readGoogle().client });
   return syncPayload();
+});
+
+// ---------- inbox: things added from outside the app ----------
+// A helper script (scripts/lowstate-add.cjs — e.g. run by Claude when asked
+// to "put this in Lowstate") drops small JSON files in "<data>/inbox/". The
+// page applies them like something typed, then the files are removed; the
+// usual sync carries the result to the other computers.
+const INBOX_MAX_BYTES = 256 * 1024;
+const inboxDir = () => path.join(syncDirectory(), "inbox");
+let inboxTimer = null;
+
+function readInbox() {
+  let names = [];
+  try {
+    names = fs.readdirSync(inboxDir()).filter((name) => /^[\w.-]+\.json$/.test(name)).sort();
+  } catch {
+    return [];
+  }
+  return names.map((name) => {
+    try {
+      const file = path.join(inboxDir(), name);
+      if (fs.statSync(file).size > INBOX_MAX_BYTES) return { file: name, ops: [] };
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      return { file: name, ops: Array.isArray(parsed?.ops) ? parsed.ops : [] };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+function pumpInbox() {
+  clearTimeout(inboxTimer);
+  inboxTimer = null;
+  if (!window || window.webContents.isLoading()) return;
+  const entries = readInbox();
+  if (entries.length) window.webContents.send("inbox-ops", entries);
+}
+
+function watchInbox() {
+  fs.mkdirSync(inboxDir(), { recursive: true });
+  try {
+    fs.watch(inboxDir(), () => {
+      if (!inboxTimer) inboxTimer = setTimeout(pumpInbox, 300);
+    });
+  } catch {
+    // Polling below still picks files up.
+  }
+  setInterval(pumpInbox, 10 * 1000);
+  window?.webContents.on("did-finish-load", () => setTimeout(pumpInbox, 1500));
+}
+
+ipcMain.on("inbox-done", (_event, names) => {
+  (Array.isArray(names) ? names : []).forEach((name) => {
+    if (typeof name !== "string" || !/^[\w.-]+\.json$/.test(name)) return;
+    try {
+      fs.unlinkSync(path.join(inboxDir(), name));
+    } catch {
+      // Already gone.
+    }
+  });
 });
 
 async function migrateLegacyProfile() {
@@ -501,8 +604,13 @@ app.whenReady().then(async () => {
   await migrateLegacyProfile();
   await initSync();
   createWindow();
-  setInterval(runSync, SYNC_INTERVAL);
-  window.on("focus", runSync);
+  syncLog(`start: ${syncEngine.info().state}`);
+  setInterval(() => runSync("timer"), SYNC_INTERVAL);
+  window.on("focus", () => runSync("focus"));
+  watchInbox();
+  // Waking up or unlocking: the other computer may have moved on meanwhile.
+  powerMonitor.on("resume", () => runSync("wake"));
+  powerMonitor.on("unlock-screen", () => runSync("unlock"));
   createTray();
   registerShortcuts(shortcuts);
   setTimeout(checkForUpdate, 2000);

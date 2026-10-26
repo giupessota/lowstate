@@ -236,7 +236,7 @@ function suggestFolders({ home, platform, exists = fs.existsSync, list = (dir) =
 // change times live in two small files next to it. `transportFor(target)`
 // gives the place the files are exchanged with: { kind: "folder", folder }
 // or another kind the app provides (Google Drive).
-function createSync({ configFile, metaFile, loadData, saveData, restorePoint, hostname, platform, transportFor = defaultTransport, now = () => Date.now() }) {
+function createSync({ configFile, metaFile, loadData, saveData, restorePoint, hostname, platform, transportFor = defaultTransport, now = () => Date.now(), exchangeLimit = 90 * 1000 }) {
   let config = readJSONFile(configFile) || {};
   // 2.5 kept only `folder`.
   if (config.folder && !config.target) config = { ...config, target: { kind: "folder", folder: config.folder } };
@@ -278,7 +278,7 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
     try {
       others = await place.readOthers(config.device);
     } catch (error) {
-      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "unavailable" };
+      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "unavailable", detail: String(error.message || error).slice(0, 200) };
       return { incoming: {} };
     }
     const firstTime = join || !config.joined;
@@ -291,7 +291,7 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
     try {
       await place.writeOwn(ownFile({ device: config.device, name: deviceName(), platform, data: last, meta, now: now() }));
     } catch (error) {
-      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "write" };
+      status = { ...status, state: error.code === "auth" ? "auth" : "unavailable", error: error.code || "write", detail: String(error.message || error).slice(0, 200) };
       return { incoming: result.incoming };
     }
     config = { ...config, joined: true, lastSync: now() };
@@ -300,15 +300,20 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
       state: "idle",
       lastSync: config.lastSync,
       error: null,
+      detail: null,
       others: others.map((other) => ({ device: other.device, name: other.name || other.device, platform: other.platform || "", savedAt: other.savedAt || null })),
     };
     return { incoming: result.incoming };
   }
 
   // One exchange at a time (a timer and a window focus can ask together).
+  // If one never finishes, the next ones don't wait for it past a limit.
   function sync(options) {
     const next = running.then(() => exchange(options));
-    running = next.catch(() => {});
+    let timer;
+    running = Promise.race([next, new Promise((resolve) => { timer = setTimeout(resolve, exchangeLimit); })])
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
     return next;
   }
 

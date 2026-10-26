@@ -95,6 +95,9 @@
       priority: item.priority === "urgent" ? "urgent" : "normal",
       focus: FOCUS.includes(item.focus) ? item.focus : item.priority === "urgent" ? "must" : "could",
       category: typeof item.category === "string" && item.category ? item.category : null,
+      // More categories (hashtags) besides the main one, which sets the color.
+      tags: [...new Set((Array.isArray(item.tags) ? item.tags : [])
+        .filter((tag) => typeof tag === "string" && tag && tag !== item.category))].slice(0, 8),
       notes: String(item.notes ?? ""),
       createdAt: Number.isFinite(item.createdAt) ? item.createdAt : now,
       order: Number.isFinite(item.order) ? item.order : 0,
@@ -280,6 +283,26 @@
       .join("\n\n");
   }
 
+  // ---------- Inbox (things added from outside the app) ----------
+  // Small JSON files dropped in the desktop app's inbox folder — by a helper
+  // script, e.g. when asking Claude to "put this in Lowstate". Each
+  // operation is applied once, like something typed in the app.
+  const INBOX_TYPES = ["task", "note", "shopping", "dump"];
+  const INBOX_FOCUS = ["must", "could", "later"];
+
+  function normalizeInboxOps(ops) {
+    return (Array.isArray(ops) ? ops : [])
+      .filter((op) => op && INBOX_TYPES.includes(op.type) && typeof op.text === "string" && op.text.trim())
+      .slice(0, 50)
+      .map((op) => ({
+        id: typeof op.id === "string" && /^[\w-]{1,64}$/.test(op.id) ? op.id : newId(),
+        type: op.type,
+        text: op.text.trim().slice(0, op.type === "note" ? 2000 : 500),
+        date: parseISODate(op.date) ? op.date : null,
+        focus: op.type === "task" && INBOX_FOCUS.includes(op.focus) ? op.focus : null,
+      }));
+  }
+
   // ---------- Day page modules ----------
   // Secondary parts of the day page can be folded or put away; the timeline
   // and the task groups always stay.
@@ -320,17 +343,29 @@
   // ignored, every word must appear). Newest first within each kind.
   const SEARCH_KINDS = ["task", "habit", "shopping", "dump", "dayNote", "closure", "mood", "weekNote"];
 
+  // "#trabalho" finds tasks with that category (hashtag) and text that
+  // contains it; other words are searched as text.
   function search(sources, query, limit = 40) {
-    const terms = foldText(query).split(/\s+/).filter(Boolean);
+    const terms = foldText(query).split(/\s+/).filter((term) => term && term !== "#");
     if (!terms.length) return [];
+    const tagTerms = terms.filter((term) => term.startsWith("#")).map((term) => term.slice(1));
+    const textTerms = terms.filter((term) => !term.startsWith("#"));
     const matches = (text) => {
       const folded = foldText(text);
       return terms.every((term) => folded.includes(term));
     };
+    const categoryNames = new Map((sources.categories || []).map((category) => [category.id, foldText(category.name)]));
+    const tagWords = (item) => itemTags(item).flatMap((id) => [foldText(id), categoryNames.get(id) || ""]);
     const out = [];
     (sources.items || []).forEach((item) => {
       const text = `${item.title} ${item.notes || ""}`;
-      if (matches(text)) out.push({ kind: "task", id: item.id, title: item.title, snippet: matches(item.title) ? "" : snippet(item.notes, terms), date: item.date, done: item.done });
+      const folded = foldText(text);
+      const words = tagWords(item);
+      const tagged = tagTerms.every((tag) => words.some((word) => word === tag || word.startsWith(tag)) || folded.includes(`#${tag}`));
+      const written = textTerms.every((term) => folded.includes(term));
+      if (tagged && written) {
+        out.push({ kind: "task", id: item.id, title: item.title, snippet: !textTerms.length || textTerms.every((term) => foldText(item.title).includes(term)) ? "" : snippet(item.notes, textTerms), date: item.date, done: item.done, tags: itemTags(item) });
+      }
     });
     (sources.habits || []).forEach((habit) => {
       if (matches(habit.name)) out.push({ kind: "habit", id: habit.id, title: habit.name, snippet: "", date: null });
@@ -617,11 +652,23 @@
 
   const TIME_PATTERN = /(^|\s)@?(\d{1,2})(?::([0-5]\d)|h([0-5]\d)?)(?=\s|$)/i;
 
+  const HASHTAG = /(^|\s)#([\p{L}\p{N}_-]+)(?=\s|$)/gu;
+
+  // Every category of a task: the main one first, then the other hashtags.
+  const itemTags = (item) => [...new Set([item?.category, ...(item?.tags || [])].filter(Boolean))];
+
   // Quick capture: everything core understands (#category, !urgent, @tomorrow…)
-  // plus a start time written as 14:30, 14h or 9h30.
+  // plus a start time written as 14:30, 14h or 9h30, and more than one
+  // hashtag (the first is the main category).
   function parseCapture(input, now = new Date()) {
     const parsed = core.parseTaskCapture(input, now);
     let title = parsed.title;
+    const categories = parsed.category ? [parsed.category] : [];
+    title = title.replace(HASHTAG, (match, space, name) => {
+      const upper = name.toUpperCase();
+      if (!categories.includes(upper)) categories.push(upper);
+      return " ";
+    }).replace(/\s+/g, " ").trim();
     let start = null;
     const match = title.match(TIME_PATTERN);
     if (match && Number(match[2]) <= 23) {
@@ -633,7 +680,8 @@
       date: parsed.dueDate || null,
       start,
       priority: parsed.priority === "boss" ? "urgent" : "normal",
-      category: parsed.category,
+      category: categories[0] || null,
+      categories,
     };
   }
 
@@ -1586,6 +1634,8 @@
     createItem,
     moveItem,
     REPEATS,
+    itemTags,
+    normalizeInboxOps,
     SHOPPING_SECTIONS,
     guessShoppingSection,
     parseShoppingLine,

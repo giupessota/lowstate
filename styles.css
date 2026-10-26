@@ -1612,6 +1612,13 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 .closed-mark { color: var(--indigo); font-weight: 600; }
 .closed-good { font-style: italic; }
 .closed-line .focus-action { margin-left: auto; }
+/* Category stamps search their hashtag; the main category of a task with
+   several is marked in the editor. */
+.stamp[data-tag-search] { cursor: pointer; }
+.stamp[data-tag-search]:hover { background: color-mix(in srgb, var(--cat, var(--muted)) 12%, transparent); }
+.stamp + .stamp { margin-left: 3px; }
+.chip.is-main { box-shadow: inset 0 0 0 1.5px var(--cat, var(--ink)); }
+
 /* ===== Shopping list ===== */
 .shop-spread { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) 0; }
 .shop-capture { margin-top: 12px; }
