@@ -295,15 +295,20 @@
     const items = parse(data["type-todo.planner.items.v1"], null);
     const legacy = !Array.isArray(items);
     const date = typeof parsed.exportedAt === "string" ? parsed.exportedAt : typeof parsed.savedAt === "string" ? parsed.savedAt : null;
+    // Calendars travel only sealed with a password (desktop app).
+    const calendars = parsed.calendars && typeof parsed.calendars === "object" && parsed.calendars.v && parsed.calendars.data
+      ? parsed.calendars : null;
     return {
       ok: true,
       data,
+      calendars,
       info: {
         date: date && !Number.isNaN(Date.parse(date)) ? date : null,
         generation: parsed.app === "type-todo" || legacy ? 1 : 2,
         tasks: legacy ? count("quest-log.todos.v1") : items.length,
         habits: count("type-todo.planner.habits.v1"),
         keys: Object.keys(data).length,
+        calendars: Boolean(calendars),
       },
     };
   }

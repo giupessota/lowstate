@@ -143,6 +143,7 @@
     dumpEmpty: $("dumpEmpty"),
     closedLine: $("closedLine"),
     closureDialog: $("closureDialog"),
+    workBox: $("workBox"),
     syncRow: $("syncRow"),
     syncBox: $("syncBox"),
     syncAlert: $("syncAlert"),
@@ -246,6 +247,17 @@
     restoreNote: $("restoreNote"),
     restoreError: $("restoreError"),
     restoreCancel: $("restoreCancel"),
+    restoreCalendars: $("restoreCalendars"),
+    restoreCalendarsPassword: $("restoreCalendarsPassword"),
+    backupDialog: $("backupDialog"),
+    backupForm: $("backupForm"),
+    backupCalendars: $("backupCalendars"),
+    backupCalendarsCount: $("backupCalendarsCount"),
+    backupPasswordFields: $("backupPasswordFields"),
+    backupPassword: $("backupPassword"),
+    backupPasswordAgain: $("backupPasswordAgain"),
+    backupError: $("backupError"),
+    backupCancel: $("backupCancel"),
     trashSummary: $("trashSummary"),
     trashRestore: $("trashRestore"),
     trashEmpty: $("trashEmpty"),
@@ -379,7 +391,8 @@
       waterGoal: Planner.clampWaterGoal(savedSettings.waterGoal ?? Planner.WATER_GOAL.fallback),
       notifyOn: savedSettings.notifyOn !== false,
       notifyLead: [5, 10, 15, 30].includes(savedSettings.notifyLead) ? savedSettings.notifyLead : 10,
-      notifyKinds: { tasks: true, habits: true, meetings: true, ...(savedSettings.notifyKinds || {}) },
+      notifyKinds: { tasks: true, habits: true, meetings: true, lunch: true, ...(savedSettings.notifyKinds || {}) },
+      workday: Planner.normalizeWorkday(savedSettings.workday),
       morningOn: savedSettings.morningOn !== false,
       morningAt: Planner.isTime(savedSettings.morningAt) ? savedSettings.morningAt : "08:00",
       closureOn: savedSettings.closureOn !== false,
@@ -1024,6 +1037,25 @@
       inner.append(h("div", { class: "hour-row", style: `top: ${(current - first) * hour}px` },
         h("span", { class: "hour-label", text: String(current).padStart(2, "0") }),
         h("button", { type: "button", class: "hour-slot", "data-slot": time, "aria-label": t("addAtTime", { time }) })));
+    }
+
+    // Working hours: outside them a light shade; lunch a quiet band behind
+    // everything (it isn't a task or a habit, and never blocks a click).
+    const work = Planner.workdayOn(state.settings.workday, iso);
+    const band = (cls, from, to, children = []) => {
+      const top = ((Math.max(from, first * 60) - first * 60) / 60) * hour;
+      const bottom = ((Math.min(to, last * 60) - first * 60) / 60) * hour;
+      if (bottom <= top) return;
+      inner.append(h("div", { class: cls, "aria-hidden": "true", style: `top: ${top}px; height: ${bottom - top}px` }, ...children));
+    };
+    if (work?.hours) {
+      band("off-hours", first * 60, work.hours.start);
+      band("off-hours", work.hours.end, last * 60);
+    }
+    if (work?.lunch) {
+      band("lunch-band", work.lunch.start, work.lunch.end, [
+        h("span", { class: "lunch-label", text: `${t("lunchBand")} · ${Planner.minutesToTime(work.lunch.start)}–${Planner.minutesToTime(work.lunch.end)}` }),
+      ]);
     }
 
     events.forEach((event) => {
@@ -2445,8 +2477,76 @@
     return null;
   }
 
+  // ---------- working hours ----------
+  const lunchHabit = () => state.habits.find((habit) => Planner.lunchFromHabit(habit) && (!habit.until || habit.until >= todayISO()));
+
+  function renderWorkday() {
+    const work = state.settings.workday;
+    const toggle = (field, on) => h("button", { type: "button", class: `chip${on ? " active" : ""}`, "aria-pressed": String(on), "data-work-toggle": field, text: t(on ? "workOn" : "workOff") });
+    const time = (field, value) => h("input", { type: "time", class: "work-time", "data-work-time": field, value, "aria-label": t(field === "lunchStart" ? "workLunch" : "workHours") });
+    const days = [1, 2, 3, 4, 5, 6, 0].map((day) => h("button", {
+      type: "button",
+      class: `chip${work.days.includes(day) ? " active" : ""}`,
+      "aria-pressed": String(work.days.includes(day)),
+      "data-work-day": day,
+      text: weekdayShort(day),
+    }));
+    const duration = h("select", { class: "work-time", "data-work-duration": "", "aria-label": t("workLunchFor") },
+      ...Planner.LUNCH_DURATIONS.map((minutes) => h("option", { value: String(minutes), text: formatDuration(minutes) })));
+    duration.value = String(work.lunchDuration);
+    const habit = lunchHabit();
+    els.workBox.replaceChildren(...[
+      h("div", { class: "work-line" }, h("span", { class: "work-label", text: t("workDays") }), h("div", { class: "chip-row" }, days)),
+      h("div", { class: "work-line" }, h("span", { class: "work-label", text: t("workHours") }), toggle("hoursOn", work.hoursOn),
+        time("start", work.start), h("span", { text: "–" }), time("end", work.end)),
+      h("div", { class: "work-line" }, h("span", { class: "work-label", text: t("workLunch") }), toggle("lunchOn", work.lunchOn),
+        time("lunchStart", work.lunchStart), h("span", { text: t("workLunchFor") }), duration),
+      habit ? h("button", { type: "button", class: "btn work-from-habit", "data-work-from-habit": habit.id, text: t("workFromHabit", { name: habit.name }) }) : null,
+    ].filter(Boolean));
+    els.workBox.querySelectorAll('[data-work-time="start"], [data-work-time="end"]').forEach((input) => { input.disabled = !work.hoursOn; });
+    els.workBox.querySelectorAll('[data-work-time="lunchStart"], [data-work-duration]').forEach((input) => { input.disabled = !work.lunchOn; });
+  }
+
+  function setWorkday(changes) {
+    state.settings.workday = Planner.normalizeWorkday({ ...state.settings.workday, ...changes });
+    persistSettings();
+    renderWorkday();
+    render();
+  }
+
+  els.workBox.addEventListener("click", (event) => {
+    const day = event.target.closest("[data-work-day]");
+    const toggle = event.target.closest("[data-work-toggle]");
+    const fromHabit = event.target.closest("[data-work-from-habit]");
+    if (day) {
+      const value = Number(day.dataset.workDay);
+      const days = state.settings.workday.days;
+      setWorkday({ days: days.includes(value) ? days.filter((entry) => entry !== value) : [...days, value] });
+    } else if (toggle) {
+      setWorkday({ [toggle.dataset.workToggle]: !state.settings.workday[toggle.dataset.workToggle] });
+    } else if (fromHabit) {
+      // The routine becomes the lunch break and ends yesterday, so its
+      // history stays and it no longer shows up as something to tick.
+      const habit = state.habits.find((candidate) => candidate.id === fromHabit.dataset.workFromHabit);
+      const lunch = Planner.lunchFromHabit(habit);
+      if (!lunch) return;
+      const yesterday = Core.toISODate(Planner.addDays(new Date(), -1));
+      state.habits = Planner.normalizeHabits(state.habits.map((candidate) => (candidate.id === habit.id ? { ...candidate, until: yesterday } : candidate)));
+      persistHabits();
+      setWorkday({ ...lunch, lunchOn: true });
+      toast(t("workFromHabitDone", { name: habit.name }));
+    }
+  });
+  els.workBox.addEventListener("change", (event) => {
+    const time = event.target.closest("[data-work-time]");
+    const duration = event.target.closest("[data-work-duration]");
+    if (time && Planner.isTime(time.value)) setWorkday({ [time.dataset.workTime]: time.value });
+    else if (duration) setWorkday({ lunchDuration: Number(duration.value) });
+  });
+
   function renderSettings() {
     renderDayModuleChips();
+    renderWorkday();
     renderSync();
     const customSwatch = els.settingsDialog.querySelector(".swatch-custom");
     const customColor = Store.getRaw(KEYS.coverColor);
@@ -2715,9 +2815,56 @@
 
   // The desktop app writes through the system's save dialog and only then
   // says "saved"; the browser can only hand the file to its downloads.
-  async function exportBackup() {
+  // With calendars in the desktop app, a small sheet asks whether to include
+  // them (behind a password) first.
+  function startBackup() {
+    const count = state.calendars.length;
+    if (!calendarsApi?.sealBackup || !count) {
+      exportBackup();
+      return;
+    }
+    els.backupCalendarsCount.textContent = t("backupCalendarsCount", { n: count });
+    els.backupCalendars.checked = true;
+    els.backupPassword.value = "";
+    els.backupPasswordAgain.value = "";
+    els.backupError.hidden = true;
+    els.backupPasswordFields.hidden = false;
+    els.backupDialog.showModal();
+    els.backupPassword.focus();
+  }
+
+  els.backupCalendars.addEventListener("change", () => {
+    els.backupPasswordFields.hidden = !els.backupCalendars.checked;
+  });
+  els.backupCancel.addEventListener("click", () => els.backupDialog.close());
+  els.backupForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    let calendars = null;
+    if (els.backupCalendars.checked) {
+      const password = els.backupPassword.value;
+      const problem = password.length < 4 ? "backupPasswordShort" : password !== els.backupPasswordAgain.value ? "backupPasswordMismatch" : null;
+      if (problem) {
+        els.backupError.textContent = t(problem);
+        els.backupError.hidden = false;
+        return;
+      }
+      const sealed = await calendarsApi.sealBackup(password).catch(() => ({ ok: false }));
+      if (!sealed?.ok) {
+        els.backupError.textContent = t("backupFailed");
+        els.backupError.hidden = false;
+        return;
+      }
+      calendars = sealed.sealed;
+    }
+    els.backupDialog.close();
+    exportBackup(calendars);
+  });
+
+  async function exportBackup(calendars = null) {
     Store.flush();
-    const text = JSON.stringify(Store.backupPayload(), null, 2);
+    const payload = Store.backupPayload();
+    if (calendars) payload.calendars = calendars;
+    const text = JSON.stringify(payload, null, 2);
     const name = `lowstate-backup-${todayISO()}.json`;
     const storageApi = window.desktopStorage;
     if (storageApi?.saveBackup) {
@@ -2747,8 +2894,12 @@
       ...restoreFact(t("restoreFrom"), t(info.generation === 1 ? "restoreGen1" : "restoreGen2")),
       ...restoreFact(t("restoreTasks"), String(info.tasks)),
       ...restoreFact(t("restoreHabits"), String(info.habits)),
+      ...(info.calendars ? restoreFact(t("restoreCalendarsInfo"), t("restoreCalendarsYes")) : []),
       ...restoreFact(t("restoreNow"), t("restoreNowValue", { tasks: state.items.length, habits: state.habits.length })));
     els.restoreNote.textContent = t(window.desktopStorage?.saveRestorePoint ? "restoreNoteDesktop" : "restoreNoteWeb");
+    const withCalendars = Boolean(info.calendars && calendarsApi?.openBackup);
+    els.restoreCalendars.hidden = !withCalendars;
+    els.restoreCalendarsPassword.value = "";
     els.restoreError.hidden = true;
     els.restoreDialog.showModal();
   }
@@ -2758,7 +2909,7 @@
     els.restoreError.hidden = false;
   }
 
-  els.exportData.addEventListener("click", exportBackup);
+  els.exportData.addEventListener("click", startBackup);
   els.importData.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", async () => {
     const file = els.importFile.files[0];
@@ -2782,9 +2933,19 @@
   els.restoreDialog.addEventListener("close", () => {
     restoreCandidate = null;
   });
-  els.restoreForm.addEventListener("submit", (event) => {
+  els.restoreForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!restoreCandidate) return;
+    // Calendars first: a wrong password stops before anything changes.
+    const calendarPassword = els.restoreCalendars.hidden ? "" : els.restoreCalendarsPassword.value;
+    if (calendarPassword && restoreCandidate.calendars) {
+      const opened = await calendarsApi.openBackup(restoreCandidate.calendars, calendarPassword).catch(() => ({ ok: false }));
+      if (!opened?.ok) {
+        restoreFailed(t(opened?.error === "password" ? "restoreCalendarsWrong" : "restoreFailed"));
+        return;
+      }
+      if (opened.added) sessionStorage.setItem("lowstate.calendarsRestored", String(opened.added));
+    }
     Store.flush();
     // A copy of what's here now, before anything is replaced.
     if (window.desktopStorage?.saveRestorePoint) {
@@ -3063,7 +3224,7 @@
     const status = Store.retry();
     toast(t(status.local === "failed" || status.desktop === "failed" ? "saveStillFailing" : "saveAllGood"));
   });
-  els.saveExport.addEventListener("click", exportBackup);
+  els.saveExport.addEventListener("click", () => exportBackup());
   // The disk copy waits a moment to group writes; leaving writes it now.
   window.addEventListener("pagehide", () => Store.flush());
   window.addEventListener("beforeunload", () => Store.flush());
@@ -3503,7 +3664,7 @@
 
   // ---------- search ----------
   const SEARCH_LABELS = {
-    task: "searchTasks", habit: "searchHabits", shopping: "searchShopping", dump: "viewDump", dayNote: "searchDayNotes",
+    tag: "searchTags", task: "searchTasks", habit: "searchHabits", shopping: "searchShopping", dump: "viewDump", dayNote: "searchDayNotes",
     closure: "searchClosures", mood: "searchMoods", weekNote: "searchWeekNotes",
   };
   let searchResults = [];
@@ -3537,7 +3698,8 @@
       if (result.kind !== searchResults[index - 1]?.kind) nodes.push(h("h3", { class: "search-group", text: t(SEARCH_LABELS[result.kind]) }));
       const meta = result.kind === "weekNote" ? t("searchWeekOf", { date: searchDate(result.date) })
         : result.kind === "task" && !result.date ? t("dumpInbox")
-          : result.kind === "habit" || result.kind === "shopping" ? "" : searchDate(result.date);
+          : result.kind === "tag" ? t(result.count === 1 ? "searchTagCountOne" : "searchTagCount", { n: result.count })
+            : result.kind === "habit" || result.kind === "shopping" ? "" : searchDate(result.date);
       const active = index === searchIndex;
       nodes.push(h("button", {
         type: "button", role: "option", "aria-selected": String(active), "data-index": index,
@@ -3573,6 +3735,13 @@
 
   function pickResult(result) {
     if (!result) return;
+    // A category: search everything with it.
+    if (result.kind === "tag") {
+      els.searchInput.value = `#${Planner.slug(result.title)} `;
+      runSearch();
+      els.searchInput.focus();
+      return;
+    }
     els.searchDialog.close();
     if (result.kind === "task") {
       if (result.date) openDay(result.date);
@@ -3711,10 +3880,12 @@
     els.closeDayBtn.hidden = Boolean(closed) || (iso !== todayISO() && iso !== yesterday);
     els.closedLine.hidden = !closed;
     if (closed) {
-      els.closedLine.replaceChildren(
+      // replaceChildren (unlike h) would print a null child as "null".
+      els.closedLine.replaceChildren(...[
         h("span", { class: "closed-mark", text: `✓ ${t("closedLine")}` }),
         closed.good ? h("span", { class: "closed-good", text: `“${closed.good}”` }) : null,
-        h("button", { type: "button", class: "focus-action", id: "reopenClosure", text: t("closedReopen") }));
+        h("button", { type: "button", class: "focus-action", id: "reopenClosure", text: t("closedReopen") }),
+      ].filter(Boolean));
     }
   }
 
@@ -4272,6 +4443,7 @@
       kinds: state.settings.notifyKinds,
       morningAt: state.settings.morningOn ? state.settings.morningAt : null,
       closureAt: state.settings.closureOn && !state.closures[todayISO()] ? state.settings.closureAt : null,
+      workday: state.settings.workday,
     });
   }
 
@@ -4294,6 +4466,10 @@
       notified[reminder.key] = now;
       if (reminder.kind === "closure") {
         desktop.notify({ title: t("closeDay"), body: t("closeNotifyBody"), iso: reminder.iso, action: "closure" });
+        return;
+      }
+      if (reminder.kind === "lunch") {
+        desktop.notify({ title: t("lunchNotifyTitle"), body: t("lunchNotifyBody", { start: reminder.start, end: reminder.end }), iso: reminder.iso });
         return;
       }
       if (reminder.kind === "morning") {
@@ -4429,5 +4605,13 @@
 
   I18n.apply();
   render();
+  // After a restore that brought calendars back.
+  try {
+    const restored = Number(sessionStorage.getItem("lowstate.calendarsRestored"));
+    sessionStorage.removeItem("lowstate.calendarsRestored");
+    if (restored) toast(t(restored === 1 ? "restoreCalendarsAddedOne" : "restoreCalendarsAdded", { n: restored }));
+  } catch {
+    // Nothing to tell.
+  }
   if (initial.migrated) toast(t("migratedNotice"));
 })();

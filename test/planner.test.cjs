@@ -410,6 +410,31 @@ test("inbox operations are checked before they are applied", () => {
   assert.equal(P.normalizeInboxOps("junk").length, 0);
 });
 
+test("working hours and lunch: a fact of workdays, not a habit", () => {
+  assert.deepEqual(P.normalizeWorkday(undefined), P.WORKDAY_DEFAULT);
+  const plan = P.normalizeWorkday({ days: [5, 1, 1, 9], hoursOn: true, start: "08:30", end: "17:30", lunchOn: true, lunchStart: "12:30", lunchDuration: 45 });
+  assert.deepEqual(plan.days, [1, 5]);
+  assert.deepEqual(P.workdayOn(plan, "2026-10-26"), { hours: { start: 510, end: 1050 }, lunch: { start: 750, end: 795 } });
+  assert.equal(P.workdayOn(plan, "2026-10-27"), null); // Tuesday is off in this plan
+  assert.deepEqual(P.workdayOn({ ...plan, hoursOn: false }, "2026-10-26").hours, null);
+  assert.equal(P.normalizeWorkday({ start: "18:00", end: "09:00" }).end, "19:00");
+  assert.equal(P.normalizeWorkday({ lunchDuration: 50 }).lunchDuration, 60);
+  // Her "Lunch" routine (weekdays, 12:00, 1h) becomes the lunch break.
+  assert.deepEqual(P.lunchFromHabit({ name: "Lunch", days: [5, 1, 2, 3, 4], start: "12:00", duration: 60 }),
+    { days: [1, 2, 3, 4, 5], lunchStart: "12:00", lunchDuration: 60 });
+  assert.equal(P.lunchFromHabit({ name: "Almoço com a Ana", start: "13:00", duration: 50 }).lunchDuration, 45);
+  assert.equal(P.lunchFromHabit({ name: "Gym", start: "17:00" }), null);
+  assert.equal(P.lunchFromHabit({ name: "Lunch" }), null);
+});
+
+test("the lunch break can remind, on workdays only", () => {
+  const now = new Date(2026, 9, 26, 11, 0); // Monday
+  const due = P.reminders({ now, workday: { lunchOn: true, lunchStart: "12:00", lunchDuration: 60 } }).filter((reminder) => reminder.kind === "lunch");
+  assert.deepEqual(due.map((reminder) => [reminder.iso, reminder.start, reminder.end]), [["2026-10-26", "12:00", "13:00"], ["2026-10-27", "12:00", "13:00"]]);
+  assert.equal(P.reminders({ now, workday: { lunchOn: true }, kinds: { lunch: false } }).some((reminder) => reminder.kind === "lunch"), false);
+  assert.equal(P.reminders({ now: new Date(2026, 9, 24, 11), workday: { lunchOn: true } }).filter((reminder) => reminder.kind === "lunch").length, 0); // Saturday/Sunday
+});
+
 test("day page modules default to open and keep only known states", () => {
   assert.deepEqual(P.normalizeDayModules(undefined), { load: "open", water: "open", habits: "open", mood: "open", notes: "open" });
   assert.deepEqual(P.normalizeDayModules({ water: "hidden", mood: "collapsed", load: "gone", timeline: "hidden" }),
@@ -446,13 +471,21 @@ test("searching by hashtag finds tasks by any of their categories", () => {
     P.normalizeItem({ id: "c", title: "Dentista", category: "saude" }),
     P.normalizeItem({ id: "d", title: "Ligar pro Jun", notes: "sobre #jun" }),
   ];
-  const ids = (query) => P.search({ items, categories, dayNotes: { "2026-10-26": "falar com #jun" } }, query).map((r) => r.id);
+  const ids = (query) => P.search({ items, categories, dayNotes: { "2026-10-26": "falar com #jun" } }, query).filter((r) => r.kind !== "tag").map((r) => r.id);
   assert.deepEqual(ids("#jun"), ["a", "d", "2026-10-26"]);
   assert.deepEqual(ids("#trabalho"), ["a", "b"]);
   assert.deepEqual(ids("#trabalho #jun"), ["a"]);
   assert.deepEqual(ids("#trab planilha"), ["b"]);
   assert.deepEqual(ids("#saude"), ["c"]);
-  assert.deepEqual(ids("#"), []);
+  // "#" lists the categories (most used first); "#tr" narrows them.
+  assert.deepEqual(P.search({ items, categories }, "#").map((r) => [r.kind, r.title, r.count]),
+    [["tag", "Trabalho", 2], ["tag", "Jun", 1], ["tag", "Saúde", 1]]);
+  assert.deepEqual(P.search({ items, categories }, "#tr").filter((r) => r.kind === "tag").map((r) => r.id), ["trabalho"]);
+  // Once the hashtag is finished (a space after it), only the results.
+  assert.equal(P.search({ items, categories }, "#trabalho ").some((r) => r.kind === "tag"), false);
+  // Plain words also find tasks by their category names.
+  assert.deepEqual(ids("saude"), ["c"]);
+  assert.deepEqual(ids("jun").filter((id) => id.length === 1), ["a", "d"]);
 });
 
 test("search finds words anywhere, ignoring accents and case", () => {

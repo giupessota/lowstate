@@ -242,6 +242,42 @@ function expansionWindow(now = Date.now()) {
   return { from: new Date(now - WINDOW_PAST_DAYS * DAY), to: new Date(now + WINDOW_FUTURE_DAYS * DAY) };
 }
 
+// ---------- calendars in a backup, behind a password ----------
+// The links are secrets, so a backup only carries them encrypted with a key
+// derived from a password the person chooses (scrypt → AES-256-GCM).
+const crypto = require("crypto");
+const SEAL_VERSION = 1;
+
+function sealSecrets(value, password) {
+  if (typeof password !== "string" || password.length < 4) throw new CalendarError("password-short");
+  const salt = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(12);
+  const key = crypto.scryptSync(password, salt, 32);
+  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  const data = Buffer.concat([cipher.update(JSON.stringify(value), "utf8"), cipher.final()]);
+  return {
+    v: SEAL_VERSION,
+    kdf: "scrypt",
+    salt: salt.toString("base64"),
+    iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"),
+    data: data.toString("base64"),
+  };
+}
+
+function openSecrets(sealed, password) {
+  if (!sealed || sealed.v !== SEAL_VERSION || sealed.kdf !== "scrypt") throw new CalendarError("sealed-format");
+  try {
+    const key = crypto.scryptSync(String(password || ""), Buffer.from(sealed.salt, "base64"), 32);
+    const decipher = crypto.createDecipheriv("aes-256-gcm", key, Buffer.from(sealed.iv, "base64"));
+    decipher.setAuthTag(Buffer.from(sealed.tag, "base64"));
+    const text = Buffer.concat([decipher.update(Buffer.from(sealed.data, "base64")), decipher.final()]).toString("utf8");
+    return JSON.parse(text);
+  } catch {
+    throw new CalendarError("password");
+  }
+}
+
 // ---------- subscriptions ----------
 
 const COLORS = ["#34508a", "#d64a32", "#7c8c4a", "#e2a43a", "#8b78bd", "#3e9aa8", "#e59aa6", "#8d8a85"];
@@ -312,6 +348,45 @@ function createCalendarStore({ file, cacheFile, encrypt, decrypt, fetchText = fe
 
   return {
     list: () => calendars.map(publicInfo),
+
+    // For an encrypted backup only: names, colors and the links themselves.
+    exportAll() {
+      return calendars.flatMap((calendar) => {
+        try {
+          return [{ name: calendar.name, color: calendar.color, enabled: calendar.enabled !== false, url: urlOf(calendar) }];
+        } catch {
+          return [];
+        }
+      });
+    },
+
+    // Restoring them: links already here are skipped; events come with the
+    // next refresh.
+    restore(list) {
+      let added = 0;
+      (Array.isArray(list) ? list : []).forEach((entry) => {
+        const normalized = normalizeCalendarUrl(entry?.url);
+        if (!normalized) return;
+        const exists = calendars.some((calendar) => {
+          try {
+            return urlOf(calendar) === normalized;
+          } catch {
+            return false;
+          }
+        });
+        if (exists) return;
+        calendars = [...calendars, {
+          id: `cal-${now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+          name: String(entry.name || "").trim().slice(0, 60) || maskUrl(normalized).replace("/…", ""),
+          color: COLORS.includes(entry.color) ? entry.color : COLORS[calendars.length % COLORS.length],
+          enabled: entry.enabled !== false,
+          secret: encrypt(normalized),
+        }];
+        added += 1;
+      });
+      if (added) save();
+      return added;
+    },
 
     events: () => calendars
       .filter((calendar) => calendar.enabled !== false)
@@ -384,6 +459,8 @@ function createCalendarStore({ file, cacheFile, encrypt, decrypt, fetchText = fe
 }
 
 module.exports = {
+  sealSecrets,
+  openSecrets,
   CalendarError,
   normalizeCalendarUrl,
   maskUrl,

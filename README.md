@@ -31,6 +31,10 @@ switches to the week or the month when you want the bigger picture.
   from 0.5 to 5 L
 - **Mood of the day** (six faces) with an optional note on what shaped it
 - Day notes, moon phase, day of the year and a quote at the foot of the page
+- Working hours (Settings → Planner): workdays, office hours shaded outside
+  on the timeline, and a lunch break shown as a quiet band — not a habit to
+  tick, not busy time — with an optional reminder; a "Lunch"/"Almoço"
+  routine can be turned into it in one click
 
 **Week and month**
 
@@ -131,7 +135,9 @@ switches to the week or the month when you want the bigger picture.
 - Settings in tabs: light/dark theme, eight cover colors, English or
   Portuguese, week start, holidays, quote style (Japanese proverbs,
   motivational, ironic or none), water unit, glass size and goal
-- Automatic durable desktop snapshots plus manual backup and restore
+- Automatic durable desktop snapshots plus manual backup and restore; in the
+  desktop app a backup can include the calendars, their secret links
+  encrypted with a password of yours (scrypt + AES-256-GCM)
 - Installable offline PWA and Electron desktop app; Windows tray support so
   global shortcuts keep working after the window is closed
 
