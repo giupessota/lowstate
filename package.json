@@ -10,7 +10,8 @@
     "test": "node --test",
     "check": "node --check app.js && node --check core.js && node --check planner.js && node --check storage.js && node --check desktop-storage.cjs && node --check desktop-lifecycle.cjs && node --check desktop-calendars.cjs && node --check desktop-sync.cjs && node --check desktop-google.cjs && node --check i18n.js && node --check main.cjs && node --check preload.cjs && node --test",
     "dist:mac": "electron-builder --mac --publish=never",
-    "dist:win": "electron-builder --win --publish=never"
+    "dist:win": "electron-builder --win --publish=never",
+    "dist:mac:local": "electron-builder --mac dir --arm64 --publish=never -c.mac.identity=\"Lowstate Local Signing\""
   },
   "devDependencies": {
     "electron": "^37.10.3",
