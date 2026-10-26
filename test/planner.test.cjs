@@ -388,6 +388,27 @@ test("brain dump splits lines, drops bullets and blanks, and imports old notes",
   assert.deepEqual(notes, [{ id: "n1", text: "ideia solta", createdAt: 5 }]);
 });
 
+test("inbox operations are checked before they are applied", () => {
+  const ops = P.normalizeInboxOps([
+    { id: "a1", type: "task", text: "  Ligar pro banco @amanhã 14h ", focus: "must" },
+    { id: "a2", type: "note", text: "Lembrar do aniversário", date: "2026-10-27" },
+    { type: "shopping", text: "leite, pão" },
+    { id: "bad id!", type: "dump", text: "ideia", focus: "must", date: "ontem" },
+    { type: "delete-everything", text: "x" },
+    { type: "task", text: "   " },
+    null,
+  ]);
+  assert.deepEqual(ops.map((op) => [op.type, op.text, op.date, op.focus]), [
+    ["task", "Ligar pro banco @amanhã 14h", null, "must"],
+    ["note", "Lembrar do aniversário", "2026-10-27", null],
+    ["shopping", "leite, pão", null, null],
+    ["dump", "ideia", null, null],
+  ]);
+  assert.deepEqual(ops.slice(0, 2).map((op) => op.id), ["a1", "a2"]);
+  assert.match(ops[3].id, /^[\w-]+$/);
+  assert.equal(P.normalizeInboxOps("junk").length, 0);
+});
+
 test("day page modules default to open and keep only known states", () => {
   assert.deepEqual(P.normalizeDayModules(undefined), { load: "open", water: "open", habits: "open", mood: "open", notes: "open" });
   assert.deepEqual(P.normalizeDayModules({ water: "hidden", mood: "collapsed", load: "gone", timeline: "hidden" }),

@@ -99,6 +99,14 @@ switches to the week or the month when you want the bigger picture.
   on each computer. Changes from the other computer show up when you come
   back to the window (or with *Update*, if you're using it).
 
+**Adding from outside the app** (desktop app)
+
+- `node scripts/lowstate-add.cjs task|note|shopping|dump "text" [--date YYYY-MM-DD] [--focus must|could|later]`
+  drops a small file in the app's `inbox` folder (next to its data); the
+  open app applies it within seconds, as if typed (tasks use the capture
+  syntax), and sync carries it to the other computers. Handy for asking an
+  assistant such as Claude to "put this in Lowstate".
+
 **Everything else**
 
 - Search everything you wrote (⌘K or `/`): tasks, day notes, brain dump,

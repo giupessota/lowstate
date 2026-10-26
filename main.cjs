@@ -352,6 +352,66 @@ ipcMain.handle("sync-stop", () => {
   return syncPayload();
 });
 
+// ---------- inbox: things added from outside the app ----------
+// A helper script (scripts/lowstate-add.cjs — e.g. run by Claude when asked
+// to "put this in Lowstate") drops small JSON files in "<data>/inbox/". The
+// page applies them like something typed, then the files are removed; the
+// usual sync carries the result to the other computers.
+const INBOX_MAX_BYTES = 256 * 1024;
+const inboxDir = () => path.join(syncDirectory(), "inbox");
+let inboxTimer = null;
+
+function readInbox() {
+  let names = [];
+  try {
+    names = fs.readdirSync(inboxDir()).filter((name) => /^[\w.-]+\.json$/.test(name)).sort();
+  } catch {
+    return [];
+  }
+  return names.map((name) => {
+    try {
+      const file = path.join(inboxDir(), name);
+      if (fs.statSync(file).size > INBOX_MAX_BYTES) return { file: name, ops: [] };
+      const parsed = JSON.parse(fs.readFileSync(file, "utf8"));
+      return { file: name, ops: Array.isArray(parsed?.ops) ? parsed.ops : [] };
+    } catch {
+      return null;
+    }
+  }).filter(Boolean);
+}
+
+function pumpInbox() {
+  clearTimeout(inboxTimer);
+  inboxTimer = null;
+  if (!window || window.webContents.isLoading()) return;
+  const entries = readInbox();
+  if (entries.length) window.webContents.send("inbox-ops", entries);
+}
+
+function watchInbox() {
+  fs.mkdirSync(inboxDir(), { recursive: true });
+  try {
+    fs.watch(inboxDir(), () => {
+      if (!inboxTimer) inboxTimer = setTimeout(pumpInbox, 300);
+    });
+  } catch {
+    // Polling below still picks files up.
+  }
+  setInterval(pumpInbox, 10 * 1000);
+  window?.webContents.on("did-finish-load", () => setTimeout(pumpInbox, 1500));
+}
+
+ipcMain.on("inbox-done", (_event, names) => {
+  (Array.isArray(names) ? names : []).forEach((name) => {
+    if (typeof name !== "string" || !/^[\w.-]+\.json$/.test(name)) return;
+    try {
+      fs.unlinkSync(path.join(inboxDir(), name));
+    } catch {
+      // Already gone.
+    }
+  });
+});
+
 async function migrateLegacyProfile() {
   const paths = desktopStoragePaths();
   if (Object.keys(loadSnapshot(paths.current, paths.backup).data).length) return;
@@ -503,6 +563,7 @@ app.whenReady().then(async () => {
   createWindow();
   setInterval(runSync, SYNC_INTERVAL);
   window.on("focus", runSync);
+  watchInbox();
   // Waking up or unlocking: the other computer may have moved on meanwhile.
   powerMonitor.on("resume", runSync);
   powerMonitor.on("unlock-screen", runSync);

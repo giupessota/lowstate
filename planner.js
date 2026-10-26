@@ -280,6 +280,26 @@
       .join("\n\n");
   }
 
+  // ---------- Inbox (things added from outside the app) ----------
+  // Small JSON files dropped in the desktop app's inbox folder — by a helper
+  // script, e.g. when asking Claude to "put this in Lowstate". Each
+  // operation is applied once, like something typed in the app.
+  const INBOX_TYPES = ["task", "note", "shopping", "dump"];
+  const INBOX_FOCUS = ["must", "could", "later"];
+
+  function normalizeInboxOps(ops) {
+    return (Array.isArray(ops) ? ops : [])
+      .filter((op) => op && INBOX_TYPES.includes(op.type) && typeof op.text === "string" && op.text.trim())
+      .slice(0, 50)
+      .map((op) => ({
+        id: typeof op.id === "string" && /^[\w-]{1,64}$/.test(op.id) ? op.id : newId(),
+        type: op.type,
+        text: op.text.trim().slice(0, op.type === "note" ? 2000 : 500),
+        date: parseISODate(op.date) ? op.date : null,
+        focus: op.type === "task" && INBOX_FOCUS.includes(op.focus) ? op.focus : null,
+      }));
+  }
+
   // ---------- Day page modules ----------
   // Secondary parts of the day page can be folded or put away; the timeline
   // and the task groups always stay.
@@ -1586,6 +1606,7 @@
     createItem,
     moveItem,
     REPEATS,
+    normalizeInboxOps,
     SHOPPING_SECTIONS,
     guessShoppingSection,
     parseShoppingLine,

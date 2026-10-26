@@ -51,5 +51,7 @@ contextBridge.exposeInMainWorld("desktopGadget", {
   notify: (payload) => ipcRenderer.send("notify", payload),
   onOpenDay: (cb) => ipcRenderer.on("open-day", (_e, iso, action, reminder) => cb(iso, action, reminder)),
   onSnoozeReminder: (cb) => ipcRenderer.on("snooze-reminder", (_e, key) => cb(key)),
-  onWindowOpened: (cb) => ipcRenderer.on("window-opened", () => cb())
+  onWindowOpened: (cb) => ipcRenderer.on("window-opened", () => cb()),
+  onInboxOps: (cb) => ipcRenderer.on("inbox-ops", (_e, entries) => cb(entries)),
+  inboxDone: (names) => ipcRenderer.send("inbox-done", names)
 });

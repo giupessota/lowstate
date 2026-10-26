@@ -2932,6 +2932,65 @@
     });
   }
 
+  // ---------- inbox: things added from outside (e.g. by Claude) ----------
+  // Each operation is applied once (its id is remembered on this computer),
+  // the same way as if it had been typed here.
+  const APPLIED_KEY = "lowstate.inbox-applied";
+  function appliedOps() {
+    try {
+      return JSON.parse(localStorage.getItem(APPLIED_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  }
+
+  function applyInboxOp(op) {
+    if (op.type === "task") {
+      const item = capture(op.text, op.date);
+      if (item && op.focus && item.date) {
+        state.items = Planner.moveItem(state.items, item.id, { date: item.date, focus: op.focus });
+        persistItems();
+      }
+      return item?.title || null;
+    }
+    if (op.type === "note") {
+      const day = op.date || todayISO();
+      const current = state.dayNotes[day] || "";
+      state.dayNotes = { ...state.dayNotes, [day]: `${current}${current && !current.endsWith("\n") ? "\n" : ""}${op.text}` };
+      persistDayNotes();
+      dayNotesKey = null;
+      return op.text.split("\n")[0];
+    }
+    if (op.type === "shopping") {
+      state.shopping = Planner.addShopping(state.shopping, op.text);
+      persistShopping();
+      return op.text;
+    }
+    state.dump = [...state.dump, { id: Planner.newId(), text: op.text, createdAt: Date.now() }];
+    persistDump();
+    return op.text;
+  }
+
+  desktop?.onInboxOps?.((entries) => {
+    const applied = new Set(appliedOps());
+    const added = [];
+    entries.forEach((entry) => Planner.normalizeInboxOps(entry.ops).forEach((op) => {
+      if (applied.has(op.id)) return;
+      const label = applyInboxOp(op);
+      applied.add(op.id);
+      if (label) added.push(label);
+    }));
+    try {
+      localStorage.setItem(APPLIED_KEY, JSON.stringify([...applied].slice(-500)));
+    } catch {
+      // The files are removed anyway; repeats are unlikely.
+    }
+    desktop.inboxDone(entries.map((entry) => entry.file));
+    if (!added.length) return;
+    render();
+    toast(added.length === 1 ? t("inboxAddedOne", { what: added[0].slice(0, 60) }) : t("inboxAdded", { n: added.length }));
+  });
+
   // A reload for synced changes comes back to the same page and day.
   const PLACE_KEY = "lowstate.reloadPlace";
   function reloadKeepingPlace() {
