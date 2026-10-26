@@ -121,8 +121,8 @@ test("migrateLegacy converts 1.x tasks and categories", () => {
     categoryColors: { WORK: "#c9dfd5" },
   });
   assert.deepEqual(categories, [
-    { id: "work", name: "Work", color: "#c9dfd5" },
-    { id: "home", name: "Home", color: P.PALETTE[1] },
+    { id: "work", name: "WORK", color: "#c9dfd5" },
+    { id: "home", name: "HOME", color: P.PALETTE[1] },
   ]);
   assert.equal(items.length, 3);
   const report = items.find((item) => item.id === "1");
@@ -798,7 +798,9 @@ test("layoutTimeline puts overlapping items side by side", () => {
 
 test("default categories are localized but keep stable ids", () => {
   assert.deepEqual(P.defaultCategories("pt").map((category) => category.id), ["work", "personal", "health", "study"]);
-  assert.equal(P.defaultCategories("pt")[2].name, "Saúde");
+  assert.equal(P.defaultCategories("pt")[2].name, "SAÚDE");
+  assert.equal(P.displayName("  abi_web_tool "), "ABI_WEB_TOOL");
+  assert.equal(P.displayName("Play_store_analysis"), "PLAY_STORE_ANALYSIS");
 });
 
 test("the capture examples shown in the app are what the parser understands", () => {

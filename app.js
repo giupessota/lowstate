@@ -371,6 +371,13 @@
       categories = Planner.defaultCategories(I18n.language);
       changed = true;
     }
+    // Names written before categories were always in capitals.
+    categories = categories.map((category) => {
+      const name = Planner.displayName(category.name);
+      if (name === category.name) return category;
+      changed = true;
+      return { ...category, name };
+    });
     return { items, categories, migrated, changed };
   }
 

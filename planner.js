@@ -68,9 +68,9 @@
       .replace(/^-|-$/g, "") || "category";
   }
 
+  // Category names are always written in capitals, like their stamps.
   function displayName(name) {
-    const text = String(name || "").trim();
-    return text ? text.charAt(0).toUpperCase() + text.slice(1).toLowerCase() : "";
+    return String(name || "").trim().toUpperCase();
   }
 
   // How a dated item is weighed on its day: must do, could do, not today.
@@ -538,7 +538,7 @@
 
   function defaultCategories(language = "en") {
     const names = DEFAULT_CATEGORY_NAMES[language] || DEFAULT_CATEGORY_NAMES.en;
-    return names.map((name, index) => ({ id: slug(DEFAULT_CATEGORY_NAMES.en[index]), name, color: PALETTE[index] }));
+    return names.map((name, index) => ({ id: slug(DEFAULT_CATEGORY_NAMES.en[index]), name: displayName(name), color: PALETTE[index] }));
   }
 
   // A cover color picked freely, darkened just enough for the cover's light
