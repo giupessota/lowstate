@@ -430,6 +430,14 @@ test("several hashtags: the first is the main category, all are kept", () => {
   assert.deepEqual(P.normalizeItem({ title: "old" }).tags, []);
 });
 
+test("hashtags left in a title are taken out; numbers alone are not hashtags", () => {
+  assert.deepEqual(P.splitHashtags("Colocar o Exec Summary no site #executive_summary #abi_web_tool"),
+    { title: "Colocar o Exec Summary no site", names: ["EXECUTIVE_SUMMARY", "ABI_WEB_TOOL"] });
+  assert.deepEqual(P.splitHashtags("Responder o chamado #123"), { title: "Responder o chamado #123", names: [] });
+  assert.deepEqual(P.splitHashtags("#jun revisar #jun"), { title: "revisar", names: ["JUN"] });
+  assert.deepEqual(P.splitHashtags("Sem nada"), { title: "Sem nada", names: [] });
+});
+
 test("searching by hashtag finds tasks by any of their categories", () => {
   const categories = [{ id: "trabalho", name: "Trabalho" }, { id: "jun", name: "Jun" }, { id: "saude", name: "Saúde" }];
   const items = [
