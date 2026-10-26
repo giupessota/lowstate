@@ -514,11 +514,18 @@ svg.i {
   background-position: 22px 22px;
 }
 .page-right {
+  --fold: rgba(60, 45, 20, .14);
   border-radius: 3px 12px 12px 3px;
-  background-position: 0 22px;
+  /* The fold's shadow is a background layer, not a pseudo-element: the
+     right page scrolls (day, dump, habits), and a positioned shadow would
+     scroll away with the content and stop halfway down. */
+  background-image: linear-gradient(270deg, transparent, var(--fold)), var(--grid-image);
+  background-size: 26px 100%, var(--grid-size) var(--grid-size);
+  background-repeat: no-repeat, repeat;
+  background-position: 0 0, 0 22px;
 }
 /* The fold between the two pages */
-.page-left::after, .page-right::before {
+.page-left::after {
   content: "";
   position: absolute;
   top: 0;
@@ -527,9 +534,9 @@ svg.i {
   pointer-events: none;
 }
 .page-left::after { right: 0; background: linear-gradient(90deg, transparent, rgba(60, 45, 20, .1)); }
-.page-right::before { left: 0; background: linear-gradient(270deg, transparent, rgba(60, 45, 20, .14)); }
+
 :root[data-theme="dark"] .page-left::after { background: linear-gradient(90deg, transparent, rgba(0, 0, 0, .35)); }
-:root[data-theme="dark"] .page-right::before { background: linear-gradient(270deg, transparent, rgba(0, 0, 0, .4)); }
+:root[data-theme="dark"] .page-right { --fold: rgba(0, 0, 0, .4); }
 
 .page-head {
   position: relative;
@@ -2290,7 +2297,8 @@ body.is-dragging .item:not(.dragging) { cursor: grabbing; }
   .timeline { flex: none; height: 60vh; }
   .month-grid { grid-auto-rows: minmax(90px, auto); }
   .page-left, .page-right { border-radius: 12px; }
-  .page-left::after, .page-right::before, .month-tabs { display: none; }
+  .page-left::after, .month-tabs { display: none; }
+  .page-right { background-image: var(--grid-image); background-size: var(--grid-size) var(--grid-size); background-repeat: repeat; background-position: 0 22px; }
   .days { overflow: visible; }
   .notes { min-height: 220px; }
 }
