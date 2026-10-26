@@ -341,28 +341,39 @@
 
   // Everything written in the planner, searched by words (accents and case
   // ignored, every word must appear). Newest first within each kind.
-  const SEARCH_KINDS = ["task", "habit", "shopping", "dump", "dayNote", "closure", "mood", "weekNote"];
+  const SEARCH_KINDS = ["tag", "task", "habit", "shopping", "dump", "dayNote", "closure", "mood", "weekNote"];
 
   // "#trabalho" finds tasks with that category (hashtag) and text that
   // contains it; other words are searched as text.
   function search(sources, query, limit = 40) {
-    const terms = foldText(query).split(/\s+/).filter((term) => term && term !== "#");
-    if (!terms.length) return [];
+    // While still typing the hashtag (no space after it yet).
+    const raw = foldText(query).replace(/^\s+/, "");
+    const categoryNames = new Map((sources.categories || []).map((category) => [category.id, foldText(category.name)]));
+    // "#" alone, or "#ab" while typing: the categories it could be, with how
+    // many tasks have each.
+    const tagTyping = /^#[^\s#]*$/.test(raw) ? raw.slice(1) : null;
+    const tagResults = tagTyping === null ? [] : (sources.categories || [])
+      .map((category) => ({ category, count: (sources.items || []).filter((item) => itemTags(item).includes(category.id)).length }))
+      .filter(({ category }) => !tagTyping || foldText(category.name).startsWith(tagTyping) || foldText(category.id).startsWith(tagTyping))
+      .sort((a, b) => b.count - a.count || a.category.name.localeCompare(b.category.name))
+      .map(({ category, count }) => ({ kind: "tag", id: category.id, title: category.name, snippet: "", date: null, count }));
+    const terms = raw.trim().split(/\s+/).filter((term) => term && term !== "#");
+    if (!terms.length) return tagResults.slice(0, limit);
     const tagTerms = terms.filter((term) => term.startsWith("#")).map((term) => term.slice(1));
     const textTerms = terms.filter((term) => !term.startsWith("#"));
     const matches = (text) => {
       const folded = foldText(text);
       return terms.every((term) => folded.includes(term));
     };
-    const categoryNames = new Map((sources.categories || []).map((category) => [category.id, foldText(category.name)]));
     const tagWords = (item) => itemTags(item).flatMap((id) => [foldText(id), categoryNames.get(id) || ""]);
-    const out = [];
+    const out = [...tagResults];
     (sources.items || []).forEach((item) => {
       const text = `${item.title} ${item.notes || ""}`;
       const folded = foldText(text);
       const words = tagWords(item);
       const tagged = tagTerms.every((tag) => words.some((word) => word === tag || word.startsWith(tag)) || folded.includes(`#${tag}`));
-      const written = textTerms.every((term) => folded.includes(term));
+      // Words also match the task's category names ("abi" finds #abi_web_tool).
+      const written = textTerms.every((term) => folded.includes(term) || words.some((word) => word.includes(term)));
       if (tagged && written) {
         out.push({ kind: "task", id: item.id, title: item.title, snippet: !textTerms.length || textTerms.every((term) => foldText(item.title).includes(term)) ? "" : snippet(item.notes, textTerms), date: item.date, done: item.done, tags: itemTags(item) });
       }

@@ -3503,7 +3503,7 @@
 
   // ---------- search ----------
   const SEARCH_LABELS = {
-    task: "searchTasks", habit: "searchHabits", shopping: "searchShopping", dump: "viewDump", dayNote: "searchDayNotes",
+    tag: "searchTags", task: "searchTasks", habit: "searchHabits", shopping: "searchShopping", dump: "viewDump", dayNote: "searchDayNotes",
     closure: "searchClosures", mood: "searchMoods", weekNote: "searchWeekNotes",
   };
   let searchResults = [];
@@ -3537,7 +3537,8 @@
       if (result.kind !== searchResults[index - 1]?.kind) nodes.push(h("h3", { class: "search-group", text: t(SEARCH_LABELS[result.kind]) }));
       const meta = result.kind === "weekNote" ? t("searchWeekOf", { date: searchDate(result.date) })
         : result.kind === "task" && !result.date ? t("dumpInbox")
-          : result.kind === "habit" || result.kind === "shopping" ? "" : searchDate(result.date);
+          : result.kind === "tag" ? t("searchTagCount", { n: result.count })
+            : result.kind === "habit" || result.kind === "shopping" ? "" : searchDate(result.date);
       const active = index === searchIndex;
       nodes.push(h("button", {
         type: "button", role: "option", "aria-selected": String(active), "data-index": index,
@@ -3573,6 +3574,13 @@
 
   function pickResult(result) {
     if (!result) return;
+    // A category: search everything with it.
+    if (result.kind === "tag") {
+      els.searchInput.value = `#${Planner.slug(result.title)} `;
+      runSearch();
+      els.searchInput.focus();
+      return;
+    }
     els.searchDialog.close();
     if (result.kind === "task") {
       if (result.date) openDay(result.date);

@@ -446,13 +446,21 @@ test("searching by hashtag finds tasks by any of their categories", () => {
     P.normalizeItem({ id: "c", title: "Dentista", category: "saude" }),
     P.normalizeItem({ id: "d", title: "Ligar pro Jun", notes: "sobre #jun" }),
   ];
-  const ids = (query) => P.search({ items, categories, dayNotes: { "2026-10-26": "falar com #jun" } }, query).map((r) => r.id);
+  const ids = (query) => P.search({ items, categories, dayNotes: { "2026-10-26": "falar com #jun" } }, query).filter((r) => r.kind !== "tag").map((r) => r.id);
   assert.deepEqual(ids("#jun"), ["a", "d", "2026-10-26"]);
   assert.deepEqual(ids("#trabalho"), ["a", "b"]);
   assert.deepEqual(ids("#trabalho #jun"), ["a"]);
   assert.deepEqual(ids("#trab planilha"), ["b"]);
   assert.deepEqual(ids("#saude"), ["c"]);
-  assert.deepEqual(ids("#"), []);
+  // "#" lists the categories (most used first); "#tr" narrows them.
+  assert.deepEqual(P.search({ items, categories }, "#").map((r) => [r.kind, r.title, r.count]),
+    [["tag", "Trabalho", 2], ["tag", "Jun", 1], ["tag", "Saúde", 1]]);
+  assert.deepEqual(P.search({ items, categories }, "#tr").filter((r) => r.kind === "tag").map((r) => r.id), ["trabalho"]);
+  // Once the hashtag is finished (a space after it), only the results.
+  assert.equal(P.search({ items, categories }, "#trabalho ").some((r) => r.kind === "tag"), false);
+  // Plain words also find tasks by their category names.
+  assert.deepEqual(ids("saude"), ["c"]);
+  assert.deepEqual(ids("jun").filter((id) => id.length === 1), ["a", "d"]);
 });
 
 test("search finds words anywhere, ignoring accents and case", () => {
