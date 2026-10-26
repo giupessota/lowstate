@@ -2192,7 +2192,7 @@
       els.itemDialog.close();
       return;
     }
-    const draft = { ...state.draft, title, notes: els.itemNotes.value };
+    const draft = titleHashtags({ ...state.draft, title, notes: els.itemNotes.value });
     if (draft.date !== original.date) {
       draft.order = Planner.nextOrder(state.items.filter((item) => item.id !== original.id), draft.date);
     }
@@ -2207,6 +2207,15 @@
     state.items = state.items.map((item) => (item.id === saved.id ? saved : item));
     if (finishing) state.items = Planner.completeItem(state.items, saved.id, todayISO());
     commit();
+  }
+
+  // Hashtags written in a title become categories (the editor, and tasks
+  // saved before several hashtags were understood).
+  function titleHashtags(item) {
+    const { title, names } = Planner.splitHashtags(item.title);
+    if (!names.length || !title) return item;
+    const ids = [...new Set([...Planner.itemTags(item), ...names.map(resolveCategory)].filter(Boolean))];
+    return { ...item, title, category: ids[0] || null, tags: ids.slice(1) };
   }
 
   function setDraftTags(ids) {
@@ -4405,6 +4414,17 @@
 
   if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
     window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
+  }
+
+  // Tasks that still carry hashtags in their titles get them as categories.
+  {
+    let changed = false;
+    state.items = state.items.map((item) => {
+      const next = titleHashtags(item);
+      if (next !== item) changed = true;
+      return next;
+    });
+    if (changed) persistItems();
   }
 
   I18n.apply();

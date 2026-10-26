@@ -654,6 +654,20 @@
 
   const HASHTAG = /(^|\s)#([\p{L}\p{N}_-]+)(?=\s|$)/gu;
 
+  // Hashtags written in a title ("Relatório #trabalho #jun"), taken out:
+  // { title, names }. Only words with a letter count, so "Chamado #123"
+  // stays as it is.
+  function splitHashtags(text) {
+    const names = [];
+    const title = String(text || "").replace(HASHTAG, (match, space, name) => {
+      if (!/\p{L}/u.test(name)) return match;
+      const upper = name.toUpperCase();
+      if (!names.includes(upper)) names.push(upper);
+      return space;
+    }).replace(/\s+/g, " ").trim();
+    return { title, names };
+  }
+
   // Every category of a task: the main one first, then the other hashtags.
   const itemTags = (item) => [...new Set([item?.category, ...(item?.tags || [])].filter(Boolean))];
 
@@ -664,11 +678,11 @@
     const parsed = core.parseTaskCapture(input, now);
     let title = parsed.title;
     const categories = parsed.category ? [parsed.category] : [];
-    title = title.replace(HASHTAG, (match, space, name) => {
-      const upper = name.toUpperCase();
-      if (!categories.includes(upper)) categories.push(upper);
-      return " ";
-    }).replace(/\s+/g, " ").trim();
+    const rest = splitHashtags(title);
+    title = rest.title;
+    rest.names.forEach((name) => {
+      if (!categories.includes(name)) categories.push(name);
+    });
     let start = null;
     const match = title.match(TIME_PATTERN);
     if (match && Number(match[2]) <= 23) {
@@ -1635,6 +1649,7 @@
     moveItem,
     REPEATS,
     itemTags,
+    splitHashtags,
     normalizeInboxOps,
     SHOPPING_SECTIONS,
     guessShoppingSection,
