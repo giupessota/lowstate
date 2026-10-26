@@ -41,7 +41,8 @@ switches to the week or the month when you want the bigger picture.
 
 - Week spread: days as rows on the left page, weekly goals and free notes on
   the right
-- Month calendar with Brazilian holidays, mood faces and a preview of each
+- Month calendar with Brazilian and/or US federal holidays (US ones include
+  the weekday off when one falls on a weekend), mood faces and a preview of each
   day; click a day to open it
 - Month index tabs on the page edge
 

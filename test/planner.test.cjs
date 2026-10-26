@@ -154,6 +154,31 @@ test("moon path draws a crescent, a half and a full disc", () => {
   assert.ok(P.moonLitPath(0.9).startsWith("M6 1A5 5 0 0 0 6 11"));
 });
 
+test("US federal holidays, with the weekday off when one falls on a weekend", () => {
+  const us = P.usHolidays(2026);
+  assert.deepEqual(
+    ["2026-01-01", "2026-01-19", "2026-02-16", "2026-05-25", "2026-06-19", "2026-07-03", "2026-07-04", "2026-09-07", "2026-10-12", "2026-11-11", "2026-11-26", "2026-12-25"].map((iso) => us.get(iso)),
+    ["newYear", "mlk", "presidents", "memorial", "juneteenth", "independence:observed", "independence", "labor", "columbus", "veterans", "thanksgiving", "christmas"]);
+  // 2027: Christmas on Saturday → Friday 24; New Year 2028 on Saturday → Friday 31 Dec 2027.
+  assert.equal(P.usHolidays(2027).get("2027-12-24"), "christmas:observed");
+  assert.equal(P.usHolidays(2027).get("2027-12-31"), "newYear:observed");
+  assert.equal(P.usHolidays(2027).get("2027-07-05"), "independence:observed"); // Sunday → Monday
+  assert.equal(P.usHolidays(2020).get("2020-06-19"), undefined); // Juneteenth from 2021
+});
+
+test("holiday names for Brazil, the US or both", () => {
+  assert.equal(P.holidayName("2026-11-26", "pt", ["br"]), null);
+  assert.equal(P.holidayName("2026-11-26", "pt", ["us"]), "Ação de Graças");
+  assert.equal(P.holidayName("2026-11-26", "pt", ["br", "us"]), "Ação de Graças (EUA)");
+  assert.equal(P.holidayName("2026-07-03", "en", ["us"]), "Independence Day (observed)");
+  assert.equal(P.holidayName("2026-12-25", "pt", ["br", "us"]), "Natal");
+  assert.equal(P.holidayName("2026-01-01", "pt", ["br", "us"]), "Confraternização Universal");
+  assert.equal(P.holidayName("2026-09-07", "pt", ["br", "us"]), "Independência do Brasil · Labor Day (EUA)");
+  assert.equal(P.holidayName("2026-10-12", "en", ["br", "us"]), "Our Lady of Aparecida · Columbus Day (US)");
+  assert.equal(P.holidayName("2026-11-02", "pt", []), null);
+  assert.deepEqual([P.normalizeHolidayRegions("br"), P.normalizeHolidayRegions("off"), P.normalizeHolidayRegions(["us", "xx", "br"])], [["br"], [], ["br", "us"]]);
+});
+
 test("Easter and the Brazilian holidays derived from it", () => {
   assert.equal(toISODate(P.easterSunday(2026)), "2026-04-05");
   assert.equal(toISODate(P.easterSunday(2027)), "2027-03-28");
