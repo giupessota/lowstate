@@ -16,7 +16,8 @@ switches to the week or the month when you want the bigger picture.
 
 **Day page** (what the app opens on)
 
-- Hourly timeline: click an empty slot to add something at that time, drag
+- Hourly timeline in half hours: click an empty half hour to add something
+  for 30 minutes, or press and drag across several for a longer period; drag
   tasks onto it to schedule them, drag a block's bottom edge to change how
   long it takes, overlapping items sit side by side, and a line marks the
   current time

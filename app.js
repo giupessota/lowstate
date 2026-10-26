@@ -559,7 +559,7 @@
   // Shared by the sidebar capture field and the per-day "+ Add" inputs.
   // fallbackStart is used when capturing on a timeline slot; a time typed in
   // the text still wins.
-  function captureFields(text, fallbackDate = null, fallbackStart = null) {
+  function captureFields(text, fallbackDate = null, fallbackStart = null, fallbackDuration = 60) {
     const parsed = Planner.parseCapture(text);
     if (!parsed.title) return null;
     const start = parsed.start || fallbackStart;
@@ -568,14 +568,16 @@
       title: parsed.title,
       date,
       start: date ? start : null,
-      duration: date && start ? 60 : null,
+      // A period chosen on the timeline keeps its length; a time typed in
+      // the text gets an hour.
+      duration: date && start ? (parsed.start ? 60 : fallbackDuration || 60) : null,
       priority: parsed.priority,
       categories: parsed.categories,
     };
   }
 
-  function capture(text, fallbackDate = null, fallbackStart = null) {
-    const fields = captureFields(text, fallbackDate, fallbackStart);
+  function capture(text, fallbackDate = null, fallbackStart = null, fallbackDuration = 60) {
+    const fields = captureFields(text, fallbackDate, fallbackStart, fallbackDuration);
     if (!fields) return null;
     const { categories, ...rest } = fields;
     const ids = [...new Set(categories.map(resolveCategory).filter(Boolean))];
@@ -1034,9 +1036,12 @@
 
     for (let current = first; current < last; current++) {
       const time = Planner.minutesToTime(current * 60);
+      const half = Planner.minutesToTime(current * 60 + 30);
       inner.append(h("div", { class: "hour-row", style: `top: ${(current - first) * hour}px` },
         h("span", { class: "hour-label", text: String(current).padStart(2, "0") }),
-        h("button", { type: "button", class: "hour-slot", "data-slot": time, "aria-label": t("addAtTime", { time }) })));
+        h("span", { class: "hour-slots" },
+          h("button", { type: "button", class: "hour-slot", "data-slot": time, "aria-label": t("addAtTime", { time }) }),
+          h("button", { type: "button", class: "hour-slot", "data-slot": half, "aria-label": t("addAtTime", { time: half }) }))));
     }
 
     // Working hours: outside them a light shade; lunch a quiet band behind
@@ -1389,13 +1394,14 @@
   }
 
   // Inline field on an empty timeline slot.
-  function openSlot(time) {
+  function openSlot(time, duration = 30) {
     els.timeline.querySelector(".slot-add")?.remove();
     const inner = els.timeline.querySelector(".timeline-inner");
     const first = Number(inner.dataset.firstHour);
     const top = ((Planner.timeToMinutes(time) - first * 60) / 60) * timelineHourHeight();
-    const input = h("input", { maxlength: "200", autocomplete: "off", placeholder: `${time} — ${t("addAtTime", { time })}`, "aria-label": t("addAtTime", { time }) });
-    const form = h("form", { class: "slot-add", style: `top: ${top + 4}px`, "data-slot": time }, input);
+    const range = `${time}–${Planner.minutesToTime(Math.min(1439, Planner.timeToMinutes(time) + duration))}`;
+    const input = h("input", { maxlength: "200", autocomplete: "off", placeholder: t("addInPeriod", { range }), "aria-label": t("addInPeriod", { range }) });
+    const form = h("form", { class: "slot-add", style: `top: ${top + 4}px`, "data-slot": time, "data-duration": duration }, input);
     inner.append(form);
     input.focus();
     input.addEventListener("blur", () => setTimeout(() => form.remove(), 120));
@@ -4118,9 +4124,60 @@
   });
 
   // Clicking an empty slot on the timeline writes something at that hour.
+  // A half hour from the keyboard (Enter/Space on a slot); the mouse goes
+  // through the period picker below.
   els.timeline.addEventListener("click", (event) => {
     const slot = event.target.closest(".hour-slot");
-    if (slot) openSlot(slot.dataset.slot);
+    if (slot && event.detail === 0) openSlot(slot.dataset.slot, 30);
+  });
+
+  // Choosing a period: press on a half hour and drag across more of them
+  // (up or down); letting go opens the field for that period.
+  let slotPick = null;
+  function slotMinutesAt(clientY) {
+    const inner = els.timeline.querySelector(".timeline-inner");
+    const first = Number(inner.dataset.firstHour);
+    const minutes = first * 60 + ((clientY - inner.getBoundingClientRect().top) / timelineHourHeight()) * 60;
+    return Math.max(first * 60, Math.min(24 * 60 - 30, Math.floor(minutes / 30) * 30));
+  }
+  function pickRange() {
+    return { from: Math.min(slotPick.anchor, slotPick.current), to: Math.max(slotPick.anchor, slotPick.current) + 30 };
+  }
+  function drawPick() {
+    const inner = els.timeline.querySelector(".timeline-inner");
+    const first = Number(inner.dataset.firstHour);
+    const hour = timelineHourHeight();
+    const { from, to } = pickRange();
+    let pick = inner.querySelector(".slot-pick");
+    if (!pick) {
+      pick = h("div", { class: "slot-pick", "aria-hidden": "true" });
+      inner.append(pick);
+    }
+    pick.style.top = `${((from - first * 60) / 60) * hour}px`;
+    pick.style.height = `${((to - from) / 60) * hour}px`;
+    pick.textContent = `${Planner.minutesToTime(from)}–${Planner.minutesToTime(Math.min(1439, to))}`;
+  }
+  els.timeline.addEventListener("pointerdown", (event) => {
+    const slot = event.target.closest(".hour-slot");
+    if (!slot || event.button !== 0) return;
+    event.preventDefault();
+    const at = Planner.timeToMinutes(slot.dataset.slot);
+    slotPick = { anchor: at, current: at };
+    drawPick();
+  });
+  window.addEventListener("pointermove", (event) => {
+    if (!slotPick) return;
+    const at = slotMinutesAt(event.clientY);
+    if (at === slotPick.current) return;
+    slotPick.current = at;
+    drawPick();
+  });
+  window.addEventListener("pointerup", () => {
+    if (!slotPick) return;
+    const { from, to } = pickRange();
+    slotPick = null;
+    els.timeline.querySelector(".slot-pick")?.remove();
+    openSlot(Planner.minutesToTime(from), to - from);
   });
   els.timeline.addEventListener("submit", (event) => {
     const form = event.target.closest(".slot-add");
@@ -4128,7 +4185,7 @@
     event.preventDefault();
     const text = form.querySelector("input").value;
     form.remove();
-    capture(text, anchorISO(), form.dataset.slot);
+    capture(text, anchorISO(), form.dataset.slot, Number(form.dataset.duration) || 30);
   });
 
   // Month index tabs: in the week view jump to the first week that mostly

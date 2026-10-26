@@ -900,7 +900,22 @@ svg.i {
 }
 .hour-label { width: var(--labels); flex: none; padding-top: 3px; color: var(--muted); font: 500 10.5px var(--mono); }
 .hour-row.is-covered .hour-label { visibility: hidden; }
-.hour-slot { flex: 1; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: copy; }
+.hour-slots { display: flex; flex: 1; flex-direction: column; }
+.hour-slot { flex: 1; width: 100%; padding: 0; border: 0; border-radius: 4px; background: transparent; cursor: copy; touch-action: none; }
+/* The period being chosen by dragging across half hours. */
+.slot-pick {
+  position: absolute;
+  left: var(--labels);
+  right: 0;
+  z-index: 5;
+  padding: 2px 8px;
+  border: 1.5px solid color-mix(in srgb, var(--indigo) 60%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--indigo) 12%, transparent);
+  color: var(--indigo);
+  font: 500 10.5px var(--mono);
+  pointer-events: none;
+}
 .hour-slot:hover { background: color-mix(in srgb, var(--highlight) 22%, transparent); }
 
 .block {
