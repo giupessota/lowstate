@@ -31,6 +31,10 @@ switches to the week or the month when you want the bigger picture.
   from 0.5 to 5 L
 - **Mood of the day** (six faces) with an optional note on what shaped it
 - Day notes, moon phase, day of the year and a quote at the foot of the page
+- Working hours (Settings → Planner): workdays, office hours shaded outside
+  on the timeline, and a lunch break shown as a quiet band — not a habit to
+  tick, not busy time — with an optional reminder; a "Lunch"/"Almoço"
+  routine can be turned into it in one click
 
 **Week and month**
 

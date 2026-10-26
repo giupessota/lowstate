@@ -303,6 +303,54 @@
       }));
   }
 
+  // ---------- Working hours and lunch ----------
+  // A plain fact of the week, not a habit to tick: which days are workdays,
+  // the working hours (shaded outside them on the timeline) and the lunch
+  // break (a quiet band on the timeline, never counted as busy time).
+  const WORKDAY_DEFAULT = { days: [1, 2, 3, 4, 5], hoursOn: false, start: "09:00", end: "18:00", lunchOn: false, lunchStart: "12:00", lunchDuration: 60 };
+  const LUNCH_DURATIONS = [30, 45, 60, 75, 90, 120];
+
+  function normalizeWorkday(value) {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    const days = Array.isArray(source.days)
+      ? [...new Set(source.days.filter((day) => Number.isInteger(day) && day >= 0 && day <= 6))].sort()
+      : WORKDAY_DEFAULT.days;
+    const start = isTime(source.start) ? source.start : WORKDAY_DEFAULT.start;
+    const end = isTime(source.end) && timeToMinutes(source.end) > timeToMinutes(start) ? source.end : WORKDAY_DEFAULT.end;
+    return {
+      days,
+      hoursOn: source.hoursOn === true,
+      start,
+      end: timeToMinutes(end) > timeToMinutes(start) ? end : minutesToTime(Math.min(1439, timeToMinutes(start) + 60)),
+      lunchOn: source.lunchOn === true,
+      lunchStart: isTime(source.lunchStart) ? source.lunchStart : WORKDAY_DEFAULT.lunchStart,
+      lunchDuration: LUNCH_DURATIONS.includes(source.lunchDuration) ? source.lunchDuration : WORKDAY_DEFAULT.lunchDuration,
+    };
+  }
+
+  // What a given day looks like: null on days off; minutes from midnight.
+  function workdayOn(workday, iso) {
+    const date = parseISODate(iso);
+    const plan = normalizeWorkday(workday);
+    if (!date || !plan.days.includes(date.getDay())) return null;
+    const lunchStart = timeToMinutes(plan.lunchStart);
+    return {
+      hours: plan.hoursOn ? { start: timeToMinutes(plan.start), end: timeToMinutes(plan.end) } : null,
+      lunch: plan.lunchOn ? { start: lunchStart, end: Math.min(1440, lunchStart + plan.lunchDuration) } : null,
+    };
+  }
+
+  // A routine that is really the lunch break ("Lunch", "Almoço") with a time:
+  // what the working hours would take from it.
+  function lunchFromHabit(habit) {
+    if (!habit || !/^(lunch|almo[cç]o|almoco)\b/i.test(String(habit.name || "").trim()) || !isTime(habit.start)) return null;
+    return {
+      days: Array.isArray(habit.days) && habit.days.length ? [...habit.days].sort() : WORKDAY_DEFAULT.days,
+      lunchStart: habit.start,
+      lunchDuration: LUNCH_DURATIONS.reduce((best, minutes) => (Math.abs(minutes - (habit.duration || 60)) < Math.abs(best - (habit.duration || 60)) ? minutes : best), 60),
+    };
+  }
+
   // ---------- Day page modules ----------
   // Secondary parts of the day page can be folded or put away; the timeline
   // and the task groups always stay.
@@ -1287,7 +1335,7 @@
   // Everything worth a heads-up today and tomorrow, each with the moment to
   // fire (`at`, ms) and a stable `key` so it's only shown once. The caller
   // decides which are due and builds the words.
-  function reminders({ items = [], habits = [], habitLog = {}, events = [], now = new Date(), lead = 10, kinds = {}, morningAt = null, closureAt = null } = {}) {
+  function reminders({ items = [], habits = [], habitLog = {}, events = [], now = new Date(), lead = 10, kinds = {}, morningAt = null, closureAt = null, workday = null } = {}) {
     const today = startOfDay(now);
     const days = [toISODate(today), toISODate(addDays(today, 1))];
     const at = (iso, time) => parseISODate(iso).getTime() + timeToMinutes(time) * 60000;
@@ -1322,6 +1370,13 @@
     }
     if (isTime(morningAt)) out.push({ key: `morning:${days[0]}`, kind: "morning", at: at(days[0], morningAt), iso: days[0], start: morningAt, title: "" });
     if (isTime(closureAt)) out.push({ key: `closure:${days[0]}`, kind: "closure", at: at(days[0], closureAt), iso: days[0], start: closureAt, title: "" });
+    // The lunch break, right on time (no lead: it's a pause, not a meeting).
+    if (workday && kinds.lunch !== false) {
+      days.forEach((iso) => {
+        const lunch = workdayOn(workday, iso)?.lunch;
+        if (lunch) out.push({ key: `lunch:${iso}`, kind: "lunch", at: parseISODate(iso).getTime() + lunch.start * 60000, iso, start: minutesToTime(lunch.start), end: minutesToTime(lunch.end), title: "" });
+      });
+    }
     return out.sort((a, b) => a.at - b.at);
   }
 
@@ -1659,6 +1714,11 @@
     createItem,
     moveItem,
     REPEATS,
+    WORKDAY_DEFAULT,
+    LUNCH_DURATIONS,
+    normalizeWorkday,
+    workdayOn,
+    lunchFromHabit,
     itemTags,
     splitHashtags,
     normalizeInboxOps,

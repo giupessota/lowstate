@@ -410,6 +410,31 @@ test("inbox operations are checked before they are applied", () => {
   assert.equal(P.normalizeInboxOps("junk").length, 0);
 });
 
+test("working hours and lunch: a fact of workdays, not a habit", () => {
+  assert.deepEqual(P.normalizeWorkday(undefined), P.WORKDAY_DEFAULT);
+  const plan = P.normalizeWorkday({ days: [5, 1, 1, 9], hoursOn: true, start: "08:30", end: "17:30", lunchOn: true, lunchStart: "12:30", lunchDuration: 45 });
+  assert.deepEqual(plan.days, [1, 5]);
+  assert.deepEqual(P.workdayOn(plan, "2026-10-26"), { hours: { start: 510, end: 1050 }, lunch: { start: 750, end: 795 } });
+  assert.equal(P.workdayOn(plan, "2026-10-27"), null); // Tuesday is off in this plan
+  assert.deepEqual(P.workdayOn({ ...plan, hoursOn: false }, "2026-10-26").hours, null);
+  assert.equal(P.normalizeWorkday({ start: "18:00", end: "09:00" }).end, "19:00");
+  assert.equal(P.normalizeWorkday({ lunchDuration: 50 }).lunchDuration, 60);
+  // Her "Lunch" routine (weekdays, 12:00, 1h) becomes the lunch break.
+  assert.deepEqual(P.lunchFromHabit({ name: "Lunch", days: [5, 1, 2, 3, 4], start: "12:00", duration: 60 }),
+    { days: [1, 2, 3, 4, 5], lunchStart: "12:00", lunchDuration: 60 });
+  assert.equal(P.lunchFromHabit({ name: "Almoço com a Ana", start: "13:00", duration: 50 }).lunchDuration, 45);
+  assert.equal(P.lunchFromHabit({ name: "Gym", start: "17:00" }), null);
+  assert.equal(P.lunchFromHabit({ name: "Lunch" }), null);
+});
+
+test("the lunch break can remind, on workdays only", () => {
+  const now = new Date(2026, 9, 26, 11, 0); // Monday
+  const due = P.reminders({ now, workday: { lunchOn: true, lunchStart: "12:00", lunchDuration: 60 } }).filter((reminder) => reminder.kind === "lunch");
+  assert.deepEqual(due.map((reminder) => [reminder.iso, reminder.start, reminder.end]), [["2026-10-26", "12:00", "13:00"], ["2026-10-27", "12:00", "13:00"]]);
+  assert.equal(P.reminders({ now, workday: { lunchOn: true }, kinds: { lunch: false } }).some((reminder) => reminder.kind === "lunch"), false);
+  assert.equal(P.reminders({ now: new Date(2026, 9, 24, 11), workday: { lunchOn: true } }).filter((reminder) => reminder.kind === "lunch").length, 0); // Saturday/Sunday
+});
+
 test("day page modules default to open and keep only known states", () => {
   assert.deepEqual(P.normalizeDayModules(undefined), { load: "open", water: "open", habits: "open", mood: "open", notes: "open" });
   assert.deepEqual(P.normalizeDayModules({ water: "hidden", mood: "collapsed", load: "gone", timeline: "hidden" }),
