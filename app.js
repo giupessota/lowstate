@@ -2871,20 +2871,30 @@
       syncInfo = { ...syncInfo, ...info };
       renderSync();
     });
-    // Changes from another computer: in the page's store at once; the page
-    // reloads to show them — right away when nobody is looking at it,
-    // otherwise when the person chooses.
+    // Changes from another computer go into the page's store at once and the
+    // page reloads to show them, on the same view. Waiting for a click was
+    // risky: an edit made before it would save the page's older copy over
+    // what had just arrived. Only typing (or an open dialog) delays the
+    // reload, until the field or dialog is left.
+    let reloadWhenIdle = false;
+    const busy = () => isTyping(document.activeElement) || Boolean(document.querySelector("dialog[open]"));
     syncApi.onIncoming((changes, info) => {
       Store.applyIncoming(changes);
-      const from = (info?.others || []).slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0]?.name;
-      if (syncConnecting || !document.hasFocus()) {
-        location.reload();
+      if (syncConnecting || !document.hasFocus() || !busy()) {
+        reloadKeepingPlace();
         return;
       }
+      const from = (info?.others || []).slice().sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))[0]?.name;
       els.syncAlertText.textContent = t("syncIncoming", { device: from || t("syncOtherComputer") });
       els.syncAlert.hidden = false;
+      reloadWhenIdle = true;
     });
-    els.syncReload.addEventListener("click", () => location.reload());
+    const reloadIfIdle = () => setTimeout(() => {
+      if (reloadWhenIdle && !busy()) reloadKeepingPlace();
+    }, 400);
+    document.addEventListener("focusout", reloadIfIdle);
+    document.addEventListener("close", reloadIfIdle, true);
+    els.syncReload.addEventListener("click", reloadKeepingPlace);
     els.syncBox.addEventListener("click", async (event) => {
       const use = event.target.closest("[data-sync-use]");
       if (use || event.target.closest("[data-sync-choose]")) {
@@ -2920,6 +2930,28 @@
         toast(t("syncStopped"));
       }
     });
+  }
+
+  // A reload for synced changes comes back to the same page and day.
+  const PLACE_KEY = "lowstate.reloadPlace";
+  function reloadKeepingPlace() {
+    Store.flush();
+    try {
+      sessionStorage.setItem(PLACE_KEY, JSON.stringify({ view: state.view, anchor: anchorISO(), at: Date.now() }));
+    } catch {
+      // Private mode: the reload opens on today's page.
+    }
+    location.reload();
+  }
+  try {
+    const place = JSON.parse(sessionStorage.getItem(PLACE_KEY) || "null");
+    sessionStorage.removeItem(PLACE_KEY);
+    if (place && Date.now() - place.at < 15000 && VIEWS.includes(place.view)) {
+      state.view = place.view;
+      state.anchor = Core.parseISODate(place.anchor) || state.anchor;
+    }
+  } catch {
+    // Nothing to restore.
   }
 
   // ---------- save status ----------
