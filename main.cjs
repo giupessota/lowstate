@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, net, powerMonitor, shell, Menu, Notification, safeStorage, session, Tray } = require("electron");
 const { execFile } = require("child_process");
 const fs = require("fs");
 const https = require("https");
@@ -503,6 +503,9 @@ app.whenReady().then(async () => {
   createWindow();
   setInterval(runSync, SYNC_INTERVAL);
   window.on("focus", runSync);
+  // Waking up or unlocking: the other computer may have moved on meanwhile.
+  powerMonitor.on("resume", runSync);
+  powerMonitor.on("unlock-screen", runSync);
   createTray();
   registerShortcuts(shortcuts);
   setTimeout(checkForUpdate, 2000);

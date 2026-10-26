@@ -236,7 +236,7 @@ function suggestFolders({ home, platform, exists = fs.existsSync, list = (dir) =
 // change times live in two small files next to it. `transportFor(target)`
 // gives the place the files are exchanged with: { kind: "folder", folder }
 // or another kind the app provides (Google Drive).
-function createSync({ configFile, metaFile, loadData, saveData, restorePoint, hostname, platform, transportFor = defaultTransport, now = () => Date.now() }) {
+function createSync({ configFile, metaFile, loadData, saveData, restorePoint, hostname, platform, transportFor = defaultTransport, now = () => Date.now(), exchangeLimit = 90 * 1000 }) {
   let config = readJSONFile(configFile) || {};
   // 2.5 kept only `folder`.
   if (config.folder && !config.target) config = { ...config, target: { kind: "folder", folder: config.folder } };
@@ -306,9 +306,13 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
   }
 
   // One exchange at a time (a timer and a window focus can ask together).
+  // If one never finishes, the next ones don't wait for it past a limit.
   function sync(options) {
     const next = running.then(() => exchange(options));
-    running = next.catch(() => {});
+    let timer;
+    running = Promise.race([next, new Promise((resolve) => { timer = setTimeout(resolve, exchangeLimit); })])
+      .catch(() => {})
+      .finally(() => clearTimeout(timer));
     return next;
   }
 

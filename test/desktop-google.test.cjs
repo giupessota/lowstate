@@ -4,7 +4,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const {
-  SCOPE, readClientFile, pkce, authUrl, waitForCode, exchangeCode, createGoogleAuth, createDriveClient, driveTransport,
+  SCOPE, withTimeout, readClientFile, pkce, authUrl, waitForCode, exchangeCode, createGoogleAuth, createDriveClient, driveTransport,
 } = require("../desktop-google.cjs");
 const { createSync } = require("../desktop-sync.cjs");
 
@@ -188,4 +188,31 @@ test("Drive trouble leaves local data alone and is reported", async (t) => {
   });
   await signedOut.connect({ kind: "google" });
   assert.equal(signedOut.info().state, "auth");
+});
+
+test("a request that never answers gives up, and a stuck exchange doesn't block the next ones", async (t) => {
+  await assert.rejects(withTimeout(new Promise(() => {}), 20), { code: "unavailable" });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lowstate-hang-"));
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+  let calls = 0;
+  const sync = createSync({
+    configFile: path.join(dir, "sync.json"),
+    metaFile: path.join(dir, "sync-meta.json"),
+    loadData: () => ({}),
+    saveData: () => {},
+    hostname: "mac",
+    platform: "darwin",
+    exchangeLimit: 30,
+    transportFor: () => ({
+      kind: "google",
+      // The first exchange hangs forever; later ones answer.
+      readOthers: () => (++calls === 1 ? new Promise(() => {}) : Promise.resolve([])),
+      writeOwn: async () => {},
+    }),
+  });
+  sync.connect({ kind: "google" });
+  const second = await sync.sync();
+  assert.deepEqual(second, { incoming: {} });
+  assert.equal(sync.info().state, "idle");
+  assert.equal(calls, 2);
 });

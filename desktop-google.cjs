@@ -23,6 +23,19 @@ const FILE_PREFIX = "lowstate-device-";
 const LOGIN_TIMEOUT = 5 * 60 * 1000;
 const REQUEST_TIMEOUT = 20000;
 
+// A request that never answers (the computer slept mid-request, a proxy
+// holding the connection) gives up instead of waiting forever: the abort
+// signal alone isn't always honoured.
+function withTimeout(promise, ms = REQUEST_TIMEOUT) {
+  let timer;
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new GoogleError("unavailable", "timeout")), ms);
+    }),
+  ]).finally(() => clearTimeout(timer));
+}
+
 class GoogleError extends Error {
   constructor(code, message = code) {
     super(message);
@@ -114,16 +127,16 @@ function waitForCode({ state, timeout = LOGIN_TIMEOUT, pages = {} } = {}) {
 async function postForm(fetch, url, fields) {
   let response;
   try {
-    response = await fetch(url, {
+    response = await withTimeout(fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams(fields).toString(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-    });
+    }));
   } catch {
     throw new GoogleError("unavailable");
   }
-  const body = await response.json().catch(() => ({}));
+  const body = await withTimeout(response.json()).catch(() => ({}));
   if (!response.ok) throw new GoogleError(body.error === "invalid_grant" || body.error === "invalid_client" ? "auth" : "unavailable", body.error);
   return body;
 }
@@ -169,11 +182,11 @@ function createDriveClient({ fetch, auth }) {
     const token = await auth.accessToken();
     let response;
     try {
-      response = await fetch(url, {
+      response = await withTimeout(fetch(url, {
         ...options,
         headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
         signal: AbortSignal.timeout(REQUEST_TIMEOUT),
-      });
+      }));
     } catch {
       throw new GoogleError("unavailable");
     }
@@ -192,11 +205,11 @@ function createDriveClient({ fetch, auth }) {
       url.searchParams.set("q", `name contains '${FILE_PREFIX}' and trashed = false`);
       url.searchParams.set("fields", "files(id,name,modifiedTime)");
       url.searchParams.set("pageSize", "100");
-      const body = await (await request(url.toString())).json();
+      const body = await withTimeout((await request(url.toString())).json());
       return Array.isArray(body.files) ? body.files : [];
     },
     async download(id) {
-      return (await request(`${API}/files/${encodeURIComponent(id)}?alt=media`)).json().catch(() => null);
+      return withTimeout((await request(`${API}/files/${encodeURIComponent(id)}?alt=media`)).json()).catch(() => null);
     },
     async create(name, content) {
       const boundary = `lowstate${crypto.randomBytes(8).toString("hex")}`;
@@ -255,6 +268,7 @@ function driveTransport({ drive, label = null }) {
 
 module.exports = {
   SCOPE,
+  withTimeout,
   GoogleError,
   readClientFile,
   pkce,
