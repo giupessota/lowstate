@@ -1,6 +1,6 @@
 {
   "name": "lowstate-desktop",
-  "version": "2.6.0",
+  "version": "2.6.1",
   "private": true,
   "description": "Lowstate — lower your mental entropy. A calm weekly planner for Windows and macOS.",
   "author": "Giuliana Pessota",
@@ -27,6 +27,7 @@
       "desktop-calendars.cjs",
       "desktop-sync.cjs",
       "desktop-google.cjs",
+      "google-client.json",
       "index.html",
       "styles.css",
       "storage.js",

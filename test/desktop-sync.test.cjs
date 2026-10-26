@@ -60,6 +60,10 @@ function computer(folder, name, initial = {}) {
     restorePoints,
     get data() { return data; },
     // A save from the page: the snapshot changes, the engine is told.
+    // A save the engine isn't told about (syncing was off).
+    saveQuietly(changes) {
+      data = { ...data, ...changes };
+    },
     edit(changes) {
       clock += 10;
       data = { ...data, ...changes };
@@ -166,4 +170,22 @@ test("a 2.5 folder setting keeps working after the update", async (t) => {
   assert.deepEqual(sync.info().target, { kind: "folder", label: folder });
   await sync.sync();
   assert.ok(fs.existsSync(path.join(folder, "Lowstate", "devices", "dold.json")));
+});
+
+test("changes made before connecting (while sync was off) are what goes out, not the startup data", async (t) => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "lowstate-late-"));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const pc = computer(folder, "win", { [ITEMS]: JSON.stringify([{ id: "t1", focus: "later" }]) });
+  const mac = computer(folder, "mac", { [ITEMS]: JSON.stringify([{ id: "m1" }]) });
+  t.after(() => { pc.cleanup(); mac.cleanup(); });
+  // The PC app opened, then the task moved to "must" before signing in:
+  // the page saved it, but the engine wasn't told (sync was off).
+  pc.saveQuietly({ [ITEMS]: JSON.stringify([{ id: "t1", focus: "must" }]) });
+  await pc.sync.connect(folder);
+  mac.tick(100);
+  await mac.sync.connect(folder);
+  assert.equal(JSON.parse(mac.data[ITEMS]).find((item) => item.id === "t1").focus, "must");
+  pc.tick(200);
+  await pc.sync.sync();
+  assert.equal(JSON.parse(pc.data[ITEMS]).find((item) => item.id === "t1").focus, "must");
 });

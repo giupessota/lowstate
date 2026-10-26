@@ -39,6 +39,10 @@ jobs:
       - run: npm ci
       - name: Check and test
         run: npm run check
+      - name: Built-in Google client
+        run: node scripts/write-google-client.cjs
+        env:
+          GOOGLE_CLIENT_JSON: ${{ secrets.GOOGLE_CLIENT_JSON }}
       - name: Build installer
         run: npm run ${{ matrix.script }} -- ${{ matrix.arch }}
         env:

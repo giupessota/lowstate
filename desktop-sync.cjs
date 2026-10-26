@@ -268,6 +268,12 @@ function createSync({ configFile, metaFile, loadData, saveData, restorePoint, ho
   async function exchange({ join = false } = {}) {
     const place = transport();
     if (!place) return { incoming: {} };
+    // Changes saved while syncing was off (or before it was turned on in
+    // this session) are counted now, so the newest local data is what goes
+    // out — not the data from when the app started.
+    const current = loadData() || {};
+    meta = trackChanges(last, current, meta, config.device, now());
+    last = { ...current };
     let others;
     try {
       others = await place.readOthers(config.device);
