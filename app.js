@@ -3537,7 +3537,7 @@
       if (result.kind !== searchResults[index - 1]?.kind) nodes.push(h("h3", { class: "search-group", text: t(SEARCH_LABELS[result.kind]) }));
       const meta = result.kind === "weekNote" ? t("searchWeekOf", { date: searchDate(result.date) })
         : result.kind === "task" && !result.date ? t("dumpInbox")
-          : result.kind === "tag" ? t("searchTagCount", { n: result.count })
+          : result.kind === "tag" ? t(result.count === 1 ? "searchTagCountOne" : "searchTagCount", { n: result.count })
             : result.kind === "habit" || result.kind === "shopping" ? "" : searchDate(result.date);
       const active = index === searchIndex;
       nodes.push(h("button", {
