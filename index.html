@@ -802,12 +802,45 @@
 
     <input type="file" id="importFile" accept="application/json,.json" hidden />
 
+    <dialog class="sheet restore-sheet" id="backupDialog" aria-labelledby="backupTitle">
+      <form class="sheet-body" id="backupForm" method="dialog">
+        <header class="sheet-head">
+          <h2 id="backupTitle" data-i18n="backupTitle">Backup</h2>
+        </header>
+        <label class="closure-choice">
+          <input type="checkbox" id="backupCalendars" checked />
+          <span><span data-i18n="backupCalendars">Include calendars</span> <small id="backupCalendarsCount"></small></span>
+        </label>
+        <div class="backup-password" id="backupPasswordFields">
+          <p class="restore-note" data-i18n="backupPasswordNote">Calendar links work like passwords, so they go into the file encrypted with a password of yours. You'll need it to restore them.</p>
+          <label class="field">
+            <span class="field-label" data-i18n="backupPassword">Password</span>
+            <input type="password" id="backupPassword" autocomplete="new-password" minlength="4" />
+          </label>
+          <label class="field">
+            <span class="field-label" data-i18n="backupPasswordAgain">Password again</span>
+            <input type="password" id="backupPasswordAgain" autocomplete="new-password" minlength="4" />
+          </label>
+        </div>
+        <p class="restore-error" id="backupError" role="alert" hidden></p>
+        <footer class="sheet-foot">
+          <span class="spacer"></span>
+          <button type="button" class="btn ghost" id="backupCancel" data-i18n="cancel">Cancel</button>
+          <button type="submit" class="btn primary" data-i18n="backupSave">Save backup</button>
+        </footer>
+      </form>
+    </dialog>
+
     <dialog class="sheet restore-sheet" id="restoreDialog" aria-labelledby="restoreTitle">
       <form class="sheet-body" id="restoreForm" method="dialog">
         <header class="sheet-head">
           <h2 id="restoreTitle" data-i18n="restoreTitle">Restore a backup</h2>
         </header>
         <dl class="restore-facts" id="restoreFacts"></dl>
+        <label class="field restore-calendars" id="restoreCalendars" hidden>
+          <span class="field-label" data-i18n="restoreCalendarsLabel">Calendars password</span>
+          <input type="password" id="restoreCalendarsPassword" autocomplete="off" data-i18n-placeholder="restoreCalendarsPlaceholder" />
+        </label>
         <p class="restore-note" id="restoreNote"></p>
         <p class="restore-error" id="restoreError" role="alert" hidden></p>
         <footer class="sheet-foot">

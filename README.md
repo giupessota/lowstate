@@ -131,7 +131,9 @@ switches to the week or the month when you want the bigger picture.
 - Settings in tabs: light/dark theme, eight cover colors, English or
   Portuguese, week start, holidays, quote style (Japanese proverbs,
   motivational, ironic or none), water unit, glass size and goal
-- Automatic durable desktop snapshots plus manual backup and restore
+- Automatic durable desktop snapshots plus manual backup and restore; in the
+  desktop app a backup can include the calendars, their secret links
+  encrypted with a password of yours (scrypt + AES-256-GCM)
 - Installable offline PWA and Electron desktop app; Windows tray support so
   global shortcuts keep working after the window is closed
 

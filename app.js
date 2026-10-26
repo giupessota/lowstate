@@ -246,6 +246,17 @@
     restoreNote: $("restoreNote"),
     restoreError: $("restoreError"),
     restoreCancel: $("restoreCancel"),
+    restoreCalendars: $("restoreCalendars"),
+    restoreCalendarsPassword: $("restoreCalendarsPassword"),
+    backupDialog: $("backupDialog"),
+    backupForm: $("backupForm"),
+    backupCalendars: $("backupCalendars"),
+    backupCalendarsCount: $("backupCalendarsCount"),
+    backupPasswordFields: $("backupPasswordFields"),
+    backupPassword: $("backupPassword"),
+    backupPasswordAgain: $("backupPasswordAgain"),
+    backupError: $("backupError"),
+    backupCancel: $("backupCancel"),
     trashSummary: $("trashSummary"),
     trashRestore: $("trashRestore"),
     trashEmpty: $("trashEmpty"),
@@ -2715,9 +2726,56 @@
 
   // The desktop app writes through the system's save dialog and only then
   // says "saved"; the browser can only hand the file to its downloads.
-  async function exportBackup() {
+  // With calendars in the desktop app, a small sheet asks whether to include
+  // them (behind a password) first.
+  function startBackup() {
+    const count = state.calendars.length;
+    if (!calendarsApi?.sealBackup || !count) {
+      exportBackup();
+      return;
+    }
+    els.backupCalendarsCount.textContent = t("backupCalendarsCount", { n: count });
+    els.backupCalendars.checked = true;
+    els.backupPassword.value = "";
+    els.backupPasswordAgain.value = "";
+    els.backupError.hidden = true;
+    els.backupPasswordFields.hidden = false;
+    els.backupDialog.showModal();
+    els.backupPassword.focus();
+  }
+
+  els.backupCalendars.addEventListener("change", () => {
+    els.backupPasswordFields.hidden = !els.backupCalendars.checked;
+  });
+  els.backupCancel.addEventListener("click", () => els.backupDialog.close());
+  els.backupForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    let calendars = null;
+    if (els.backupCalendars.checked) {
+      const password = els.backupPassword.value;
+      const problem = password.length < 4 ? "backupPasswordShort" : password !== els.backupPasswordAgain.value ? "backupPasswordMismatch" : null;
+      if (problem) {
+        els.backupError.textContent = t(problem);
+        els.backupError.hidden = false;
+        return;
+      }
+      const sealed = await calendarsApi.sealBackup(password).catch(() => ({ ok: false }));
+      if (!sealed?.ok) {
+        els.backupError.textContent = t("backupFailed");
+        els.backupError.hidden = false;
+        return;
+      }
+      calendars = sealed.sealed;
+    }
+    els.backupDialog.close();
+    exportBackup(calendars);
+  });
+
+  async function exportBackup(calendars = null) {
     Store.flush();
-    const text = JSON.stringify(Store.backupPayload(), null, 2);
+    const payload = Store.backupPayload();
+    if (calendars) payload.calendars = calendars;
+    const text = JSON.stringify(payload, null, 2);
     const name = `lowstate-backup-${todayISO()}.json`;
     const storageApi = window.desktopStorage;
     if (storageApi?.saveBackup) {
@@ -2747,8 +2805,12 @@
       ...restoreFact(t("restoreFrom"), t(info.generation === 1 ? "restoreGen1" : "restoreGen2")),
       ...restoreFact(t("restoreTasks"), String(info.tasks)),
       ...restoreFact(t("restoreHabits"), String(info.habits)),
+      ...(info.calendars ? restoreFact(t("restoreCalendarsInfo"), t("restoreCalendarsYes")) : []),
       ...restoreFact(t("restoreNow"), t("restoreNowValue", { tasks: state.items.length, habits: state.habits.length })));
     els.restoreNote.textContent = t(window.desktopStorage?.saveRestorePoint ? "restoreNoteDesktop" : "restoreNoteWeb");
+    const withCalendars = Boolean(info.calendars && calendarsApi?.openBackup);
+    els.restoreCalendars.hidden = !withCalendars;
+    els.restoreCalendarsPassword.value = "";
     els.restoreError.hidden = true;
     els.restoreDialog.showModal();
   }
@@ -2758,7 +2820,7 @@
     els.restoreError.hidden = false;
   }
 
-  els.exportData.addEventListener("click", exportBackup);
+  els.exportData.addEventListener("click", startBackup);
   els.importData.addEventListener("click", () => els.importFile.click());
   els.importFile.addEventListener("change", async () => {
     const file = els.importFile.files[0];
@@ -2782,9 +2844,19 @@
   els.restoreDialog.addEventListener("close", () => {
     restoreCandidate = null;
   });
-  els.restoreForm.addEventListener("submit", (event) => {
+  els.restoreForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!restoreCandidate) return;
+    // Calendars first: a wrong password stops before anything changes.
+    const calendarPassword = els.restoreCalendars.hidden ? "" : els.restoreCalendarsPassword.value;
+    if (calendarPassword && restoreCandidate.calendars) {
+      const opened = await calendarsApi.openBackup(restoreCandidate.calendars, calendarPassword).catch(() => ({ ok: false }));
+      if (!opened?.ok) {
+        restoreFailed(t(opened?.error === "password" ? "restoreCalendarsWrong" : "restoreFailed"));
+        return;
+      }
+      if (opened.added) sessionStorage.setItem("lowstate.calendarsRestored", String(opened.added));
+    }
     Store.flush();
     // A copy of what's here now, before anything is replaced.
     if (window.desktopStorage?.saveRestorePoint) {
@@ -3063,7 +3135,7 @@
     const status = Store.retry();
     toast(t(status.local === "failed" || status.desktop === "failed" ? "saveStillFailing" : "saveAllGood"));
   });
-  els.saveExport.addEventListener("click", exportBackup);
+  els.saveExport.addEventListener("click", () => exportBackup());
   // The disk copy waits a moment to group writes; leaving writes it now.
   window.addEventListener("pagehide", () => Store.flush());
   window.addEventListener("beforeunload", () => Store.flush());
@@ -4437,5 +4509,13 @@
 
   I18n.apply();
   render();
+  // After a restore that brought calendars back.
+  try {
+    const restored = Number(sessionStorage.getItem("lowstate.calendarsRestored"));
+    sessionStorage.removeItem("lowstate.calendarsRestored");
+    if (restored) toast(t(restored === 1 ? "restoreCalendarsAddedOne" : "restoreCalendarsAdded", { n: restored }));
+  } catch {
+    // Nothing to tell.
+  }
   if (initial.migrated) toast(t("migratedNotice"));
 })();

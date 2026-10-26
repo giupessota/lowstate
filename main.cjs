@@ -6,7 +6,7 @@ const os = require("os");
 const path = require("path");
 const { loadSnapshot, saveSnapshot, saveRestorePoint } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
-const { createCalendarStore, isMeetingUrl } = require("./desktop-calendars.cjs");
+const { createCalendarStore, isMeetingUrl, sealSecrets, openSecrets } = require("./desktop-calendars.cjs");
 const { createSync, folderTransport, suggestFolders } = require("./desktop-sync.cjs");
 const {
   GoogleError, readClientFile, pkce, authUrl, waitForCode, exchangeCode, createGoogleAuth, createDriveClient, driveTransport,
@@ -672,6 +672,28 @@ function initCalendars() {
 }
 
 ipcMain.handle("calendars-get", () => calendarPayload());
+
+// Calendars in a backup: the links leave this process only encrypted with
+// the person's password, and come back the same way.
+ipcMain.handle("calendars-backup-seal", (_event, password) => {
+  const list = calendarStore ? calendarStore.exportAll() : [];
+  if (!list.length) return { ok: true, sealed: null, count: 0 };
+  try {
+    return { ok: true, sealed: sealSecrets(list, String(password || "")), count: list.length };
+  } catch (error) {
+    return { ok: false, error: error.code || "failed" };
+  }
+});
+ipcMain.handle("calendars-backup-open", (_event, sealed, password) => {
+  if (!calendarStore) return { ok: false, error: "failed" };
+  try {
+    const added = calendarStore.restore(openSecrets(sealed, String(password || "")));
+    if (added) refreshCalendars();
+    return { ok: true, added };
+  } catch (error) {
+    return { ok: false, error: error.code || "failed" };
+  }
+});
 ipcMain.handle("calendars-add", async (_event, input) => {
   if (!calendarStore) return { ok: false, error: "network" };
   const { name, color, url } = input || {};

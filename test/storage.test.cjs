@@ -179,7 +179,10 @@ test("backups: every format Lowstate exported is accepted and summarized", () =>
     },
   }));
   assert.equal(current.ok, true);
-  assert.deepEqual(current.info, { date: "2026-10-20T12:00:00.000Z", generation: 2, tasks: 3, habits: 1, keys: 3 });
+  assert.deepEqual(current.info, { date: "2026-10-20T12:00:00.000Z", generation: 2, tasks: 3, habits: 1, keys: 3, calendars: false });
+  const sealed = { v: 1, kdf: "scrypt", salt: "s", iv: "i", tag: "t", data: "d" };
+  const withCalendars = storage.readBackup(JSON.stringify({ app: "lowstate", version: 3, data: { "type-todo.theme.v1": "dark" }, calendars: sealed }));
+  assert.deepEqual([withCalendars.calendars, withCalendars.info.calendars], [sealed, true]);
   assert.equal(current.data.foreign, undefined);
 
   const notebook = storage.readBackup(JSON.stringify({

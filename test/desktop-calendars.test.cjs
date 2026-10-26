@@ -10,6 +10,8 @@ const {
   isMeetingUrl,
   eventsFromCalendar,
   createCalendarStore,
+  sealSecrets,
+  openSecrets,
 } = require("../desktop-calendars.cjs");
 
 const WINDOW = { from: new Date("2026-09-01T00:00:00Z"), to: new Date("2027-01-31T00:00:00Z") };
@@ -192,4 +194,27 @@ test("a feed that isn't a calendar is rejected", async () => {
   const result = await store.add({ url: "https://example.com/x.ics" });
   assert.equal(result.ok, false);
   assert.equal(result.error, "not-calendar");
+});
+
+test("calendar links go into a backup only encrypted with a password", () => {
+  const list = [{ name: "Trabalho", color: "#34508a", enabled: true, url: "https://calendar.google.com/calendar/ical/x/private-abc/basic.ics" }];
+  const sealed = sealSecrets(list, "minha senha");
+  assert.ok(!JSON.stringify(sealed).includes("private-abc"));
+  assert.deepEqual(openSecrets(sealed, "minha senha"), list);
+  assert.throws(() => openSecrets(sealed, "outra"), { code: "password" });
+  assert.throws(() => openSecrets({ ...sealed, data: Buffer.from("tampered").toString("base64") }, "minha senha"), { code: "password" });
+  assert.throws(() => sealSecrets(list, "123"), { code: "password-short" });
+  assert.throws(() => openSecrets({ v: 9 }, "x"), { code: "sealed-format" });
+});
+
+test("restoring calendars from a backup skips links already here", async () => {
+  const { store } = makeStore();
+  await store.add({ name: "Pessoal", url: "https://example.com/a.ics" });
+  const exported = store.exportAll();
+  assert.deepEqual(exported.map((entry) => [entry.name, entry.url]), [["Pessoal", "https://example.com/a.ics"]]);
+  const { store: other, options } = makeStore();
+  assert.equal(other.restore([...exported, { name: "Trabalho", color: "#d64a32", url: "webcal://example.com/b.ics" }, { url: "http://bad" }]), 2);
+  assert.deepEqual(other.list().map((calendar) => [calendar.name, calendar.color]), [["Pessoal", exported[0].color], ["Trabalho", "#d64a32"]]);
+  assert.ok(!fs.readFileSync(options.file, "utf8").includes("example.com/b.ics"));
+  assert.equal(other.restore(exported), 0);
 });
