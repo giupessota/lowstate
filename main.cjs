@@ -143,7 +143,21 @@ const STARTUP_SYNC_WAIT = 4000;
 
 const syncDirectory = () => path.dirname(desktopStoragePaths().current);
 const googleFile = () => path.join(syncDirectory(), "sync-google.json");
-const netFetch = (url, options) => net.fetch(url, options);
+// Chromium's network stack first (it follows the system's proxy settings,
+// as on a work PC); if it fails outright — on macOS, launched from the Dock,
+// it was seen failing with net::ERR_FAILED while Node's own fetch worked —
+// Node's fetch is tried. Bodies are strings, so a request can be sent twice.
+async function netFetch(url, options) {
+  try {
+    return await net.fetch(url, options);
+  } catch (chromiumError) {
+    try {
+      return await fetch(url, options);
+    } catch (nodeError) {
+      throw new Error(`${chromiumError.message}; ${nodeError.cause?.code || nodeError.message}`);
+    }
+  }
+}
 
 // The app's own Google client, when the build carries one (google-client.json,
 // written in CI from a secret); otherwise the person loads their file.
