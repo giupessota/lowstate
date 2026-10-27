@@ -594,7 +594,10 @@
   }
 
   // Untimed tasks first (manual order), then time-blocked items by start time.
+  // Done tasks sink to the bottom; then untimed before timed, by time, by
+  // the order the person gave them.
   function compareInDay(a, b) {
+    if (Boolean(a.done) !== Boolean(b.done)) return a.done ? 1 : -1;
     const aTimed = Boolean(a.start);
     const bTimed = Boolean(b.start);
     if (aTimed !== bTimed) return aTimed ? 1 : -1;
