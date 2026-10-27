@@ -513,6 +513,18 @@ test("searching by hashtag finds tasks by any of their categories", () => {
   assert.deepEqual(ids("jun").filter((id) => id.length === 1), ["a", "d"]);
 });
 
+test("done tasks go to the bottom of the day, keeping their own order", () => {
+  const day = "2026-10-27";
+  const items = [
+    P.normalizeItem({ id: "a", title: "a", date: day, order: 0, done: true }),
+    P.normalizeItem({ id: "b", title: "b", date: day, order: 1 }),
+    P.normalizeItem({ id: "c", title: "c", date: day, order: 2, done: true }),
+    P.normalizeItem({ id: "d", title: "d", date: day, start: "09:00", order: 3 }),
+    P.normalizeItem({ id: "e", title: "e", date: day, order: 4 }),
+  ];
+  assert.deepEqual(P.itemsForDay(items, day).map((item) => item.id), ["b", "e", "d", "a", "c"]);
+});
+
 test("search finds words anywhere, ignoring accents and case", () => {
   const sources = {
     items: [

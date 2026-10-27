@@ -285,6 +285,7 @@ async function runSync(reason = "timer") {
   syncTimer = null;
   if (!syncEngine?.active) return;
   const { incoming } = await syncSafely();
+  if (typeof incoming[CAL_SYNC_KEY] === "string") applyRemoteCalendars(incoming[CAL_SYNC_KEY]);
   const info = syncEngine.info();
   const changed = Object.keys(incoming);
   syncLog(info.state === "idle"
@@ -643,6 +644,101 @@ function sendCalendars() {
   if (window && !window.isDestroyed()) window.webContents.send("calendars-updated", calendarPayload());
 }
 
+// ---------- calendars across computers (behind a password) ----------
+// The calendar list (with its secret links) travels as one synced key whose
+// value is sealed with a password the person types once per computer; the
+// password itself stays here, encrypted with the keychain.
+const CAL_SYNC_KEY = "type-todo.sync.calendars.v1";
+const calSyncFile = () => path.join(syncDirectory(), "sync-calendars.json");
+let calSyncPlain = null;
+
+function readCalPassword() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(calSyncFile(), "utf8"));
+    return raw.password ? decryptSecret(raw.password) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCalPassword(password) {
+  try {
+    if (password) fs.writeFileSync(calSyncFile(), JSON.stringify({ password: encryptSecret(password) }), { mode: 0o600 });
+    else fs.unlinkSync(calSyncFile());
+  } catch {
+    // Nothing to remove.
+  }
+}
+
+const calendarListKey = (list) => JSON.stringify([...list]
+  .sort((a, b) => (a.url < b.url ? -1 : a.url > b.url ? 1 : 0))
+  .map((entry) => [entry.url, entry.name, entry.color, entry.enabled !== false]));
+
+function sealedCalendarsHere() {
+  const paths = desktopStoragePaths();
+  return loadSnapshot(paths.current, paths.backup).data[CAL_SYNC_KEY] || null;
+}
+
+// This computer's calendars changed: seal the list and let the page save it
+// (so sync carries it). Unchanged lists aren't sealed again.
+function pushCalendars() {
+  const password = readCalPassword();
+  if (!password || !calendarStore || !window || window.isDestroyed()) return;
+  const list = calendarStore.exportAll();
+  const key = calendarListKey(list);
+  if (key === calSyncPlain) return;
+  calSyncPlain = key;
+  window.webContents.send("calendars-sealed", CAL_SYNC_KEY, JSON.stringify(sealSecrets(list, password)));
+}
+
+// A sealed list from another computer: open it and follow it (the first
+// time, keep both sides and send the result back).
+function applyRemoteCalendars(value, { join = false } = {}) {
+  const password = readCalPassword();
+  if (!password || !value || !calendarStore) return { ok: false, error: "no-password" };
+  let list;
+  try {
+    list = openSecrets(JSON.parse(value), password);
+  } catch (error) {
+    return { ok: false, error: error.code || "password" };
+  }
+  const changed = calendarStore.syncTo(list, { keepLocal: join });
+  calSyncPlain = join ? null : calendarListKey(list);
+  if (changed) {
+    sendCalendars();
+    refreshCalendars();
+  }
+  if (join) pushCalendars();
+  return { ok: true, count: calendarStore.list().length };
+}
+
+function calendarSyncPayload(extra = {}) {
+  return { on: Boolean(readCalPassword()), remote: Boolean(sealedCalendarsHere()), count: calendarStore ? calendarStore.list().length : 0, ...extra };
+}
+
+ipcMain.handle("calendars-sync-get", () => calendarSyncPayload());
+ipcMain.handle("calendars-sync-enable", (_event, password) => {
+  if (typeof password !== "string" || password.length < 4) return calendarSyncPayload({ error: "password-short" });
+  writeCalPassword(password);
+  calSyncPlain = null;
+  const remote = sealedCalendarsHere();
+  if (remote) {
+    const result = applyRemoteCalendars(remote, { join: true });
+    if (!result.ok) {
+      writeCalPassword(null);
+      return calendarSyncPayload({ error: result.error });
+    }
+  } else {
+    pushCalendars();
+  }
+  return calendarSyncPayload();
+});
+ipcMain.handle("calendars-sync-disable", () => {
+  writeCalPassword(null);
+  calSyncPlain = null;
+  return calendarSyncPayload();
+});
+
 function refreshCalendars() {
   if (!calendarStore) return Promise.resolve();
   if (!calendarRefresh) {
@@ -663,6 +759,11 @@ function initCalendars() {
     encrypt: encryptSecret,
     decrypt: decryptSecret,
   });
+  // Calendars that came from another computer while this one was closed.
+  if (readCalPassword()) {
+    const remote = sealedCalendarsHere();
+    if (remote) applyRemoteCalendars(remote);
+  }
   setTimeout(refreshCalendars, 3000);
   setInterval(refreshCalendars, CALENDAR_REFRESH);
   // Coming back to the window after a while picks up new meetings sooner.
@@ -688,7 +789,10 @@ ipcMain.handle("calendars-backup-open", (_event, sealed, password) => {
   if (!calendarStore) return { ok: false, error: "failed" };
   try {
     const added = calendarStore.restore(openSecrets(sealed, String(password || "")));
-    if (added) refreshCalendars();
+    if (added) {
+      refreshCalendars();
+      pushCalendars();
+    }
     return { ok: true, added };
   } catch (error) {
     return { ok: false, error: error.code || "failed" };
@@ -698,17 +802,22 @@ ipcMain.handle("calendars-add", async (_event, input) => {
   if (!calendarStore) return { ok: false, error: "network" };
   const { name, color, url } = input || {};
   const result = await calendarStore.add({ name: String(name || ""), color: String(color || ""), url: String(url || "") });
-  if (result.ok) sendCalendars();
+  if (result.ok) {
+    sendCalendars();
+    pushCalendars();
+  }
   return result;
 });
 ipcMain.handle("calendars-update", (_event, id, changes) => {
   calendarStore?.update(String(id), changes && typeof changes === "object" ? changes : {});
   sendCalendars();
+  pushCalendars();
   return calendarPayload();
 });
 ipcMain.handle("calendars-remove", (_event, id) => {
   calendarStore?.remove(String(id));
   sendCalendars();
+  pushCalendars();
   return calendarPayload();
 });
 ipcMain.handle("calendars-refresh", async () => {

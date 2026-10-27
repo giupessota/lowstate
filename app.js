@@ -2561,6 +2561,7 @@
     renderDayModuleChips();
     renderWorkday();
     renderSync();
+    refreshCalendarSync();
     const customSwatch = els.settingsDialog.querySelector(".swatch-custom");
     const customColor = Store.getRaw(KEYS.coverColor);
     if (customColor) customSwatch.style.setProperty("--chosen", customColor);
@@ -2998,6 +2999,32 @@
     return h("p", { class: "sync-fact" }, h("span", { class: "sync-label", text: label }), h("span", { text: value }));
   }
 
+  // Calendars across computers: a password per computer, typed once.
+  let calSyncInfo = null;
+  async function refreshCalendarSync() {
+    if (!calendarsApi?.syncGet) return;
+    calSyncInfo = await calendarsApi.syncGet().catch(() => null);
+    renderSync();
+  }
+  calendarsApi?.onSealed?.((key, value) => Store.setRaw(key, value));
+
+  function calendarSyncBlock() {
+    if (!calendarsApi?.syncGet || !calSyncInfo) return null;
+    if (calSyncInfo.on) {
+      return h("div", { class: "sync-cal" },
+        syncFact(t("syncCalTitle"), t(calSyncInfo.count === 1 ? "syncCalOnOne" : "syncCalOn", { n: calSyncInfo.count })),
+        h("div", { class: "btn-row" }, h("button", { type: "button", class: "btn ghost", "data-cal-sync-off": "", text: t("syncCalOff") })));
+    }
+    const remote = calSyncInfo.remote;
+    return h("div", { class: "sync-cal" },
+      h("p", { class: "sync-way", text: t("syncCalTitle") }),
+      h("p", { class: "field-hint", text: t(remote ? "syncCalHintRemote" : "syncCalHintNew") }),
+      h("div", { class: "sync-cal-form" },
+        h("input", { type: "password", class: "work-time", "data-cal-pass": "1", autocomplete: remote ? "current-password" : "new-password", placeholder: t("backupPassword"), "aria-label": t("backupPassword") }),
+        remote ? null : h("input", { type: "password", class: "work-time", "data-cal-pass": "2", autocomplete: "new-password", placeholder: t("backupPasswordAgain"), "aria-label": t("backupPasswordAgain") }),
+        h("button", { type: "button", class: "btn", "data-cal-sync-on": "", text: t(remote ? "syncCalBring" : "syncCalStart") })));
+  }
+
   let googleWaiting = false;
   const GOOGLE_CONSOLE = "https://console.cloud.google.com/";
 
@@ -3062,7 +3089,8 @@
           ? h("button", { type: "button", class: "btn primary", "data-sync-google-login": "", text: t("syncGoogleLogin") })
           : h("button", { type: "button", class: "btn", "data-sync-now": "", text: t("syncNow") }),
         h("button", { type: "button", class: "btn ghost", "data-sync-stop": "", text: t("syncStop") })),
-      h("p", { class: "field-hint", text: t("syncKept") }),
+      calendarSyncBlock(),
+      h("p", { class: "field-hint", text: t(calSyncInfo?.on ? "syncKeptNoCal" : "syncKept") }),
     ].filter(Boolean));
   }
 
@@ -3134,6 +3162,25 @@
         await syncApi.googleCancel();
       } else if (event.target.closest("[data-sync-console]")) {
         desktop?.openExternal?.(GOOGLE_CONSOLE);
+      } else if (event.target.closest("[data-cal-sync-on]")) {
+        const [first, second] = [1, 2].map((n) => els.syncBox.querySelector(`[data-cal-pass="${n}"]`)?.value);
+        if (!first || first.length < 4) {
+          toast(t("backupPasswordShort"));
+          return;
+        }
+        if (second !== undefined && second !== first) {
+          toast(t("backupPasswordMismatch"));
+          return;
+        }
+        const result = await calendarsApi.syncEnable(first).catch(() => ({ error: "failed" }));
+        calSyncInfo = result;
+        renderSync();
+        if (result?.error) toast(t(result.error === "password" ? "syncCalWrong" : result.error === "password-short" ? "backupPasswordShort" : "restoreFailed"));
+        else toast(t("syncCalStarted"));
+      } else if (event.target.closest("[data-cal-sync-off]")) {
+        calSyncInfo = await calendarsApi.syncDisable();
+        renderSync();
+        toast(t("syncCalStopped"));
       } else if (event.target.closest("[data-sync-now]")) {
         await syncCall(() => syncApi.now());
       } else if (event.target.closest("[data-sync-stop]")) {

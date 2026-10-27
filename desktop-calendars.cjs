@@ -360,6 +360,52 @@ function createCalendarStore({ file, cacheFile, encrypt, decrypt, fetchText = fe
       });
     },
 
+    // Making this computer's calendars match a list from another computer
+    // (calendar sync): missing ones are added, names/colors/on-off follow
+    // the list, and — unless `keepLocal` (the first time, when both sides
+    // are kept) — ones not in the list are removed. Returns what changed.
+    syncTo(list, { keepLocal = false } = {}) {
+      const wanted = new Map();
+      (Array.isArray(list) ? list : []).forEach((entry) => {
+        const url = normalizeCalendarUrl(entry?.url);
+        if (url) wanted.set(url, entry);
+      });
+      let changed = 0;
+      const kept = [];
+      calendars.forEach((calendar) => {
+        let url = null;
+        try {
+          url = urlOf(calendar);
+        } catch {
+          // Unreadable here: left alone.
+        }
+        const entry = url && wanted.get(url);
+        if (entry) {
+          const next = {
+            ...calendar,
+            name: String(entry.name || "").trim().slice(0, 60) || calendar.name,
+            color: COLORS.includes(entry.color) ? entry.color : calendar.color,
+            enabled: entry.enabled !== false,
+          };
+          if (next.name !== calendar.name || next.color !== calendar.color || next.enabled !== (calendar.enabled !== false)) changed += 1;
+          kept.push(next);
+          wanted.delete(url);
+        } else if (keepLocal || !url) {
+          kept.push(calendar);
+        } else {
+          delete cache[calendar.id];
+          changed += 1;
+        }
+      });
+      calendars = kept;
+      const added = this.restore([...wanted.values()]);
+      if (changed) {
+        save();
+        saveCache();
+      }
+      return changed + added;
+    },
+
     // Restoring them: links already here are skipped; events come with the
     // next refresh.
     restore(list) {
