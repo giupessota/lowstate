@@ -218,3 +218,20 @@ test("restoring calendars from a backup skips links already here", async () => {
   assert.ok(!fs.readFileSync(options.file, "utf8").includes("example.com/b.ics"));
   assert.equal(other.restore(exported), 0);
 });
+
+test("calendar sync: this computer follows the other's list; the first time both are kept", async () => {
+  const { store } = makeStore();
+  await store.add({ name: "Pessoal", url: "https://example.com/mine.ics" });
+  const theirs = [
+    { name: "Trabalho", color: "#d64a32", enabled: true, url: "https://example.com/work.ics" },
+    { name: "Feriados", color: "#3e9aa8", enabled: false, url: "https://example.com/holidays.ics" },
+  ];
+  // First time: union.
+  assert.equal(store.syncTo(theirs, { keepLocal: true }), 2);
+  assert.deepEqual(store.list().map((c) => [c.name, c.enabled]).sort(), [["Feriados", false], ["Pessoal", true], ["Trabalho", true]]);
+  // Afterwards: the list wins — renamed, recolored, and a removal travels.
+  const next = [{ ...theirs[0], name: "Work", color: "#7c8c4a" }];
+  assert.equal(store.syncTo(next), 3);
+  assert.deepEqual(store.list().map((c) => [c.name, c.color]), [["Work", "#7c8c4a"]]);
+  assert.equal(store.syncTo(next), 0);
+});

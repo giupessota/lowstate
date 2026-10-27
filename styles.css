@@ -1791,6 +1791,9 @@ body.is-resizing, body.is-resizing * { cursor: ns-resize !important; user-select
 .sync-label { color: var(--muted); font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; align-self: center; }
 .sync-warn { margin: 0; padding: 6px 9px; border-radius: 7px; background: color-mix(in srgb, var(--yamabuki) 16%, transparent); font-size: 12.5px; }
 .sync-box .field-hint { margin: 0; }
+.sync-cal { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px dashed var(--rule); }
+.sync-cal-form { display: flex; flex-wrap: wrap; gap: 6px; }
+.sync-cal-form input { flex: 1 1 140px; }
 .sync-way { margin: 6px 0 0; color: var(--ink-2); font: 500 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
 .sync-way:first-child { margin-top: 0; }
 .sync-google { display: flex; flex-direction: column; gap: 6px; padding: 8px 10px; border: 1px dashed var(--rule); border-radius: 8px; }

@@ -35,6 +35,10 @@ contextBridge.exposeInMainWorld("desktopCalendars", {
   refresh: () => ipcRenderer.invoke("calendars-refresh"),
   sealBackup: (password) => ipcRenderer.invoke("calendars-backup-seal", password),
   openBackup: (sealed, password) => ipcRenderer.invoke("calendars-backup-open", sealed, password),
+  syncGet: () => ipcRenderer.invoke("calendars-sync-get"),
+  syncEnable: (password) => ipcRenderer.invoke("calendars-sync-enable", password),
+  syncDisable: () => ipcRenderer.invoke("calendars-sync-disable"),
+  onSealed: (cb) => ipcRenderer.on("calendars-sealed", (_e, key, value) => cb(key, value)),
   onUpdate: (cb) => ipcRenderer.on("calendars-updated", (_e, payload) => cb(payload)),
 });
 

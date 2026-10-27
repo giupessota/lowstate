@@ -101,8 +101,11 @@ switches to the week or the month when you want the bigger picture.
   key keeps when it last changed; the newest change wins. The first time a
   computer joins, tasks, habits, notes and lists from both sides are added
   together, and a `before-restore-…json` copy of its data is kept first.
-- Keyboard shortcuts, "always on top" and the calendars' secret links stay
-  on each computer. Changes from the other computer show up when you come
+- Calendars can sync too, behind a password typed once per computer: the
+  list with its secret links travels sealed (scrypt + AES-256-GCM); the
+  first time both computers' calendars are kept, then adding, removing,
+  renaming or recoloring on one reaches the other. Keyboard shortcuts and
+  "always on top" stay on each computer. Changes from the other computer show up when you come
   back to the window (or with *Update*, if you're using it).
 
 **Adding from outside the app** (desktop app)
