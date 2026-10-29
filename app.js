@@ -286,7 +286,8 @@
       else if (key === "style") node.style.cssText = value;
       else node.setAttribute(key, value === true ? "" : String(value));
     });
-    children.flat().forEach((child) => {
+    // Nested lists of children (several stamps…) are flattened all the way.
+    children.flat(Infinity).forEach((child) => {
       if (child === null || child === undefined || child === false) return;
       node.append(child instanceof Node ? child : document.createTextNode(String(child)));
     });
@@ -695,7 +696,7 @@
       const meta = [
         variant === "overdue" ? h("span", { class: "slip-date", text: shortDate(item.date) }) : null,
         item.start && variant !== "overdue" ? h("span", { class: "line-time", text: item.start }) : null,
-        stamp,
+        ...stamp,
         seal,
       ].filter(Boolean);
       body = h("div", { class: "item-body", "data-action": "edit", role: "button", tabindex: "0" },
