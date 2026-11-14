@@ -234,6 +234,15 @@ function createDriveClient({ fetch, auth }) {
         body: content,
       });
     },
+    // One file by its exact name (e.g. the desk screen's agenda).
+    async findByName(name) {
+      const url = new URL(`${API}/files`);
+      url.searchParams.set("spaces", "appDataFolder");
+      url.searchParams.set("q", `name = '${name.replace(/['\\]/g, "")}' and trashed = false`);
+      url.searchParams.set("fields", "files(id,name)");
+      const body = await withTimeout((await request(url.toString())).json());
+      return Array.isArray(body.files) && body.files[0] ? body.files[0].id : null;
+    },
     async account() {
       const body = await (await request(`${API}/about?fields=user(emailAddress)`)).json();
       return body?.user?.emailAddress || null;
@@ -246,6 +255,7 @@ const fileName = (device) => `${FILE_PREFIX}${device}.json`;
 // The sync transport: same contract as folderTransport.
 function driveTransport({ drive, label = null }) {
   let ownId = null;
+  const sharedIds = new Map();
   return {
     kind: "google",
     label,
@@ -262,6 +272,13 @@ function driveTransport({ drive, label = null }) {
       if (!ownId) ownId = (await drive.list()).find((entry) => entry.name === fileName(file.device))?.id || null;
       if (ownId) await drive.update(ownId, content);
       else ownId = await drive.create(fileName(file.device), content);
+    },
+    // A file that isn't a computer's (the desk screen's agenda), created
+    // once and then replaced.
+    async writeShared(name, content) {
+      const id = sharedIds.get(name) || await drive.findByName(name);
+      if (id) await drive.update(id, content);
+      sharedIds.set(name, id || await drive.create(name, content));
     },
   };
 }

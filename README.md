@@ -116,6 +116,28 @@ switches to the week or the month when you want the bigger picture.
   syntax), and sync carries it to the other computers. Handy for asking an
   assistant such as Claude to "put this in Lowstate".
 
+**Little desk screen** (`gadget/`)
+
+- An ESP32-2432S028 ("Cheap Yellow Display", 320×240 touch) shows today's
+  page on the desk: the next meeting or timed task, and the day's Must do /
+  Could do tasks with their category stamps, in the app's paper look.
+  Tapping a task ticks it (repeating tasks make their next occurrence, as in
+  the app)
+- It is one more computer in *Same data on your computers* through Google
+  Drive: it reads the computers' files from the hidden app folder and writes
+  its own, so it works with every computer off. Calendars travel sealed, so
+  a computer syncing through Google also leaves `lowstate-agenda.json` there
+  with the next eight days' meeting titles and times (no links or notes)
+- Setup, once: `node scripts/lowstate-gadget.cjs` (macOS) signs the screen in
+  with Google in the browser and writes `gadget/include/secrets.h` (not
+  committed); type the Wi-Fi name and password there, then
+  `cd gadget && pio run -t upload` (`--place "City"` picks the weather's
+  city). The day logic is tested on the computer with `gadget/test/run.sh`;
+  `gadget/tools/screenshot.py` takes a screenshot over USB
+- The screen opens on a home page (clock, weather from Open-Meteo, a tile per
+  tool); Lowstate is the first tool, and `gadget/src/apps.cpp` lists them
+- Its text is DM Sans (SIL Open Font License), converted with lv_font_conv
+
 **Everything else**
 
 - Search everything you wrote (⌘K or `/`): tasks, day notes, brain dump,

@@ -10,6 +10,7 @@ const {
   isMeetingUrl,
   eventsFromCalendar,
   createCalendarStore,
+  gadgetAgenda,
   sealSecrets,
   openSecrets,
 } = require("../desktop-calendars.cjs");
@@ -234,4 +235,21 @@ test("calendar sync: this computer follows the other's list; the first time both
   assert.equal(store.syncTo(next), 3);
   assert.deepEqual(store.list().map((c) => [c.name, c.color]), [["Work", "#7c8c4a"]]);
   assert.equal(store.syncTo(next), 0);
+});
+
+test("the desk screen's agenda keeps the next days' titles and times, nothing else", () => {
+  const now = new Date(2026, 10, 13, 9, 0);
+  const at = (day, hour) => new Date(2026, 10, day, hour).toISOString();
+  const events = [
+    { id: "a", title: "Yesterday", start: at(12, 10), end: at(12, 11), allDay: false, link: "https://meet.google.com/x" },
+    { id: "b", title: "Standup", start: at(13, 10), end: at(13, 10.5), allDay: false, location: "Room", description: "secret", link: "https://meet.google.com/y", busy: true },
+    { id: "c", title: "Holiday", start: "2026-11-15", end: "2026-11-16", allDay: true, busy: false },
+    { id: "d", title: "Far away", start: at(28, 10), end: at(28, 11), allDay: false },
+  ];
+  const agenda = gadgetAgenda(events, now);
+  assert.equal(agenda.from, "2026-11-13");
+  assert.equal(agenda.to, "2026-11-21");
+  assert.deepEqual(agenda.events.map((event) => event.title), ["Standup", "Holiday"]);
+  assert.deepEqual(Object.keys(agenda.events[0]).sort(), ["allDay", "busy", "end", "start", "title"]);
+  assert.equal(agenda.events[1].busy, false);
 });

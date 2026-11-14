@@ -6,7 +6,7 @@ const os = require("os");
 const path = require("path");
 const { loadSnapshot, saveSnapshot, saveRestorePoint } = require("./desktop-storage.cjs");
 const { hideWindowOnClose, isNewerVersion } = require("./desktop-lifecycle.cjs");
-const { createCalendarStore, isMeetingUrl, sealSecrets, openSecrets } = require("./desktop-calendars.cjs");
+const { createCalendarStore, gadgetAgenda, isMeetingUrl, sealSecrets, openSecrets } = require("./desktop-calendars.cjs");
 const { createSync, folderTransport, suggestFolders } = require("./desktop-sync.cjs");
 const {
   GoogleError, readClientFile, pkce, authUrl, waitForCode, exchangeCode, createGoogleAuth, createDriveClient, driveTransport,
@@ -293,6 +293,7 @@ async function runSync(reason = "timer") {
     : `${reason}: ${info.state} (${info.error}) ${info.detail || ""}`);
   clearTimeout(syncRetry);
   syncRetry = info.state === "unavailable" ? setTimeout(() => runSync("retry"), 10 * 1000) : null;
+  if (info.state === "idle") publishAgenda();
   if (!window) return;
   if (Object.keys(incoming).length) window.webContents.send("sync-incoming", incoming, syncEngine.info());
   window.webContents.send("sync-status", syncPayload());
@@ -746,9 +747,30 @@ function refreshCalendars() {
       calendarRefresh = null;
       calendarRefreshedAt = Date.now();
       sendCalendars();
+      publishAgenda();
     });
   }
   return calendarRefresh;
+}
+
+// The little desk screen reads Lowstate straight from Drive, but calendars
+// travel sealed with a password, so this computer also leaves there the next
+// days' meetings — titles and times only (desktop-calendars.cjs gadgetAgenda).
+const AGENDA_FILE = "lowstate-agenda.json";
+let agendaPublished = null;
+
+async function publishAgenda() {
+  if (!calendarStore || syncEngine?.info().target?.kind !== "google") return;
+  const content = JSON.stringify(gadgetAgenda(calendarStore.events()));
+  if (content === agendaPublished) return;
+  const transport = googleTransport();
+  if (!transport.writeShared) return;
+  try {
+    await transport.writeShared(AGENDA_FILE, content);
+    agendaPublished = content;
+  } catch (error) {
+    syncLog(`agenda: ${error.code || error.message}`);
+  }
 }
 
 function initCalendars() {

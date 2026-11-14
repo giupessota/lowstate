@@ -504,7 +504,39 @@ function createCalendarStore({ file, cacheFile, encrypt, decrypt, fetchText = fe
   };
 }
 
+// What the little desk screen gets of the calendars (lowstate-agenda.json in
+// the Drive app folder): the next days' meetings with title and time only —
+// no links, places or notes, and never the calendars' secret addresses.
+// Timed events keep their UTC instants; all-day ones their dates.
+const AGENDA_DAYS = 8;
+const AGENDA_MAX = 120;
+
+function gadgetAgenda(events, now = new Date(), days = AGENDA_DAYS) {
+  const from = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + days);
+  const day = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const fromDay = day(from);
+  const toDay = day(to);
+  const kept = (events || []).filter((event) => {
+    if (!event || typeof event.start !== "string" || typeof event.end !== "string") return false;
+    if (event.allDay) return event.end > fromDay && event.start < toDay;
+    const start = new Date(event.start);
+    const end = new Date(event.end);
+    return end > from && start < to;
+  }).sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0))
+    .slice(0, AGENDA_MAX)
+    .map((event) => ({
+      title: String(event.title || "").slice(0, 120),
+      start: event.start,
+      end: event.end,
+      allDay: Boolean(event.allDay),
+      busy: event.busy !== false,
+    }));
+  return { app: "lowstate", kind: "agenda", version: 1, from: fromDay, to: toDay, events: kept };
+}
+
 module.exports = {
+  gadgetAgenda,
   sealSecrets,
   openSecrets,
   CalendarError,

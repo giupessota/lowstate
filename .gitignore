@@ -3,3 +3,5 @@ dist/
 *.log
 .DS_Store
 google-client.json
+gadget/.pio/
+gadget/include/secrets.h
