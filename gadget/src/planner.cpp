@@ -136,16 +136,49 @@ static bool beforeInDay(JsonObjectConst a, JsonObjectConst b) {
   return (a["createdAt"] | 0.0) < (b["createdAt"] | 0.0);
 }
 
+static Task makeTask(JsonObjectConst item, JsonArrayConst categories) {
+  Task task;
+  task.id = str(item["id"]);
+  task.title = str(item["title"]);
+  task.date = str(item["date"]);
+  task.focus = str(item["focus"]) == "must" ? "must" : "could";
+  task.time = str(item["start"]);
+  task.done = item["done"] | false;
+  task.urgent = str(item["priority"]) == "urgent";
+  task.repeat = str(item["repeat"]);
+  task.duration = item["duration"] | 0;
+  task.notes = str(item["notes"]);
+  if (task.notes.size() > 1500) {
+    size_t cut = 1500;
+    while (cut > 0 && (static_cast<unsigned char>(task.notes[cut]) & 0xC0) == 0x80) cut--;  // whole UTF-8 letters
+    task.notes = task.notes.substr(0, cut) + "…";
+  }
+  const std::string categoryId = str(item["category"]);
+  if (!categoryId.empty()) {
+    for (JsonObjectConst category : categories) {
+      if (str(category["id"]) != categoryId) continue;
+      task.category = str(category["name"]);
+      task.color = str(category["color"]);
+      break;
+    }
+  }
+  return task;
+}
+
 Day buildDay(JsonArrayConst items, JsonArrayConst categories, JsonArrayConst agenda,
              const std::string& today, int nowMinutes, const MinutesOfDay& minutesOfDay) {
   Day day;
   day.date = today;
 
-  std::vector<JsonObjectConst> list;
+  std::vector<JsonObjectConst> list, late;
   for (JsonObjectConst item : items) {
-    // planner.js overdueItems: a date before today and not done.
     const std::string date = str(item["date"]);
-    if (!date.empty() && date < today && !(item["done"] | false)) day.overdue++;
+    // planner.js overdueItems: a date before today and not done.
+    if (!date.empty() && date < today && !(item["done"] | false)) {
+      day.overdue++;
+      if (!str(item["title"]).empty()) late.push_back(item);
+      continue;
+    }
     if (date != today || str(item["title"]).empty()) continue;
     const std::string focus = str(item["focus"]);
     if (focus == "later") continue;
@@ -156,34 +189,21 @@ Day buildDay(JsonArrayConst items, JsonArrayConst categories, JsonArrayConst age
     if (aMust != bMust) return aMust;
     return beforeInDay(a, b);
   });
+  // Oldest first, as the app's Overdue list.
+  std::stable_sort(late.begin(), late.end(), [](JsonObjectConst a, JsonObjectConst b) {
+    const std::string aDate = str(a["date"]), bDate = str(b["date"]);
+    if (aDate != bDate) return aDate < bDate;
+    return beforeInDay(a, b);
+  });
 
   for (JsonObjectConst item : list) {
-    Task task;
-    task.id = str(item["id"]);
-    task.title = str(item["title"]);
-    task.focus = str(item["focus"]) == "must" ? "must" : "could";
-    task.time = str(item["start"]);
-    task.done = item["done"] | false;
-    task.urgent = str(item["priority"]) == "urgent";
-    task.repeat = str(item["repeat"]);
-    task.duration = item["duration"] | 0;
-    task.notes = str(item["notes"]);
-    if (task.notes.size() > 1500) {
-      size_t cut = 1500;
-      while (cut > 0 && (static_cast<unsigned char>(task.notes[cut]) & 0xC0) == 0x80) cut--;  // whole UTF-8 letters
-      task.notes = task.notes.substr(0, cut) + "…";
-    }
-    const std::string categoryId = str(item["category"]);
-    if (!categoryId.empty()) {
-      for (JsonObjectConst category : categories) {
-        if (str(category["id"]) != categoryId) continue;
-        task.category = str(category["name"]);
-        task.color = str(category["color"]);
-        break;
-      }
-    }
+    Task task = makeTask(item, categories);
     if (task.done) day.done++;
     day.tasks.push_back(task);
+  }
+  for (JsonObjectConst item : late) {
+    if (day.late.size() >= MAX_LATE) break;
+    day.late.push_back(makeTask(item, categories));
   }
 
   // The next thing on today's timeline that hasn't ended: a meeting or an

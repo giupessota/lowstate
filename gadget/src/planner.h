@@ -33,6 +33,7 @@ int64_t parseUtc(const char* text);
 struct Task {
   std::string id;
   std::string title;
+  std::string date;      // YYYY-MM-DD (shown for overdue tasks)
   std::string focus;     // "must" | "could"
   std::string time;      // "HH:MM" or ""
   std::string category;  // name, or ""
@@ -58,8 +59,11 @@ struct Day {
   std::vector<Task> tasks;  // Must do first, then Could do; open before done
   Next next;
   int done = 0;
-  int overdue = 0;  // open tasks from earlier days (the app's "Overdue" list)
+  int overdue = 0;          // open tasks from earlier days (the app's "Overdue" list)
+  std::vector<Task> late;   // those tasks, oldest first (at most MAX_LATE)
 };
+
+const size_t MAX_LATE = 12;
 
 // The status light behind the screen: red when something is overdue, amber
 // when an urgent task of today is still open, green when the day is on track.

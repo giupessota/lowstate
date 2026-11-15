@@ -68,6 +68,8 @@ static int overdue() {
                      "2026-11-13", 600, minutes);
   CHECK(day.overdue == 1);
   CHECK(lightFor(day) == Light::Red);
+  CHECK(day.late.size() == 1 && day.late[0].id == "o1" && day.late[0].date == "2026-11-10");
+  CHECK(day.tasks.size() == 1 && day.tasks[0].id == "t1");  // overdue ones aren't today's
   return 0;
 }
 

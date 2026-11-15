@@ -28,6 +28,7 @@ static const lv_color_t GOLD = lv_color_hex(0xCBAF75);
 static const lv_color_t CYAN = lv_color_hex(0x29B5CD);
 static const lv_color_t FADED = lv_color_hex(0x5C616B);
 static const lv_color_t GREEN = lv_color_hex(0x6FCF97);
+static const lv_color_t LATE = lv_color_hex(0xFF5C6C);  // overdue: the home tile's red
 
 static const int W = 320;
 static const int GRID_STEP = 16;
@@ -36,6 +37,7 @@ static ToggleHandler toggleHandler = nullptr;
 static lv_obj_t* root;
 static std::string statusLine;  // for the home tile, e.g. "2 ATRASADAS" or "2/5 FEITAS"
 static uint32_t tileTint = 0;   // the home tile's color, 0 until the first day
+static std::string shownDate;   // the day on screen (overdue tasks have earlier dates)
 static lv_obj_t* dateLabel;
 static lv_obj_t* countLabel;
 static lv_obj_t* progressBand;
@@ -245,6 +247,18 @@ static lv_obj_t* stamp(lv_obj_t* parent, const char* label, lv_color_t color, bo
 
 // One task: checkbox, the title on up to two lines, and under it the
 // stamps and the time.
+// "sex 13/11", for overdue tasks.
+static std::string shortDate(const std::string& iso) {
+  static const char* days[] = {"dom", "seg", "ter", "qua", "qui", "sex", "sáb"};
+  int y, m, d;
+  if (!planner::parseIso(iso, y, m, d)) return iso;
+  char out[16];
+  std::snprintf(out, sizeof out, "%s %02d/%02d", days[planner::weekday(iso)], d, m);
+  return out;
+}
+
+static bool isLate(const planner::Task& task) { return !task.date.empty() && task.date < shownDate; }
+
 static void addRow(const planner::Task& task, size_t index) {
   static const int ROW_W = W - 20;           // list padding
   static const int TITLE_W = ROW_W - 8 - 18 - 10;
@@ -266,7 +280,8 @@ static void addRow(const planner::Task& task, size_t index) {
   lv_obj_set_style_bg_opa(row, LV_OPA_10, LV_STATE_PRESSED);
   lv_obj_add_event_cb(row, rowClicked, LV_EVENT_CLICKED, reinterpret_cast<void*>(index));
 
-  const lv_color_t ink = task.focus == "must" ? CYAN : GOLD;
+  const bool late = isLate(task);
+  const lv_color_t ink = late ? LATE : task.focus == "must" ? CYAN : GOLD;
   lv_obj_t* box = plain(row);
   lv_obj_set_size(box, 18, 18);
   lv_obj_set_style_translate_y(box, 1, 0);
@@ -300,12 +315,13 @@ static void addRow(const planner::Task& task, size_t index) {
   if (task.done) lv_obj_set_style_text_decor(title, LV_TEXT_DECOR_STRIKETHROUGH, 0);
 
   const bool urgent = task.urgent && !task.done;
-  if (!urgent && task.category.empty() && task.time.empty()) return;
+  if (!late && !urgent && task.category.empty() && task.time.empty()) return;
   lv_obj_t* meta = plain(body);
   lv_obj_set_size(meta, lv_pct(100), LV_SIZE_CONTENT);
   lv_obj_set_flex_flow(meta, LV_FLEX_FLOW_ROW);
   lv_obj_set_flex_align(meta, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_column(meta, 6, 0);
+  if (late) text(meta, &dm_sans_bold_12, task.done ? FADED : LATE, shortDate(task.date).c_str());
   if (!task.time.empty()) {
     lv_obj_t* when = text(meta, &dm_sans_bold_12, task.done ? FADED : INK, task.time.c_str());
     lv_obj_set_style_text_opa(when, LV_OPA_70, 0);
@@ -369,7 +385,8 @@ static lv_obj_t* button(lv_obj_t* parent, lv_color_t fill, bool outlined) {
 static void openDetail(const planner::Task& task) {
   closeDetail();
   detailId = task.id;
-  const lv_color_t ink = task.focus == "must" ? CYAN : GOLD;
+  const bool late = isLate(task);
+  const lv_color_t ink = late ? LATE : task.focus == "must" ? CYAN : GOLD;
 
   detail = plain(root);
   lv_obj_set_size(detail, W, 240);
@@ -399,7 +416,7 @@ static void openDetail(const planner::Task& task) {
   text(back, &dm_sans_16, GOLD, "Voltar");
   lv_obj_add_event_cb(back, backClicked, LV_EVENT_CLICKED, nullptr);
 
-  lv_obj_t* group = text(detail, &dm_sans_bold_12, ink, task.focus == "must" ? "PRECISO FAZER" : "POSSO FAZER");
+  lv_obj_t* group = text(detail, &dm_sans_bold_12, ink, late ? ("ATRASADA · " + shortDate(task.date)).c_str() : task.focus == "must" ? "PRECISO FAZER" : "POSSO FAZER");
   lv_obj_set_style_text_letter_space(group, 1, 0);
   lv_obj_align(group, LV_ALIGN_TOP_RIGHT, -12, 14);
 
@@ -476,6 +493,7 @@ static void showNextCard(bool shown) {
 }
 
 void showDay(const planner::Day& day) {
+  shownDate = day.date;
   lv_label_set_text(dateLabel, longDate(day.date).c_str());
 
   const int total = static_cast<int>(day.tasks.size());
@@ -513,12 +531,29 @@ void showDay(const planner::Day& day) {
   const lv_coord_t scrolled = lv_obj_get_scroll_y(list);
   lv_obj_clean(list);
   rowTasks.clear();
-  if (day.tasks.empty()) {
+  if (day.tasks.empty() && day.late.empty()) {
     lv_obj_t* empty = text(list, &dm_sans_16, FADED, "Nada pra hoje :)");
     lv_obj_set_width(empty, lv_pct(100));
     lv_obj_set_style_text_align(empty, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_style_pad_top(empty, 40, 0);
     return;
+  }
+  // Overdue first, as in the app: what the home tile's red is about.
+  if (!day.late.empty()) {
+    addSection("ATRASADAS", day.overdue, LATE);
+    for (const planner::Task& task : day.late) {
+      rowTasks.push_back(task);
+      addRow(task, rowTasks.size() - 1);
+    }
+    if (day.overdue > static_cast<int>(day.late.size())) {
+      char more[48];
+      std::snprintf(more, sizeof more, "+ %d no app", day.overdue - static_cast<int>(day.late.size()));
+      lv_obj_set_style_pad_top(text(list, &dm_sans_bold_12, FADED, more), 6, 0);
+    }
+    if (day.tasks.empty()) {
+      lv_obj_t* none = text(list, &dm_sans_14, FADED, "Nada marcado pra hoje.");
+      lv_obj_set_style_pad_top(none, 12, 0);
+    }
   }
   int must = 0;
   for (const planner::Task& task : day.tasks) must += task.focus == "must";

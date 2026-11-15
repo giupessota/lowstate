@@ -339,6 +339,11 @@ static void onToggle(const std::string& id) {
     task.done = !task.done;
     shown.done += task.done ? 1 : -1;
   }
+  for (planner::Task& task : shown.late) {
+    if (task.id != id) continue;
+    task.done = !task.done;
+    shown.overdue += task.done ? -1 : 1;
+  }
   redrawShown = true;
   char text[65] = {0};
   strncpy(text, id.c_str(), sizeof text - 1);
