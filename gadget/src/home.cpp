@@ -7,6 +7,7 @@
 #include <string>
 
 #include "apps.h"
+#include "ota.h"
 #include "secrets.h"
 #include "weather.h"
 
@@ -37,7 +38,6 @@ static const int W = 320;
 static const int SLOTS = 4;  // tiles shown even when there are fewer tools
 static const int TILE_W = 145;
 static const int TILE_H = 70;
-static const int CUT = 10;  // the cut corner
 
 static lv_obj_t* root;
 static lv_obj_t* clock;
@@ -64,40 +64,6 @@ static void tileClicked(lv_event_t* event) {
   if (index < APP_COUNT) nav::open(APPS[index]);
 }
 
-// The tile's outline in its neon: four straight sides (plain fills, cheap)
-// and one short diagonal for the cut corner. A polyline with rounded joints
-// looked the same and took five times longer to draw.
-static void drawOutline(lv_event_t* event) {
-  lv_obj_t* tile = lv_event_get_target(event);
-  lv_draw_ctx_t* ctx = lv_event_get_draw_ctx(event);
-  const bool used = reinterpret_cast<uintptr_t>(lv_event_get_user_data(event)) != 0;
-  const lv_coord_t width = used ? 2 : 1;
-  lv_area_t box;
-  lv_obj_get_coords(tile, &box);
-
-  lv_draw_rect_dsc_t side;
-  lv_draw_rect_dsc_init(&side);
-  side.bg_color = lv_obj_get_style_bg_color(tile, 0);
-  side.bg_opa = used ? LV_OPA_COVER : LV_OPA_60;
-  const lv_area_t top = {box.x1, box.y1, box.x2, static_cast<lv_coord_t>(box.y1 + width - 1)};
-  const lv_area_t left = {box.x1, box.y1, static_cast<lv_coord_t>(box.x1 + width - 1), box.y2};
-  const lv_area_t bottom = {box.x1, static_cast<lv_coord_t>(box.y2 - width + 1), static_cast<lv_coord_t>(box.x2 - CUT), box.y2};
-  const lv_area_t right = {static_cast<lv_coord_t>(box.x2 - width + 1), box.y1, box.x2, static_cast<lv_coord_t>(box.y2 - CUT)};
-  lv_draw_rect(ctx, &side, &top);
-  lv_draw_rect(ctx, &side, &left);
-  lv_draw_rect(ctx, &side, &bottom);
-  lv_draw_rect(ctx, &side, &right);
-
-  lv_draw_line_dsc_t cut;
-  lv_draw_line_dsc_init(&cut);
-  cut.color = side.bg_color;
-  cut.opa = side.bg_opa;
-  cut.width = width;
-  const lv_point_t a = {static_cast<lv_coord_t>(box.x2 - CUT), static_cast<lv_coord_t>(box.y2 - width / 2)};
-  const lv_point_t b = {static_cast<lv_coord_t>(box.x2 - width / 2), static_cast<lv_coord_t>(box.y2 - CUT)};
-  lv_draw_line(ctx, &cut, &a, &b);
-}
-
 static void addTile(lv_obj_t* grid, int slot) {
   const bool used = slot < static_cast<int>(APP_COUNT);
   const App* app = used ? &APPS[slot] : nullptr;
@@ -107,10 +73,11 @@ static void addTile(lv_obj_t* grid, int slot) {
   lv_obj_remove_style_all(tile);
   lv_obj_clear_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(tile, TILE_W, TILE_H);
-  lv_obj_set_style_bg_color(tile, color, 0);  // also the outline's color
-
-  // The neon outline with its cut corner (drawOutline).
-  lv_obj_add_event_cb(tile, drawOutline, LV_EVENT_DRAW_MAIN_END, reinterpret_cast<void*>(static_cast<uintptr_t>(used)));
+  lv_obj_set_style_bg_color(tile, color, 0);
+  lv_obj_set_style_radius(tile, 12, 0);
+  lv_obj_set_style_border_width(tile, used ? 2 : 1, 0);
+  lv_obj_set_style_border_color(tile, color, 0);
+  lv_obj_set_style_border_opa(tile, used ? LV_OPA_COVER : LV_OPA_60, 0);
 
   if (!used) {
     // A free slot: quiet, so the screen reads as room to grow.
@@ -129,12 +96,25 @@ static void addTile(lv_obj_t* grid, int slot) {
   lv_obj_add_flag(tile, LV_OBJ_FLAG_CLICKABLE);
   lv_obj_add_event_cb(tile, tileClicked, LV_EVENT_CLICKED, reinterpret_cast<void*>(static_cast<size_t>(slot)));
 
-  lv_obj_t* icon = text(tile, &lv_font_montserrat_20, color, app->symbol);
-  lv_obj_set_pos(icon, 12, 14);
+  if (app->icon) {
+    lv_obj_t* icon = lv_img_create(tile);
+    lv_img_set_src(icon, app->icon);
+    // Compensate for the sprite's transparent top padding when centering.
+    lv_obj_align(icon, LV_ALIGN_RIGHT_MID, -8, -6);
+    lv_obj_clear_flag(icon, LV_OBJ_FLAG_CLICKABLE);
+  } else {
+    lv_obj_t* icon = text(tile, &lv_font_montserrat_20, color, app->symbol);
+    lv_obj_set_pos(icon, 12, 14);
+  }
   lv_obj_t* name = text(tile, &dm_sans_bold_18, WHITE, app->name);
   lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-  lv_obj_set_width(name, TILE_W - 40 - 8);
-  lv_obj_set_pos(name, 40, 13);
+  lv_obj_set_width(name, app->icon ? 80 : TILE_W - 40 - 8);
+  if (app->icon) {
+    lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(name, LV_ALIGN_LEFT_MID, 8, 0);
+  } else {
+    lv_obj_set_pos(name, 40, 13);
+  }
 
   lv_obj_t* status = text(tile, &dm_sans_bold_12, color, "");
   lv_obj_set_style_text_letter_space(status, 1, 0);
@@ -144,13 +124,14 @@ static void addTile(lv_obj_t* grid, int slot) {
 
   if (app->progress) {
     lv_obj_t* bar = lv_bar_create(tile);
-    // Along the bottom, stopping before the cut corner.
-    lv_obj_set_size(bar, TILE_W - 24 - CUT, 3);
+    // Inset from the rounded corners.
+    lv_obj_set_size(bar, TILE_W - 24, 3);
     lv_obj_set_pos(bar, 12, TILE_H - 10);
     lv_bar_set_range(bar, 0, 100);
     lv_obj_set_style_bg_color(bar, color, LV_PART_MAIN);
     lv_obj_set_style_bg_opa(bar, LV_OPA_20, LV_PART_MAIN);
     lv_obj_set_style_bg_color(bar, color, LV_PART_INDICATOR);
+    lv_obj_set_style_bg_opa(bar, LV_OPA_COVER, LV_PART_INDICATOR);  // no default theme
     lv_obj_set_style_radius(bar, 2, LV_PART_MAIN);
     lv_obj_set_style_radius(bar, 2, LV_PART_INDICATOR);
     if (slot < 16) progressBars[slot] = bar;
@@ -227,7 +208,10 @@ void begin() {
   lv_obj_set_style_bg_opa(root, LV_OPA_COVER, 0);
 
   clock = text(root, &dm_sans_bold_56, CYAN, "--:--");
-  lv_obj_set_pos(clock, 10, 0);
+  lv_obj_set_pos(clock, 10, 6);
+  // Holding the clock turns on update mode (firmware over Wi-Fi, ota.h).
+  lv_obj_add_flag(clock, LV_OBJ_FLAG_CLICKABLE);
+  lv_obj_add_event_cb(clock, [](lv_event_t*) { ota::enable(); }, LV_EVENT_LONG_PRESSED, nullptr);
 
   dateLabel = text(root, &dm_sans_bold_12, WHITE, "");
   lv_obj_set_style_text_letter_space(dateLabel, 2, 0);

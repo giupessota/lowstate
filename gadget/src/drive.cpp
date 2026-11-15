@@ -4,7 +4,7 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 
-#include "tls_roots.h"
+#include "tls_providers.h"
 #include "planner.h"
 #include "secrets.h"
 
@@ -115,7 +115,7 @@ class PatientStream : public Stream {
 static int request(const char* method, const String& url, const String& payload, const char* contentType,
                    String* body, JsonDocument* json = nullptr, JsonDocument* filter = nullptr) {
   WiFiClientSecure client;
-  client.setCACert(TLS_ROOTS);
+  client.setCACert(GOOGLE_TLS_ROOTS);
   HTTPClient http;
   http.setTimeout(15000);
   http.useHTTP10(true);  // no chunked answers, so JSON can be read as it arrives
@@ -320,7 +320,7 @@ static int streamUpload(const String& path, const std::function<void(Print&)>& w
   CountingPrint counter;
   writeBody(counter);
   WiFiClientSecure client;
-  client.setCACert(TLS_ROOTS);
+  client.setCACert(GOOGLE_TLS_ROOTS);
   client.setTimeout(15000);  // milliseconds (Arduino-ESP32 3.x)
   if (!client.connect("www.googleapis.com", 443)) {
     char tls[96] = "";

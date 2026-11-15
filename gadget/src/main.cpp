@@ -20,6 +20,9 @@
 #include <time.h>
 
 #include "apps.h"
+#include "ota.h"
+#include "byteco.h"
+#include "apartment.h"
 #include "drive.h"
 #include "planner.h"
 #include "secrets.h"
@@ -288,6 +291,9 @@ static void driveTask(void*) {
   unsigned long wait = 0;
   bool first = true;
   for (;;) {
+    // Update mode needs the heap the TLS connections would take.
+    if (ota::active()) { vTaskDelay(pdMS_TO_TICKS(200)); continue; }
+    byteco::process();
     if (WiFi.status() != WL_CONNECTED) {
       setLink(lowstate::Link::Offline);
       if (first) setMessage("Procurando o Wi-Fi...", WIFI_SSID);
@@ -371,6 +377,7 @@ void setup() {
 
   lock = xSemaphoreCreateMutex();
   toggles = xQueueCreate(8, 65);
+  byteco::begin();
   lowstate::begin(onToggle);
   home::begin();
   lv_scr_load(home::screen());
@@ -388,6 +395,7 @@ void setup() {
 // each piece sent as LVGL drew it; gadget/tools/screenshot.py), h = home,
 // 1..9 = open that tool, t = open the first task's card, b = close it,
 // k = tick the last task on the list (as its card's button would),
+// m = ask Byteco for motivation, u = turn on update mode (Wi-Fi OTA),
 // r = time a full redraw of the screen.
 static void screenshot() {
   // The whole screen is drawn again, and flush() sends every piece.
@@ -405,6 +413,8 @@ static void serialCommands() {
     if (c == 's') screenshot();
     else if (c == 'h') nav::home();
     else if (c >= '1' && c <= '9' && static_cast<size_t>(c - '1') < APP_COUNT) nav::open(APPS[c - '1']);
+    else if (c == 'm') apartment::motivate();
+    else if (c == 'u') ota::enable();
     else if (c == 't') lowstate::openTask(0);
     else if (c == 'b') lowstate::closeTask();
     else if (c == 'k' && !shown.tasks.empty()) onToggle(shown.tasks.back().id);  // tick the last task
@@ -423,6 +433,7 @@ static void serialCommands() {
 }
 
 void loop() {
+  ota::poll();
   serialCommands();
   xSemaphoreTake(lock, portMAX_DELAY);
   const bool dayChanged = shared.dayChanged;

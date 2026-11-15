@@ -134,6 +134,7 @@ void begin(ToggleHandler onToggle) {
   lv_obj_set_style_bg_color(progressBand, RULE, LV_PART_MAIN);
   lv_obj_set_style_bg_opa(progressBand, LV_OPA_COVER, LV_PART_MAIN);
   lv_obj_set_style_bg_color(progressBand, GOLD, LV_PART_INDICATOR);
+  lv_obj_set_style_bg_opa(progressBand, LV_OPA_COVER, LV_PART_INDICATOR);  // no default theme
 
   // Back to the home screen.
   lv_obj_t* homeButton = plain(screen);

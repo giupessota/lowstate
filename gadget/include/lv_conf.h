@@ -33,7 +33,7 @@
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_DEFAULT &lv_font_montserrat_14
 
-#define LV_USE_THEME_DEFAULT 1
+#define LV_USE_THEME_DEFAULT 0
 #define LV_THEME_DEFAULT_DARK 0
 #define LV_THEME_DEFAULT_GROW 0
 

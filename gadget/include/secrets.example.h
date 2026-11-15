@@ -17,3 +17,8 @@
 #define GADGET_PLACE "PAULÍNIA"
 #define GADGET_LAT -22.76111
 #define GADGET_LON -47.15417
+
+// Optional local Byteco bridge (OpenAI API key stays on the Mac).
+// Filled by node scripts/byteco-setup.cjs [Mac LAN IP].
+#define BYTECO_SERVER_URL "http://192.168.1.100:8787"
+#define BYTECO_DEVICE_TOKEN "random-device-token-from-setup"

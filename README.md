@@ -136,6 +136,70 @@ switches to the week or the month when you want the bigger picture.
   `gadget/tools/screenshot.py` takes a screenshot over USB
 - The screen opens on a home page (clock, weather from Open-Meteo, a tile per
   tool); Lowstate is the first tool, and `gadget/src/apps.cpp` lists them
+- **Byteco companion:** open BYTECO (the second home tile, after LOWSTATE).
+  A large version of the reference character sits next to three touch options:
+  **Me motiva** (acidic, sarcastic encouragement), **Tá difícil** (support with dry wit), and
+  **Me distrai** (an absurd, sarcastic question). A speech bubble replaces the menu;
+  **Mais uma** repeats the selected mode and **Opções** returns to the menu.
+  Loading shows an animated progress strip and a warm-colored status chip;
+  **Opções** stays active while a response is loading. The ten-second cooldown
+  is visible on the repeat button. **Menu** goes home.
+- **Standalone OpenAI:** the ESP32 calls `https://api.openai.com/v1/responses`
+  directly over certificate-verified HTTPS. After setup it needs only Wi-Fi
+  and power; the Mac and `npm run byteco` are no longer required. Requests
+  run in the existing network worker, avoiding simultaneous TLS connections
+  with Drive. The response is streamed with a JSON filter instead of buffered.
+  The three modes share the bridge's prompt source; after editing it, run
+  `node scripts/byteco-prompts.cjs` and re-upload the firmware.
+- **Direct API setup:** after explicitly confirming that the existing API key
+  may be embedded in this personal device, run
+  `node scripts/byteco-direct-setup.cjs`. It reads `OPENAI_API_KEY` from the
+  ignored `.env.local` and writes only to ignored
+  `gadget/include/byteco_secrets.h` (mode 600), without printing the key.
+  `OPENAI_MODEL` can override the default `gpt-4.1-mini`. Then run
+  `pio run -d gadget -t upload`. The firmware binary contains the credential;
+  do not share that binary or the private header. This is a personal-device
+  configuration, not a distribution mechanism for a shared service key.
+  Only the selected fixed prompt is sent; no agenda/task content or history.
+  `store: false`, 100 output tokens, one request per ten seconds, no background
+  requests or automatic retries. API usage belongs to the selected project.
+  On errors the screen identifies the mode-specific local fallback.
+  USB command `m` requests motivation; serial logs `Byteco direct: HTTP ...`
+  and `phrase ready` verify the direct route without printing credentials.
+  `bash gadget/test/byteco-run.sh` validates parsing and request behavior
+  offline. The optional old LAN bridge (`npm run byteco`) is retained for
+  development; the firmware no longer connects to it.
+- **Wi-Fi firmware updates (OTA):** run
+  `node scripts/byteco-ota-setup.cjs` once, then bootstrap over USB with
+  `pio run -d gadget -t upload`. This first upload also migrates the flash
+  partition table to two equal 0x1F0000-byte app slots, preserving NVS.
+  After that, **hold the home screen's clock for 2 s** to turn on update mode
+  (or send `u` over USB), then run `npm run gadget:update` on the same
+  trusted Wi-Fi, or `npm run gadget:update -- 192.168.x.x` if `byteco.local`
+  is unavailable. Update mode shows the address and turns itself off after
+  five minutes or when tapped; Drive and Byteco pause meanwhile. The OTA
+  listener and mDNS take ~12 KB of heap, which the TLS connections to Google
+  need, so they never run all the time.
+  The script builds, checks the binary size, and authenticates without printing
+  the password. It updates the inactive slot and reboots only after completion.
+  Do not unplug power during an update. The screen displays progress.
+  OTA uses ArduinoOTA authentication on the local network; firmware transport
+  is not encrypted, so use only a trusted LAN and never expose the port online.
+  The password stays in ignored `.env.local`; only its SHA-256 hash goes in
+  ignored `gadget/include/ota_secrets.h`. Retain the same password for future
+  builds. Changing flash partitions still requires USB. The binary contains
+  device credentials and must not be shared.
+- To fit both OTA slots, firmware uses an indexed
+  RGBA portrait and disables the unused LVGL default theme. Widgets have
+  explicit styles. The standard ESP32 C library and original fonts are retained.
+  Each HTTPS provider loads only its required CA roots to keep TLS within the
+  heap budget alongside OTA/mDNS; regenerate these public selections with
+  `python3 gadget/tools/select_tls_roots.py` after refreshing the source roots.
+  Certificate and hostname verification always remain enabled.
+- Byteco's appearance comes from the supplied character reference, adapted
+  with the built-in image tool into `gadget/assets/byteco.png`. The 48×64
+  version is stored in flash as RGB565 + alpha; regenerate it with
+  `uv run --with pillow python gadget/tools/convert_byteco.py`.
 - Its text is DM Sans (SIL Open Font License), converted with lv_font_conv
 
 **Everything else**

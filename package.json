@@ -7,6 +7,8 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
+    "byteco": "node scripts/byteco-server.cjs",
+    "gadget:update": "node scripts/byteco-ota.cjs",
     "test": "node --test",
     "check": "node --check app.js && node --check core.js && node --check planner.js && node --check storage.js && node --check desktop-storage.cjs && node --check desktop-lifecycle.cjs && node --check desktop-calendars.cjs && node --check desktop-sync.cjs && node --check desktop-google.cjs && node --check i18n.js && node --check main.cjs && node --check preload.cjs && node --test",
     "dist:mac": "electron-builder --mac --publish=never",

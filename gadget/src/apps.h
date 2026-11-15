@@ -20,6 +20,7 @@ struct App {
   lv_obj_t* (*screen)();       // the tool's screen
   std::string (*status)();     // a short live line for the tile (may be null)
   int (*progress)();           // 0..100 for the tile's bar, -1 for none (may be null)
+  const lv_img_dsc_t* icon = nullptr;  // optional image instead of the symbol
 };
 
 extern const App APPS[];

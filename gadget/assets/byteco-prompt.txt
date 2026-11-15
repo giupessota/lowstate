@@ -1,0 +1,5 @@
+Tool: built-in image_gen
+Mode: edit, transparent_background=true
+Reference: user-supplied Byteco photo
+
+Use case: identity-preserve. Input image is the EXACT character reference. Create a single full-body transparent cutout game sprite of this same Byteco robot, front facing, identical oversized rounded square warm ivory beige head, dark desaturated teal ear discs, same half closed tired black eyes and weary arched eyebrows, tiny downturned mouth, beige stocky body and dark teal shoulder joints boots and fingers, holding the same tan takeaway coffee cup with dark teal lid in his right hand (viewer left). Preserve the original character identity and proportions, materials and 3D toy look, no antenna, no glowing visor. Simplify tiny surface texture just enough for display at 60 pixels high. Full body centered with minimal transparent padding. No floor, no shadow outside character, no background, no text, no extra objects or characters. Real transparent alpha background.

@@ -8,7 +8,7 @@
 #include <cmath>
 
 #include "secrets.h"
-#include "tls_roots.h"
+#include "tls_providers.h"
 
 #ifndef GADGET_LAT
 #define GADGET_LAT 0
@@ -30,7 +30,7 @@ bool fetch() {
            static_cast<double>(GADGET_LAT), static_cast<double>(GADGET_LON));
 
   WiFiClientSecure client;
-  client.setCACert(TLS_ROOTS);
+  client.setCACert(WEATHER_TLS_ROOTS);
   HTTPClient http;
   http.setTimeout(10000);
   http.useHTTP10(true);
