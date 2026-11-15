@@ -3,3 +3,10 @@ dist/
 *.log
 .DS_Store
 google-client.json
+gadget/.pio/
+gadget/include/secrets.h
+
+# Local OpenAI credentials and device authentication
+.env.local
+gadget/include/byteco_secrets.h
+gadget/include/ota_secrets.h

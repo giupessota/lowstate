@@ -79,7 +79,11 @@ function fakeGoogle({ refreshToken = "refresh-1" } = {}) {
     if (!/^Bearer access-\d+$/.test(options.headers?.Authorization || "")) return json(401, { error: "unauthorized" });
     if (url.pathname === "/drive/v3/files" && method === "GET") {
       assert.equal(url.searchParams.get("spaces"), "appDataFolder");
-      return json(200, { files: [...files.entries()].map(([id, file]) => ({ id, name: file.name })) });
+      const q = url.searchParams.get("q") || "";
+      const exact = /name = '([^']*)'/.exec(q);
+      const part = /name contains '([^']*)'/.exec(q);
+      const matches = (name) => (exact ? name === exact[1] : part ? name.includes(part[1]) : true);
+      return json(200, { files: [...files.entries()].filter(([, file]) => matches(file.name)).map(([id, file]) => ({ id, name: file.name })) });
     }
     if (url.pathname === "/drive/v3/about") return json(200, { user: { emailAddress: "giu@gmail.com" } });
     const download = url.pathname.match(/^\/drive\/v3\/files\/([^/]+)$/);
@@ -216,4 +220,18 @@ test("a request that never answers gives up, and a stuck exchange doesn't block 
   assert.deepEqual(second, { incoming: {} });
   assert.equal(sync.info().state, "idle");
   assert.equal(calls, 2);
+});
+
+test("the desk screen's agenda is written once, then replaced, and never read as a computer", async () => {
+  const google = fakeGoogle();
+  const transport = driveTransport({ drive: createDriveClient({ fetch: google.fetch, auth: createGoogleAuth({ fetch: google.fetch, client: CLIENT, refreshToken: "refresh-1" }) }) });
+  await transport.writeShared("lowstate-agenda.json", "{\"events\":[]}");
+  await transport.writeShared("lowstate-agenda.json", "{\"events\":[1]}");
+  assert.equal(google.files.size, 1);
+  assert.equal([...google.files.values()][0].content, "{\"events\":[1]}");
+  // A fresh transport (app restarted) finds the same file instead of adding one.
+  const again = driveTransport({ drive: createDriveClient({ fetch: google.fetch, auth: createGoogleAuth({ fetch: google.fetch, client: CLIENT, refreshToken: "refresh-1" }) }) });
+  await again.writeShared("lowstate-agenda.json", "{\"events\":[2]}");
+  assert.equal(google.files.size, 1);
+  assert.deepEqual(await again.readOthers("mac"), []);
 });
