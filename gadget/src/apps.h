@@ -21,6 +21,7 @@ struct App {
   std::string (*status)();     // a short live line for the tile (may be null)
   int (*progress)();           // 0..100 for the tile's bar, -1 for none (may be null)
   const lv_img_dsc_t* icon = nullptr;  // optional image instead of the symbol
+  uint32_t (*tint)() = nullptr;        // the tile's color right now, 0 for `color` (may be null)
 };
 
 extern const App APPS[];

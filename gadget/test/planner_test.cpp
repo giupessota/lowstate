@@ -53,6 +53,24 @@ static const char* AGENDA = R"({"events":[
   {"title":"Feriado","start":"2026-11-13","end":"2026-11-14","allDay":true}
 ]})";
 
+// Overdue: open tasks dated before today, whatever their group; done ones
+// and undated ones don't count, as in the app's Overdue list.
+static int overdue() {
+  JsonDocument items, none;
+  deserializeJson(items, R"([
+    {"id":"o1","title":"Old","date":"2026-11-10","focus":"later","done":false},
+    {"id":"o2","title":"Old done","date":"2026-11-11","focus":"must","done":true},
+    {"id":"o3","title":"Loose","date":null,"done":false},
+    {"id":"t1","title":"Today","date":"2026-11-13","focus":"could","done":false}
+  ])");
+  MinutesOfDay minutes = [](int64_t) { return 0; };
+  Day day = buildDay(items.as<JsonArrayConst>(), none.as<JsonArrayConst>(), none.as<JsonArrayConst>(),
+                     "2026-11-13", 600, minutes);
+  CHECK(day.overdue == 1);
+  CHECK(lightFor(day) == Light::Red);
+  return 0;
+}
+
 static int day() {
   JsonDocument items, categories, agenda;
   deserializeJson(items, ITEMS);
@@ -81,6 +99,13 @@ static int day() {
                          "2026-11-13", 16 * 60, minutes);
   CHECK(evening.next.has && !evening.next.meeting && !evening.next.now);
   CHECK(evening.next.title == "Gym" && evening.next.start == "18:00" && evening.next.end == "19:00");
+
+  // Light: an urgent task open today → amber; nothing overdue yet.
+  CHECK(at1430.overdue == 0);
+  CHECK(lightFor(at1430) == Light::Amber);
+  Day ticked = at1430;
+  ticked.tasks[0].done = true;  // the urgent one
+  CHECK(lightFor(ticked) == Light::Green);
 
   Day night = buildDay(items.as<JsonArrayConst>(), categories.as<JsonArrayConst>(), agenda["events"].as<JsonArrayConst>(),
                        "2026-11-13", 20 * 60, minutes);
@@ -118,7 +143,7 @@ static int ticking() {
 }
 
 int main() {
-  if (dates() || day() || ticking()) return 1;
+  if (dates() || day() || overdue() || ticking()) return 1;
   std::printf("planner: %d checks passed\n", checks);
   return 0;
 }

@@ -34,7 +34,8 @@ static const int GRID_STEP = 16;
 
 static ToggleHandler toggleHandler = nullptr;
 static lv_obj_t* root;
-static std::string statusLine;  // for the home tile, e.g. "2/5 FEITAS"
+static std::string statusLine;  // for the home tile, e.g. "2 ATRASADAS" or "2/5 FEITAS"
+static uint32_t tileTint = 0;   // the home tile's color, 0 until the first day
 static lv_obj_t* dateLabel;
 static lv_obj_t* countLabel;
 static lv_obj_t* progressBand;
@@ -478,10 +479,17 @@ void showDay(const planner::Day& day) {
   lv_label_set_text(dateLabel, longDate(day.date).c_str());
 
   const int total = static_cast<int>(day.tasks.size());
+  // The home tile: its color says how the day is, its line says why.
   char line[32];
-  if (total) std::snprintf(line, sizeof line, "%d/%d FEITAS", day.done, total);
+  const planner::Light light = planner::lightFor(day);
+  int urgent = 0;
+  for (const planner::Task& task : day.tasks) urgent += task.urgent && !task.done;
+  if (light == planner::Light::Red) std::snprintf(line, sizeof line, day.overdue == 1 ? "1 ATRASADA" : "%d ATRASADAS", day.overdue);
+  else if (light == planner::Light::Amber) std::snprintf(line, sizeof line, urgent == 1 ? "1 URGENTE" : "%d URGENTES", urgent);
+  else if (total) std::snprintf(line, sizeof line, "%d/%d FEITAS", day.done, total);
   else std::snprintf(line, sizeof line, "DIA LIVRE");
   statusLine = line;
+  tileTint = light == planner::Light::Red ? 0xFF5C6C : light == planner::Light::Amber ? 0xFFB347 : 0x4BF2A0;
   char count[16];
   std::snprintf(count, sizeof count, "%d/%d", day.done, total);
   lv_label_set_text(countLabel, total ? count : "");
@@ -564,5 +572,7 @@ void closeTask() { closeDetail(); }
 std::string status() { return statusLine; }
 
 int progress() { return progressValue; }
+
+uint32_t tint() { return tileTint; }
 
 }  // namespace lowstate

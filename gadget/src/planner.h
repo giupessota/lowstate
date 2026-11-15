@@ -58,7 +58,13 @@ struct Day {
   std::vector<Task> tasks;  // Must do first, then Could do; open before done
   Next next;
   int done = 0;
+  int overdue = 0;  // open tasks from earlier days (the app's "Overdue" list)
 };
+
+// The status light behind the screen: red when something is overdue, amber
+// when an urgent task of today is still open, green when the day is on track.
+enum class Light { Green, Amber, Red };
+Light lightFor(const Day& day);
 
 // Minutes from today's local midnight for a UTC instant (negative before
 // today, over 1440 after it).

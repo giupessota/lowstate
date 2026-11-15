@@ -14,6 +14,7 @@
 #include <lvgl.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 
 #include "planner.h"
@@ -34,6 +35,8 @@ void showLink(Link link);
 lv_obj_t* screen();
 std::string status();
 int progress();  // 0..100, -1 when the day has no tasks
+// The tile's color for the day (planner::lightFor), 0 before the first day.
+uint32_t tint();
 
 // Development (serial commands in main.cpp): open/close a task's card.
 void openTask(size_t index);

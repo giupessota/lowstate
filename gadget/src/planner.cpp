@@ -143,7 +143,10 @@ Day buildDay(JsonArrayConst items, JsonArrayConst categories, JsonArrayConst age
 
   std::vector<JsonObjectConst> list;
   for (JsonObjectConst item : items) {
-    if (str(item["date"]) != today || str(item["title"]).empty()) continue;
+    // planner.js overdueItems: a date before today and not done.
+    const std::string date = str(item["date"]);
+    if (!date.empty() && date < today && !(item["done"] | false)) day.overdue++;
+    if (date != today || str(item["title"]).empty()) continue;
     const std::string focus = str(item["focus"]);
     if (focus == "later") continue;
     list.push_back(item);
@@ -219,6 +222,14 @@ Day buildDay(JsonArrayConst items, JsonArrayConst categories, JsonArrayConst age
     day.next.now = first.start <= nowMinutes;
   }
   return day;
+}
+
+Light lightFor(const Day& day) {
+  if (day.overdue > 0) return Light::Red;
+  for (const Task& task : day.tasks) {
+    if (task.urgent && !task.done) return Light::Amber;
+  }
+  return Light::Green;
 }
 
 // ---------- ticking ----------

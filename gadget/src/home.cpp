@@ -49,6 +49,9 @@ static lv_obj_t* skyLabel;
 static lv_obj_t* placeLabel;
 static lv_obj_t* statusLabels[16];
 static lv_obj_t* progressBars[16];
+static lv_obj_t* tiles[16];
+static lv_obj_t* symbols[16];  // a tile's symbol icon, when it has one
+static uint32_t painted[16];   // the color each tile has now
 
 static lv_obj_t* text(lv_obj_t* parent, const lv_font_t* font, lv_color_t color, const char* value) {
   lv_obj_t* label = lv_label_create(parent);
@@ -70,6 +73,7 @@ static void addTile(lv_obj_t* grid, int slot) {
   const lv_color_t color = used ? lv_color_hex(app->color) : DIM;
 
   lv_obj_t* tile = lv_obj_create(grid);
+  if (slot < 16) { tiles[slot] = tile; painted[slot] = used ? app->color : 0; }
   lv_obj_remove_style_all(tile);
   lv_obj_clear_flag(tile, LV_OBJ_FLAG_SCROLLABLE);
   lv_obj_set_size(tile, TILE_W, TILE_H);
@@ -105,6 +109,7 @@ static void addTile(lv_obj_t* grid, int slot) {
   } else {
     lv_obj_t* icon = text(tile, &lv_font_montserrat_20, color, app->symbol);
     lv_obj_set_pos(icon, 12, 14);
+    if (slot < 16) symbols[slot] = icon;
   }
   lv_obj_t* name = text(tile, &dm_sans_bold_18, WHITE, app->name);
   lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
@@ -135,6 +140,22 @@ static void addTile(lv_obj_t* grid, int slot) {
     lv_obj_set_style_radius(bar, 2, LV_PART_MAIN);
     lv_obj_set_style_radius(bar, 2, LV_PART_INDICATOR);
     if (slot < 16) progressBars[slot] = bar;
+  }
+}
+
+// A tool can recolor its tile (Lowstate: green, amber or red for the day).
+static void paint(size_t slot, uint32_t hex) {
+  if (slot >= 16 || !tiles[slot] || painted[slot] == hex) return;
+  painted[slot] = hex;
+  const lv_color_t color = lv_color_hex(hex);
+  lv_obj_set_style_bg_color(tiles[slot], color, 0);
+  lv_obj_set_style_border_color(tiles[slot], color, 0);
+  lv_obj_set_style_shadow_color(tiles[slot], color, 0);
+  if (symbols[slot]) lv_obj_set_style_text_color(symbols[slot], color, 0);
+  if (statusLabels[slot]) lv_obj_set_style_text_color(statusLabels[slot], color, 0);
+  if (progressBars[slot]) {
+    lv_obj_set_style_bg_color(progressBars[slot], color, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(progressBars[slot], color, LV_PART_INDICATOR);
   }
 }
 
@@ -187,6 +208,10 @@ static void tick(lv_timer_t*) {
   lv_obj_align_to(placeLabel, dateLabel, LV_ALIGN_OUT_RIGHT_MID, 0, 0);
 
   for (size_t i = 0; i < APP_COUNT && i < 16; i++) {
+    if (APPS[i].tint) {
+      const uint32_t hex = APPS[i].tint();
+      paint(i, hex ? hex : APPS[i].color);
+    }
     if (APPS[i].status && statusLabels[i]) setIfChanged(statusLabels[i], APPS[i].status().c_str());
     if (APPS[i].progress && progressBars[i]) {
       const int value = APPS[i].progress();
